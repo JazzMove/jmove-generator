@@ -32,7 +32,7 @@ Presets build on top of one (or more) base styles:
 
 ```bash
 # Clone the repo
-git clone https://github.com/jmove/generator.git
+git clone https://github.com/JazzMove/jmove-generator.git
 cd generator
 
 # Install dependencies (Node.js 20+ required)

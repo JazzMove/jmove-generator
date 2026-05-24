@@ -4,7 +4,7 @@ Jazz backing track generator — walking bass lines, piano comping, drum pattern
 
 Zero dependencies. TypeScript. ESM + CJS.
 
-[![CI](https://github.com/jazzmove/jmove-generator/actions/workflows/ci.yml/badge.svg)](https://github.com/jazzmove/jmove-generator/actions/workflows/ci.yml)
+[![CI](https://github.com/JazzMove/jmove-generator/actions/workflows/ci.yml/badge.svg)](https://github.com/JazzMove/jmove-generator/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@jmove/generator)](https://www.npmjs.com/package/@jmove/generator)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 

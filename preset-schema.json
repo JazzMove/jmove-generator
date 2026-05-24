@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/jmove/generator/preset-schema.json",
+  "$id": "https://github.com/JazzMove/jmove-generator/preset-schema.json",
   "title": "JMove Generator Style Preset",
   "description": "Schema for community-contributed style presets for @jmove/generator",
   "type": "object",
