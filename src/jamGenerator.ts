@@ -995,7 +995,7 @@ function buildLabel(form: JamForm, key: JamKey): string {
 const ENRICH_MAJ: string[] = ["maj9", "69", "maj7#11", "maj7#5"];
 const ENRICH_MIN: string[] = ["m9", "m11", "m6", "m(maj7)"];
 const ENRICH_DOM: string[] = ["9", "13", "7#11", "7#5", "7b5"];
-const ENRICH_ALT: string[] = ["7alt", "7b9b13", "7#9b13", "7b9#11", "7#9#11"];
+const _ENRICH_ALT: string[] = ["7alt", "7b9b13", "7#9b13", "7b9#11", "7#9#11"];
 const ENRICH_SUS: string[] = ["9sus4", "13sus4"];
 
 /** Styles that favor simpler harmony — lower enrichment probability. */

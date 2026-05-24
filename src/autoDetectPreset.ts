@@ -6,7 +6,7 @@
  * Returns the highest-scoring preset as the recommended default.
  */
 
-import type { QuantizedScore, MeasureChord, PracticeStyle, StylePreset } from "./types";
+import type { QuantizedScore, MeasureChord, StylePreset } from "./types";
 import { STYLE_PRESETS } from "./stylePresets";
 import { irealStyleToPracticeStyle } from "./styleMapping";
 

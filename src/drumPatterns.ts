@@ -1490,7 +1490,7 @@ const JAZZ_FILLS: Pattern[] = [
 ];
 
 // Small fills: beat 4 only (before 4-bar phrases)
-const JAZZ_FILLS_SMALL: Pattern[] = [
+const _JAZZ_FILLS_SMALL: Pattern[] = [
   [
     { drum: GM_DRUMS.KICK, beat: 3, velocity: 80 },
     { drum: GM_DRUMS.SNARE, beat: 3.5, velocity: 90 },
@@ -1748,7 +1748,7 @@ const HOLDSWORTH_STOCHASTIC: StochasticTable = {
 // Alfa Mist / Jas Kayser: broken-beat displacement, flam accents, Afrobeat-jazz hybrid.
 // Kick drags (+10ms), snare pushes (-6ms). Sextuplet ghost cascades.
 // NOT straight hip-hop — jazz vocabulary with Dilla pocket + West African polyrhythm.
-const ALFA_MIST_STOCHASTIC: StochasticTable = {
+const _ALFA_MIST_STOCHASTIC: StochasticTable = {
   slots: {
     "0":    [{ drum: GM_DRUMS.KICK, probability: 0.80, velocity: 85 }],
     "0.5":  [{ drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 30, ghost: true }],

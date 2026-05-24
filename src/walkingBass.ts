@@ -21,7 +21,7 @@ export type { BassNote, WalkingBassOptions, ChordEvent };
 
 const BASS_LOW = 28;  // E1
 const BASS_HIGH = 55; // G3
-const BASS_MID = 40;  // E2 — preferred center
+const _BASS_MID = 40;  // E2 — preferred center
 
 const ROOT_SEMITONES: Record<string, number> = {
   C: 0, "C#": 1, Db: 1, D: 2, "D#": 3, Eb: 3,
@@ -1028,7 +1028,7 @@ function generateHoldsworthMeasure(
 ): BassNote[] {
   const rootMidi = rootToMidi(chord.root);
   const chordTones = getChordTones(chord.root, chord.quality);
-  const scaleTones = getScaleTones(chord.root, chord.quality);
+  const _scaleTones = getScaleTones(chord.root, chord.quality);
   const startPitch = prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi;
 
   const third = chordTones.length > 1
@@ -1212,7 +1212,7 @@ function generateMethenyMeasure(
 ): BassNote[] {
   const rootMidi = rootToMidi(chord.root);
   const chordTones = getChordTones(chord.root, chord.quality);
-  const scaleTones = getScaleTones(chord.root, chord.quality);
+  const _scaleTones = getScaleTones(chord.root, chord.quality);
   const startPitch = prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi;
   const fifth = chordTones.length > 2
     ? clamp(startPitch + (chordTones[2] - chordTones[0]))
@@ -1548,7 +1548,7 @@ export function generateWalkingBass(
   let prevDirection: "up" | "down" | null = null; // two-bar phrasing: track contour direction
 
   // Detect time signature for odd-meter handling
-  const timeSig: [number, number] | undefined = options.measureInfo
+  const _timeSig: [number, number] | undefined = options.measureInfo
     ? undefined // will use style-specific generators
     : undefined;
   // Infer time signature from chord durations if available

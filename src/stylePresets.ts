@@ -1,4 +1,4 @@
-import type { PracticeStyle, InstrumentStyles, StyleParameters, StylePreset } from "./types";
+import type { PracticeStyle, StylePreset } from "./types";
 
 export type { StylePreset };
 
