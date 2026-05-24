@@ -1,0 +1,387 @@
+# @jmove/generator
+
+Jazz backing track generator — walking bass lines, piano comping, drum patterns, and full jam sessions from chord progressions.
+
+Zero dependencies. TypeScript. ESM + CJS.
+
+[![CI](https://github.com/jazzmove/jmove-generator/actions/workflows/ci.yml/badge.svg)](https://github.com/jazzmove/jmove-generator/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@jmove/generator)](https://www.npmjs.com/package/@jmove/generator)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+## Features
+
+- **Jam Session Generator** — random chord progressions across 17 jazz forms (blues, rhythm changes, AABA, modal, Coltrane matrix, and more)
+- **Walking Bass** — rule-based walking lines with chromatic approaches, style-specific patterns (swing, bossa, Latin tumbao)
+- **Piano Comping** — Bill Evans rootless voicings (Type A/B) with voice leading, rhythmic templates per style
+- **Drum Patterns** — 19 styles with humanization, ghost notes, groove templates based on GrooVAE research
+- **Style Presets** — 21 built-in presets from Classic Swing to IDM, with per-instrument style overrides
+- **Auto-Detect** — analyze a score's tempo, time signature, and chord content to recommend the best preset
+- **Full Song Form** — generate multi-section arrangements (intro → head → solo → bridge → outro) with dynamic shaping
+- **Groove Templates** — structured micro-timing offsets per instrument, not random jitter
+
+## Install
+
+```bash
+npm install @jmove/generator
+```
+
+Requires Node.js 20+.
+
+## Quick Start
+
+```typescript
+import {
+  generateJamSession,
+  generateWalkingBass,
+  generatePianoComping,
+  generateDrumPattern,
+  scoreChordsToEvents,
+} from '@jmove/generator';
+
+// Generate a 12-bar blues in Bb at 140 BPM
+const session = generateJamSession({
+  key: 'Bb',
+  form: 'blues12',
+  style: 'swing',
+  tempo: 140,
+  timeSignature: [4, 4],
+});
+
+// Extract chord events from the score
+const chords = scoreChordsToEvents(session.score.measures);
+
+// Generate individual instrument parts
+const bass = generateWalkingBass(chords, { style: 'swing', tempo: 140 });
+const piano = generatePianoComping(chords, { style: 'swing', tempo: 140 });
+const drums = generateDrumPattern({ style: 'swing', tempo: 140, measures: 12 });
+```
+
+## API Reference
+
+### Jam Session
+
+#### `generateJamSession(config: JamConfig): JamResult`
+
+Generate a complete chord progression with score.
+
+```typescript
+interface JamConfig {
+  key: JamKey;                    // 'C' | 'Db' | 'D' | ... | 'B'
+  form: JamForm;                  // 'blues12' | 'rhythm32' | 'aaba32' | ...
+  style: PracticeStyle;           // 'swing' | 'bossa' | 'funk' | ...
+  tempo: number;                  // BPM
+  timeSignature: [number, number]; // e.g. [4, 4], [3, 4], [7, 8]
+  measures?: number;              // override measure count (for 'free' form)
+}
+
+interface JamResult {
+  score: QuantizedScore;          // full score with measures and chords
+  config: JamConfig;
+  progressionLabel: string;       // e.g. "Bb7 | Eb7 | Bb7 | ..."
+  sections?: SongSection[];       // for 'fullSong' form
+}
+```
+
+#### `transposeProgression(chords, semitones): string[][]`
+
+Transpose a chord progression by semitones.
+
+#### `getFormsForStyle(style): JamForm[]`
+
+Get available forms for a style (e.g. waltz styles get waltz-compatible forms).
+
+#### `enrichQuality(quality): string`
+
+Normalize chord quality strings (e.g. `'-'` → `'m'`, `'^7'` → `'maj7'`).
+
+### Walking Bass
+
+#### `generateWalkingBass(chords: ChordEvent[], options?: WalkingBassOptions): BassNote[]`
+
+Generate a walking bass line from chord events.
+
+```typescript
+interface BassNote {
+  pitch: number;     // MIDI pitch (28-55, E1-G3)
+  time: number;      // seconds
+  duration: number;  // seconds
+  velocity: number;  // 0-127
+}
+
+interface WalkingBassOptions {
+  style?: string;    // affects pattern: swing=quarter walk, bossa=root-5th, latin=tumbao
+  tempo?: number;    // affects swing ratio and dynamics
+  swingAmount?: number;
+  density?: number;
+  humanize?: boolean;
+}
+```
+
+#### `scoreChordsToEvents(measures): ChordEvent[]`
+
+Extract chord events with timing from score measures.
+
+### Piano Comping
+
+#### `generatePianoComping(chords: ChordEvent[], options?: PianoCompingOptions): CompNote[]`
+
+Generate piano voicings with rhythmic comping patterns.
+
+```typescript
+interface CompNote {
+  pitches: number[];  // MIDI pitches (chord voicing)
+  time: number;
+  duration: number;
+  velocity: number;
+}
+
+interface PianoCompingOptions {
+  style?: string;
+  tempo?: number;
+  humanize?: boolean;
+  swingAmount?: number;
+  density?: number;
+  strum?: boolean;    // arpeggiate voicings
+  strumMs?: number;   // strum speed in ms
+}
+```
+
+### Drum Patterns
+
+#### `generateDrumPattern(options: DrumPatternOptions): DrumHit[]`
+
+Generate a drum pattern for the specified style and duration.
+
+```typescript
+interface DrumHit {
+  pitch: number;     // GM drum map pitch
+  time: number;      // seconds
+  duration: number;
+  velocity: number;
+}
+
+interface DrumPatternOptions {
+  style?: string;
+  tempo?: number;
+  measures?: number;
+  timeSignature?: [number, number];
+  humanize?: boolean;
+  startTime?: number;
+  swingAmount?: number;
+  density?: number;
+}
+```
+
+#### `GM_DRUMS`
+
+General MIDI drum map constants:
+
+```typescript
+GM_DRUMS.KICK          // 36
+GM_DRUMS.SNARE         // 38
+GM_DRUMS.HI_HAT_CLOSED // 42
+GM_DRUMS.HI_HAT_OPEN  // 46
+GM_DRUMS.RIDE          // 51
+GM_DRUMS.CRASH         // 49
+// ... and more
+```
+
+### Style Presets
+
+#### `STYLE_PRESETS: StylePreset[]`
+
+21 built-in presets:
+
+| Category | Presets |
+|----------|---------|
+| Traditional | Classic Swing, Hard Bop Drive, West Coast Cool, Soft Ballad |
+| Modern | Fusion Groove, ECM Space, Miles Modal, Contemporary Jazz |
+| Latin | Bossa Nova, Latin Fire |
+| Groove | Funk Pocket, Jazz Waltz, Blues Shuffle, Neo-Soul Pocket |
+| Experimental | Holdsworth Fusion, Alfa Mist, Pat Metheny, Math Rock, IDM |
+| Hybrid | Fusion/ECM, Modal Funk, Fusion/Neo-Soul |
+
+```typescript
+interface StylePreset {
+  id: string;
+  name: string;
+  description: string;
+  style: PracticeStyle;
+  instrumentStyles?: {     // per-instrument overrides
+    bass?: PracticeStyle;
+    piano?: PracticeStyle;
+    drums?: PracticeStyle;
+  };
+  parameters: {
+    swingAmount: number;   // 0-100
+    density: number;       // 0-100
+  };
+  tempoRange: [number, number];
+}
+```
+
+#### `STYLE_LABELS: Record<PracticeStyle, string>`
+
+Display names for all 19 practice styles.
+
+#### `STYLE_CATEGORIES: Record<string, PracticeStyle[]>`
+
+Styles grouped by category (Traditional, Modern, Latin, Groove, Experimental).
+
+#### `autoDetectPreset(score: QuantizedScore): StylePreset`
+
+Analyze a score and return the best-matching preset based on tempo, time signature, chord content, and style hints.
+
+### Groove & Swing Utilities
+
+#### `getGrooveTemplate(style): GrooveTemplate`
+
+Get micro-timing template for a style. Templates define per-instrument bias and jitter values based on GrooVAE research.
+
+#### `applyGroove(time, element, template): number`
+
+Apply groove displacement to a note time.
+
+#### `tempoSwingMultiplier(tempo): number`
+
+Tempo-dependent swing scaling. Slow tempos swing harder; fast tempos straighten out.
+
+#### `instrumentSwingFactor(role): number`
+
+Per-instrument swing scaling. Ride swings hardest, bass walks straighter, piano between.
+
+#### `humanizeTime(time, amount?): number`
+
+Add timing jitter to a note.
+
+#### `humanizeVelocity(velocity, amount?): number`
+
+Add velocity variation to a note.
+
+### Style Mapping
+
+#### `irealStyleToPracticeStyle(irealStyle): PracticeStyle`
+
+Convert iReal Pro style strings (e.g. `"Medium Swing"`, `"Bossa Nova"`) to generator styles.
+
+### Constants
+
+```typescript
+ALL_KEYS              // ['C', 'Db', 'D', ..., 'B']
+FORM_LABELS           // { blues12: '12-Bar Blues', ... }
+FORM_MEASURE_COUNTS   // { blues12: 12, rhythm32: 32, ... }
+TIME_SIGNATURE_GROUPS // grouped time signatures
+ALL_TIME_SIGNATURES   // all supported time signatures
+```
+
+## Styles
+
+19 styles with distinct algorithms for bass, piano, and drums:
+
+| Style | Swing | Bass | Piano | Drums |
+|-------|-------|------|-------|-------|
+| `swing` | Triplet swing | Quarter-note walk | Rootless voicings, syncopated | Ride + hi-hat 2&4 |
+| `bossa` | Straight 8ths | Root-5th pattern | Montuno rhythm | Cross-stick + syncopated kick |
+| `latin` | Straight 8ths | Tumbao pattern | Montuno variations | Cascara + clave |
+| `ballad` | Light swing | Half-note roots | Whole/half-note voicings | Brushes feel |
+| `funk` | Straight 16ths | Syncopated octaves | Staccato stabs | 16th hi-hat + ghost notes |
+| `fusion` | Light swing | Chromaticism | Extended voicings | Linear patterns |
+| `ecm` | Minimal | Sparse, open | Wide intervals | Brushes, space |
+| `hardBop` | Heavy swing | Strong walk | Punchy voicings | Driving ride |
+| `coolJazz` | Light swing | Melodic walk | Light touch | Brushes |
+| `modal` | Medium swing | Pedal points | Quartal voicings | Sparse |
+| `jazzWaltz` | Waltz swing | 3/4 walk | Waltz comp | 3/4 ride pattern |
+| `shuffleBlues` | Triplet shuffle | Shuffle bass | Blues comping | Shuffle groove |
+| `neoSoul` | Broken feel | Erykah-style | Glasper voicings | J Dilla pocket |
+| `contemporaryJazz` | Moderate | Nordic clarity | Avishai Cohen trio | Brushes/sticks mix |
+| `holdsworth` | Straight | Melodic minor | Wide voicings | Linear fusion |
+| `alfaMist` | Broken beat | Lo-fi chromatic | Rhodes, chromatic | Broken beat |
+| `metheny` | Light swing | Jaco melodic | Lydian shimmer | Bob Moses brushes |
+| `mathRock` | Straight | Angular | Staccato | Odd groupings |
+| `idm` | Generative | Glitch patterns | Algorithmic | Generative |
+
+## Forms
+
+17 chord progression forms:
+
+| Form | Measures | Description |
+|------|----------|-------------|
+| `blues12` | 12 | 12-bar blues |
+| `minorBlues12` | 12 | Minor blues |
+| `rhythm32` | 32 | Rhythm changes (I Got Rhythm) |
+| `aaba32` | 32 | AABA standard form |
+| `abac32` | 32 | ABAC form |
+| `modal16` | 16 | Modal vamp |
+| `turnaround8` | 8 | Short turnaround |
+| `songForm24` | 24 | Song form |
+| `rondo20` | 20 | Rondo form |
+| `clave16` | 16 | Clave-based montuno |
+| `secondLine16` | 16 | New Orleans second line |
+| `coltraneMatrix16` | 16 | Coltrane changes matrix |
+| `throughComposed12` | 12 | Through-composed |
+| `pentatonic8` | 8 | Pentatonic vamp |
+| `quartal16` | 16 | Quartal harmony |
+| `fullSong` | varies | Multi-section arrangement |
+| `free` | custom | Free form (set `measures` in config) |
+
+## Community Presets
+
+You can contribute new style presets! See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
+
+Quick version:
+
+```bash
+# Copy the template
+cp preset-template.ts presets/your-preset.ts
+
+# Edit and validate
+npx tsx scripts/validate-preset.ts presets/your-preset.ts
+
+# Submit a PR
+```
+
+Presets are validated against [`preset-schema.json`](preset-schema.json) and smoke-tested with the generator.
+
+## Development
+
+```bash
+# Install
+npm install
+
+# Run tests (890 tests)
+npm test
+
+# Watch mode
+npm run test:watch
+
+# Lint + type check
+npm run lint
+npm run typecheck
+
+# Build (ESM + CJS + .d.ts)
+npm run build
+
+# Validate community presets
+npm run validate-preset -- --all
+```
+
+## Architecture
+
+```
+src/
+  index.ts              Barrel exports (public API)
+  types.ts              All public type definitions
+  jamGenerator.ts       Chord progression generation (17 forms)
+  walkingBass.ts        Walking bass line generation
+  pianoComping.ts       Piano voicing + comping patterns
+  drumPatterns.ts       Drum pattern generation (19 styles)
+  stylePresets.ts       Built-in style presets
+  autoDetectPreset.ts   Score analysis + preset recommendation
+  grooveTemplates.ts    Micro-timing templates (GrooVAE-based)
+  swingUtils.ts         Tempo/instrument swing calculations
+  styleMapping.ts       iReal Pro style string mapping
+```
+
+## License
+
+[MIT](LICENSE)
