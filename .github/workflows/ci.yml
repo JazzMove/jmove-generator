@@ -38,6 +38,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Validate community presets
+        run: npm run validate-preset -- --all
+
       - name: Verify package contents
         run: |
           npm pack --dry-run 2>&1 | head -30

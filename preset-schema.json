@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/jmove/generator/preset-schema.json",
+  "title": "JMove Generator Style Preset",
+  "description": "Schema for community-contributed style presets for @jmove/generator",
+  "type": "object",
+  "required": ["id", "name", "description", "style", "parameters", "tempoRange"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "description": "Unique kebab-case identifier"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 50,
+      "description": "Display name"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 200,
+      "description": "Genre, influences, character"
+    },
+    "style": {
+      "type": "string",
+      "enum": [
+        "swing", "bossa", "latin", "ballad", "funk",
+        "fusion", "ecm", "hardBop", "coolJazz",
+        "modal", "jazzWaltz", "shuffleBlues",
+        "neoSoul", "contemporaryJazz", "mathRock", "idm",
+        "holdsworth", "alfaMist", "metheny"
+      ],
+      "description": "Base style for generator algorithms"
+    },
+    "instrumentStyles": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "bass": { "$ref": "#/properties/style" },
+        "piano": { "$ref": "#/properties/style" },
+        "drums": { "$ref": "#/properties/style" }
+      },
+      "description": "Optional per-instrument style overrides"
+    },
+    "parameters": {
+      "type": "object",
+      "required": ["swingAmount", "density"],
+      "additionalProperties": false,
+      "properties": {
+        "swingAmount": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "0 = straight 8ths, 100 = heavy triplet swing"
+        },
+        "density": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "0 = sparse, 100 = busy"
+        }
+      }
+    },
+    "tempoRange": {
+      "type": "array",
+      "items": { "type": "number", "minimum": 30, "maximum": 300 },
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "[minBPM, maxBPM] — realistic range for this style"
+    }
+  }
+}
