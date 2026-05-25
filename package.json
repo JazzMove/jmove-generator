@@ -1,12 +1,16 @@
 {
   "name": "@jmove/generator",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Jazz backing track generator — walking bass, piano comping, drum patterns, and style presets for practice sessions",
   "license": "MIT",
   "author": "JMove",
+  "homepage": "https://github.com/JazzMove/jmove-generator#readme",
   "repository": {
     "type": "git",
     "url": "https://github.com/JazzMove/jmove-generator.git"
+  },
+  "bugs": {
+    "url": "https://github.com/JazzMove/jmove-generator/issues"
   },
   "keywords": [
     "jazz",
