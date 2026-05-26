@@ -282,10 +282,16 @@ const LATIN_RHYTHMS: RhythmHit[][] = [
 const FUSION_RHYTHMS: RhythmHit[][] = [
   // Syncopated short stabs (Rhodes-like)
   [[0, 0.5], [0.75, 0.5], [2, 0.5], [2.75, 0.5]],
-  // Punchy off-beats
+  // Punchy off-beats (Headhunters anticipation)
   [[0.5, 0.4], [1.5, 0.4], [2.5, 0.4], [3.5, 0.4]],
   // Accent on 1 + stabs
   [[0, 0.8], [1.75, 0.4], [3, 0.5]],
+  // Held chord with off-beat push (Herbie Hancock)
+  [[0, 1.5], [2.75, 0.8]],
+  // Spacious: beat 1 pad + beat 4 stab
+  [[0, 2.2], [3, 0.6]],
+  // Dotted-quarter groove (Chick Corea)
+  [[0, 0.6], [0.75, 0.6], [1.5, 0.6], [2.25, 0.6], [3, 0.8]],
 ];
 
 const ECM_RHYTHMS: RhythmHit[][] = [
@@ -295,6 +301,12 @@ const ECM_RHYTHMS: RhythmHit[][] = [
   [[1, 2.8]],
   // Two gentle entries
   [[0, 2.0], [2.5, 1.3]],
+  // Beat 2 entry — Jarrett trio floating feel
+  [[1, 3.0]],
+  // Dotted half + light re-entry
+  [[0, 2.8], [3.5, 0.4]],
+  // Sparse: beat 3 entry only (breathes)
+  [[2, 1.8]],
 ];
 
 const HARD_BOP_RHYTHMS: RhythmHit[][] = [
@@ -1093,19 +1105,23 @@ export function generatePianoComping(
   const humanize = options.humanize ?? true;
   const density = options.density;
   const swingAmount = options.swingAmount ?? 100; // default: full triplet swing (matches drum default)
-  const doStrum = options.strum !== false; // default true
+  // Strum: caller controls via strumMs (0=off). Generator defaults to 20ms strum on.
   const strumMs = options.strumMs ?? 20;
+  const doStrum = strumMs > 0 && options.strum !== false;
   const beatDuration = 60 / tempo;
 
   // Style-specific velocity scaling
-  const velScale = style === "ecm" || style === "coolJazz" ? 0.75
+  // Velocity scaling per style: balances instrument volumes in the mix.
+  // ECM/coolJazz bumped from 0.75 → 0.88: soft but audible against sparse drums.
+  const velScale = style === "ecm" ? 0.88
+    : style === "coolJazz" ? 0.85
     : style === "hardBop" ? 1.1
     : style === "fusion" ? 0.9
     : style === "neoSoul" || style === "contemporaryJazz" ? 0.85
     : style === "idm" ? 0.7
     : style === "holdsworth" ? 0.85
     : style === "metheny" ? 0.78
-    : style === "alfaMist" ? 0.80  // lower base — dynamic arc does heavy lifting (0.60→1.05 range)
+    : style === "alfaMist" ? 0.80
     : 1.0;
 
   const useShell = density !== undefined && density < 35;

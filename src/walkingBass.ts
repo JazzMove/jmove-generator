@@ -541,15 +541,47 @@ function generateFusionMeasure(
   const chordTones = getChordTones(chord.root, chord.quality);
   const startPitch = prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi;
   const ct = chordTones.length > 1 ? clamp(startPitch + (chordTones[1] - chordTones[0])) : clamp(startPitch + 5);
+  const fifth = clamp(startPitch + 7);
+  const octave = clamp(startPitch + 12);
 
-  // Syncopated 16th-note groove (6 notes with off-beat emphasis)
+  const r = Math.random();
+  if (r < 0.3) {
+    // Pattern A: Syncopated 16th groove (Jaco-style off-beat emphasis)
+    return [
+      { pitch: startPitch, time: chord.time, duration: beatDuration * 0.7, velocity: 100 },
+      { pitch: ct, time: chord.time + beatDuration * 0.75, duration: beatDuration * 0.5, velocity: 80 },
+      { pitch: fifth, time: chord.time + beatDuration * 1.5, duration: beatDuration * 0.4, velocity: 85 },
+      { pitch: startPitch, time: chord.time + beatDuration * 2, duration: beatDuration * 0.6, velocity: 95 },
+      { pitch: clamp(startPitch + 3), time: chord.time + beatDuration * 2.75, duration: beatDuration * 0.4, velocity: 75 },
+      { pitch: ct, time: chord.time + beatDuration * 3.5, duration: beatDuration * 0.4, velocity: 70 },
+    ];
+  }
+  if (r < 0.55) {
+    // Pattern B: Chromatic approach to beat 3 (Weather Report pocket)
+    return [
+      { pitch: startPitch, time: chord.time, duration: beatDuration * 0.9, velocity: 100 },
+      { pitch: clamp(fifth - 1), time: chord.time + beatDuration * 1.0, duration: beatDuration * 0.4, velocity: 70 },
+      { pitch: fifth, time: chord.time + beatDuration * 1.5, duration: beatDuration * 0.8, velocity: 90 },
+      { pitch: ct, time: chord.time + beatDuration * 2.5, duration: beatDuration * 0.5, velocity: 80 },
+      { pitch: startPitch, time: chord.time + beatDuration * 3.0, duration: beatDuration * 0.9, velocity: 85 },
+    ];
+  }
+  if (r < 0.8) {
+    // Pattern C: Octave jump groove (Marcus Miller snap)
+    return [
+      { pitch: startPitch, time: chord.time, duration: beatDuration * 0.5, velocity: 100 },
+      { pitch: octave, time: chord.time + beatDuration * 0.5, duration: beatDuration * 0.3, velocity: 75 },
+      { pitch: startPitch, time: chord.time + beatDuration * 1.0, duration: beatDuration * 0.8, velocity: 90 },
+      { pitch: fifth, time: chord.time + beatDuration * 2.0, duration: beatDuration * 0.7, velocity: 85 },
+      { pitch: ct, time: chord.time + beatDuration * 2.75, duration: beatDuration * 0.5, velocity: 75 },
+      { pitch: startPitch, time: chord.time + beatDuration * 3.25, duration: beatDuration * 0.6, velocity: 80 },
+    ];
+  }
+  // Pattern D: Space groove — fewer notes, longer durations (breathing room)
   return [
-    { pitch: startPitch, time: chord.time, duration: beatDuration * 0.7, velocity: 100 },
-    { pitch: ct, time: chord.time + beatDuration * 0.75, duration: beatDuration * 0.5, velocity: 80 },
-    { pitch: clamp(startPitch + 5), time: chord.time + beatDuration * 1.5, duration: beatDuration * 0.4, velocity: 85 },
-    { pitch: startPitch, time: chord.time + beatDuration * 2, duration: beatDuration * 0.6, velocity: 95 },
-    { pitch: clamp(startPitch + 3), time: chord.time + beatDuration * 2.75, duration: beatDuration * 0.4, velocity: 75 },
-    { pitch: ct, time: chord.time + beatDuration * 3.5, duration: beatDuration * 0.4, velocity: 70 },
+    { pitch: startPitch, time: chord.time, duration: beatDuration * 1.2, velocity: 100 },
+    { pitch: fifth, time: chord.time + beatDuration * 1.5, duration: beatDuration * 1.0, velocity: 85 },
+    { pitch: ct, time: chord.time + beatDuration * 3.0, duration: beatDuration * 0.8, velocity: 75 },
   ];
 }
 
@@ -561,18 +593,34 @@ function generateEcmMeasure(
 ): BassNote[] {
   const rootMidi = rootToMidi(chord.root);
   const fifth = clamp(rootMidi + 7);
+  const ninth = clamp(rootMidi + 14);  // color tone
+  const fourth = clamp(rootMidi + 5);  // sus quality
 
-  // Pedal point: mostly root as sustained note, occasional 5th on beat 3
-  if (Math.random() < 0.6) {
-    // Just root, sustained whole note
+  const r = Math.random();
+  if (r < 0.35) {
+    // Sustained root — pedal point (Peacock style)
     return [
-      { pitch: rootMidi, time: chord.time, duration: beatDuration * 3.8, velocity: 65 },
+      { pitch: rootMidi, time: chord.time, duration: beatDuration * 3.8, velocity: 70 },
     ];
   }
-  // Root + 5th
+  if (r < 0.6) {
+    // Root + 5th on beat 3
+    return [
+      { pitch: rootMidi, time: chord.time, duration: beatDuration * 1.9, velocity: 70 },
+      { pitch: fifth, time: chord.time + beatDuration * 2, duration: beatDuration * 1.8, velocity: 58 },
+    ];
+  }
+  if (r < 0.8) {
+    // Root + 9th — adds Nordic harmonic color (Christensen trio)
+    return [
+      { pitch: rootMidi, time: chord.time, duration: beatDuration * 2.5, velocity: 70 },
+      { pitch: ninth, time: chord.time + beatDuration * 2.5, duration: beatDuration * 1.3, velocity: 55 },
+    ];
+  }
+  // Root → 4th (sus quality, creates tension without resolution)
   return [
-    { pitch: rootMidi, time: chord.time, duration: beatDuration * 1.9, velocity: 65 },
-    { pitch: fifth, time: chord.time + beatDuration * 2, duration: beatDuration * 1.8, velocity: 55 },
+    { pitch: rootMidi, time: chord.time, duration: beatDuration * 1.5, velocity: 70 },
+    { pitch: fourth, time: chord.time + beatDuration * 2, duration: beatDuration * 1.8, velocity: 55 },
   ];
 }
 
@@ -690,22 +738,35 @@ function generateModalMeasure(
 ): BassNote[] {
   const rootMidi = rootToMidi(chord.root);
   const fifth = clamp(rootMidi + 7);
+  const ninth = clamp(rootMidi + 14);
+  const fourth = clamp(rootMidi + 5);
 
-  // Pedal point: hold root 2-3 beats, then 1-2 walk notes
-  const holdBeats = Math.random() < 0.5 ? 2 : 3;
-
-  if (holdBeats === 3) {
-    // Root held 3 beats + approach on beat 4
+  const r = Math.random();
+  if (r < 0.25) {
+    // Sustained root — full pedal (Chambers on Kind of Blue)
+    return [
+      { pitch: rootMidi, time: chord.time, duration: beatDuration * 3.8, velocity: 75 },
+    ];
+  }
+  if (r < 0.5) {
+    // Root held 3 beats + chromatic approach on beat 4
     return [
       { pitch: rootMidi, time: chord.time, duration: beatDuration * 2.9, velocity: 75 },
       { pitch: clamp(rootMidi + 2), time: chord.time + beatDuration * 3, duration: beatDuration * 0.7, velocity: 60 },
     ];
   }
-  // Root held 2 beats + 5th + walk
+  if (r < 0.75) {
+    // Root + 5th on beat 3 (classic modal walk)
+    return [
+      { pitch: rootMidi, time: chord.time, duration: beatDuration * 1.9, velocity: 75 },
+      { pitch: fifth, time: chord.time + beatDuration * 2, duration: beatDuration * 0.9, velocity: 65 },
+      { pitch: fourth, time: chord.time + beatDuration * 3, duration: beatDuration * 0.7, velocity: 60 },
+    ];
+  }
+  // Root + 9th — modal color (Ron Carter on Maiden Voyage)
   return [
-    { pitch: rootMidi, time: chord.time, duration: beatDuration * 1.9, velocity: 75 },
-    { pitch: fifth, time: chord.time + beatDuration * 2, duration: beatDuration * 0.9, velocity: 65 },
-    { pitch: clamp(rootMidi + 5), time: chord.time + beatDuration * 3, duration: beatDuration * 0.7, velocity: 60 },
+    { pitch: rootMidi, time: chord.time, duration: beatDuration * 2.2, velocity: 75 },
+    { pitch: ninth, time: chord.time + beatDuration * 2.5, duration: beatDuration * 1.3, velocity: 58 },
   ];
 }
 

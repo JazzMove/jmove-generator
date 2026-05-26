@@ -23,6 +23,7 @@ export type DrumStyle = PracticeStyle;
 export interface StyleParameters {
   swingAmount: number;  // 0-100: 0=straight 8ths, 50=light swing, 100=hard triplet
   density: number;      // 0-100: sparse vs busy
+  strumMs?: number;     // 0-30: piano chord strum spread in ms (0=no strum)
 }
 
 export interface InstrumentStyles {

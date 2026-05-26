@@ -14,7 +14,7 @@ Zero dependencies. TypeScript. ESM + CJS.
 - **Walking Bass** — rule-based walking lines with chromatic approaches, style-specific patterns (swing, bossa, Latin tumbao)
 - **Piano Comping** — Bill Evans rootless voicings (Type A/B) with voice leading, rhythmic templates per style
 - **Drum Patterns** — 19 styles with humanization, ghost notes, groove templates based on GrooVAE research
-- **Style Presets** — 21 built-in presets from Classic Swing to IDM, with per-instrument style overrides
+- **Style Presets** — 22 built-in presets from Classic Swing to IDM, with per-instrument style overrides and per-preset strum defaults
 - **Auto-Detect** — analyze a score's tempo, time signature, and chord content to recommend the best preset
 - **Full Song Form** — generate multi-section arrangements (intro → head → solo → bridge → outro) with dynamic shaping
 - **Groove Templates** — structured micro-timing offsets per instrument, not random jitter
@@ -190,7 +190,7 @@ GM_DRUMS.CRASH         // 49
 
 #### `STYLE_PRESETS: StylePreset[]`
 
-21 built-in presets:
+22 built-in presets:
 
 | Category | Presets |
 |----------|---------|
@@ -215,6 +215,7 @@ interface StylePreset {
   parameters: {
     swingAmount: number;   // 0-100
     density: number;       // 0-100
+    strumMs?: number;      // 0-30: piano chord strum spread in ms
   };
   tempoRange: [number, number];
 }
