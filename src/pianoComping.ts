@@ -191,6 +191,14 @@ const VOICINGS: Record<string, [VoicingTemplate, VoicingTemplate]> = {
     { intervals: [4, 7, 9, 14], label: "A" },    // same as 6
     { intervals: [9, 12, 16, 19], label: "B" },
   ],
+  "6/9": [
+    { intervals: [4, 7, 9, 14], label: "A" },    // 3-5-6-9 (same as 69)
+    { intervals: [9, 12, 16, 19], label: "B" },
+  ],
+  "m6/9": [
+    { intervals: [3, 7, 9, 14], label: "A" },    // b3-5-6-9
+    { intervals: [9, 12, 15, 19], label: "B" },   // 6-9-b3-5
+  ],
   "aug7": [
     { intervals: [4, 8, 10, 14], label: "A" },   // 3-#5-b7-9
     { intervals: [10, 14, 16, 20], label: "B" },  // b7-9-3-#5
@@ -218,6 +226,14 @@ const VOICINGS: Record<string, [VoicingTemplate, VoicingTemplate]> = {
   "7#9#11": [
     { intervals: [4, 6, 10, 15], label: "A" },   // 3-#11-b7-#9
     { intervals: [10, 15, 18, 22], label: "B" },
+  ],
+  "7#9b5": [
+    { intervals: [4, 6, 10, 15], label: "A" },   // 3-b5-b7-#9 (b5=#11)
+    { intervals: [10, 15, 18, 22], label: "B" },
+  ],
+  "7b9b5": [
+    { intervals: [4, 6, 10, 13], label: "A" },   // 3-b5-b7-b9 (b5=#11)
+    { intervals: [10, 13, 16, 18], label: "B" },
   ],
   "add9": [
     { intervals: [4, 7, 9, 14], label: "A" },

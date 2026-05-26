@@ -756,3 +756,87 @@ describe("Piano Comping — new genres", () => {
     expect(avgVel).toBeLessThan(80); // 0.7 velScale → noticeably softer
   });
 });
+
+// ── Quality coverage guard: every engine quality must produce consonant voicings ──
+
+describe("Piano Comping — quality coverage (no fallback dissonance)", () => {
+  // All 28 valid engine qualities (from transcriber _VALID_QUALITIES)
+  const ENGINE_QUALITIES = [
+    "", "m", "dim", "aug",
+    "maj7", "maj9", "maj7#11", "maj7#5",
+    "m7", "m9", "m11", "m6", "m6/9", "m(maj7)", "m7b5",
+    "7", "9", "13", "7#9", "7b9", "7#9b5", "7b9b5", "7#11", "7#5", "7b5", "7alt",
+    "7sus4", "sus4", "sus2",
+    "dim7", "6", "6/9", "add9",
+  ];
+
+  // Expected interval classes for each quality (semitones mod 12 that MUST appear)
+  const REQUIRED_INTERVALS: Record<string, number[]> = {
+    "": [4],           // must have major 3rd
+    "m": [3],          // must have minor 3rd
+    "6": [9],          // must have 6th, NOT b7(10) or maj7(11)
+    "6/9": [9],        // must have 6th, NOT b7(10) or maj7(11)
+    "m6": [3, 9],      // minor 3rd + 6th
+    "m6/9": [3, 9],    // minor 3rd + 6th
+    "7#9b5": [6],      // must have b5(6), NOT nat5(7)
+    "7b9b5": [6],      // must have b5(6), NOT nat5(7)
+    "7b5": [6],        // must have b5
+    "sus4": [5],       // must have 4th, NOT 3rd(4)
+    "sus2": [2],       // must have 2nd, NOT 3rd
+    "7sus4": [5],      // must have 4th
+    "dim": [3, 6],     // minor 3rd + dim 5th
+    "dim7": [3, 6],
+    "aug": [4, 8],     // major 3rd + aug 5th
+  };
+
+  // Intervals that must NOT appear (would indicate wrong fallback)
+  const FORBIDDEN_INTERVALS: Record<string, number[]> = {
+    "6": [10, 11],     // no b7 or maj7 for a 6th chord
+    "6/9": [10, 11],
+    "m6": [10, 11],
+    "m6/9": [10, 11],
+    "7#9b5": [7],      // no natural 5th for b5 chord
+    "7b9b5": [7],
+    "sus4": [4],       // no major 3rd for sus chord
+    "sus2": [3, 4],    // no 3rd for sus chord
+    "7sus4": [4],
+  };
+
+  for (const q of ENGINE_QUALITIES) {
+    it(`quality "${q || "(major)"}" produces output without error`, () => {
+      const notes = generatePianoComping(
+        [makeChord("C", q, 0, 4)],
+        { style: "swing", humanize: false, strum: false },
+      );
+      expect(notes.length).toBeGreaterThan(0);
+    });
+  }
+
+  for (const [q, required] of Object.entries(REQUIRED_INTERVALS)) {
+    it(`quality "${q || "(major)"}" voicing contains required intervals`, () => {
+      const notes = generatePianoComping(
+        [makeChord("C", q, 0, 4)],
+        { style: "ballad", humanize: false, strum: false, density: 50 },
+      );
+      expect(notes.length).toBeGreaterThan(0);
+      const pcs = new Set(notes[0].pitches.map((p) => ((p % 12) - 0 + 12) % 12)); // C=0
+      for (const interval of required) {
+        expect(pcs.has(interval), `quality "${q}": missing interval ${interval} in pitches ${[...pcs]}`).toBe(true);
+      }
+    });
+  }
+
+  for (const [q, forbidden] of Object.entries(FORBIDDEN_INTERVALS)) {
+    it(`quality "${q}" voicing excludes forbidden intervals`, () => {
+      const notes = generatePianoComping(
+        [makeChord("C", q, 0, 4)],
+        { style: "ballad", humanize: false, strum: false, density: 50 },
+      );
+      expect(notes.length).toBeGreaterThan(0);
+      const pcs = new Set(notes[0].pitches.map((p) => ((p % 12) - 0 + 12) % 12));
+      for (const interval of forbidden) {
+        expect(pcs.has(interval), `quality "${q}": forbidden interval ${interval} found in pitches ${[...pcs]}`).toBe(false);
+      }
+    });
+  }
+});

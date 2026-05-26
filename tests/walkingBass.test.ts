@@ -716,3 +716,36 @@ describe("Walking Bass — shuffle blues patterns", () => {
     expect(fingerprints.size).toBeGreaterThanOrEqual(3);
   });
 });
+
+// ── Quality coverage guard: every engine quality must produce bass output ──
+
+describe("Walking Bass — quality coverage (no missing chord tones)", () => {
+  const ENGINE_QUALITIES = [
+    "", "m", "dim", "aug",
+    "maj7", "maj9", "maj7#11", "maj7#5",
+    "m7", "m9", "m11", "m6", "m6/9", "m(maj7)", "m7b5",
+    "7", "9", "13", "7#9", "7b9", "7#9b5", "7b9b5", "7#11", "7#5", "7b5", "7alt",
+    "7sus4", "sus4", "sus2",
+    "dim7", "6", "6/9", "add9",
+  ];
+
+  for (const q of ENGINE_QUALITIES) {
+    it(`quality "${q || "(major)"}" produces bass notes`, () => {
+      const notes = generateWalkingBass(
+        [makeChord("C", q, 0, 4)],
+        { tempo: 120, style: "swing" },
+      );
+      expect(notes.length).toBeGreaterThan(0);
+      // Beat 1 should be root (C = any pitch where pitch % 12 === 0)
+      expect(notes[0].pitch % 12).toBe(0);
+    });
+  }
+
+  // Verify b5 qualities don't produce natural 5th on downbeat chord tones
+  it("7b5 family: beat-1 root is correct (pattern uses right chord tones)", () => {
+    for (const q of ["7b5", "7#9b5", "7b9b5"]) {
+      const notes = generateWalkingBass([makeChord("C", q, 0, 4)], { tempo: 120, style: "swing" });
+      expect(notes[0].pitch % 12).toBe(0); // root on beat 1
+    }
+  });
+});

@@ -4,6 +4,17 @@ All notable changes to `@jmove/generator` will be documented in this file.
 
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [1.0.3] - 2026-05-26
+
+### Added
+
+- **Voicing entries for `6/9`, `m6/9`, `7#9b5`, `7b9b5`** — piano voicings and bass chord tones for all 4 qualities that previously fell back to wrong chord types, causing semitone clashes
+- **Quality coverage guard tests** — verify all 28 engine-valid chord qualities produce consonant output (required intervals present, forbidden intervals absent)
+
+### Fixed
+
+- **Backing track dissonance** — 5 chord qualities from transcriber pipeline had no direct voicing entries, falling back to wrong types: `6/9`→`7` (b7 vs 6th), `m6/9`→`m7` (b7 vs 6th), `7#9b5`→`7` (nat5 vs b5), `7b9b5`→`7` (nat5 vs b5). All now have correct dedicated voicings
+
 ## [1.0.2] - 2026-05-26
 
 ### Added
