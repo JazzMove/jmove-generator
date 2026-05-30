@@ -749,3 +749,15 @@ describe("Walking Bass — quality coverage (no missing chord tones)", () => {
     }
   });
 });
+
+// ── Tempo Validation ──
+
+describe("Walking Bass — tempo validation", () => {
+  it("throws RangeError for tempo = 0", () => {
+    expect(() => generateWalkingBass(iiVI(), { tempo: 0 })).toThrow(RangeError);
+  });
+
+  it("throws RangeError for negative tempo", () => {
+    expect(() => generateWalkingBass(iiVI(), { tempo: -120 })).toThrow(RangeError);
+  });
+});

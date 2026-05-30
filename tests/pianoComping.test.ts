@@ -840,3 +840,104 @@ describe("Piano Comping — quality coverage (no fallback dissonance)", () => {
     });
   }
 });
+
+// ── Tempo Validation ──
+
+describe("Piano Comping — tempo validation", () => {
+  it("throws RangeError for tempo = 0", () => {
+    expect(() => generatePianoComping(iiVI(), { tempo: 0 })).toThrow(RangeError);
+  });
+
+  it("throws RangeError for negative tempo", () => {
+    expect(() => generatePianoComping(iiVI(), { tempo: -60 })).toThrow(RangeError);
+  });
+});
+
+// ── Density Full Range ──
+
+describe("Piano Comping — density full range", () => {
+  it("density 100 produces zero rests (maximum density)", () => {
+    // With density=100 baseRestChance = 0.15 * (1 - 1) = 0
+    // Run multiple trials — should consistently produce notes on every chord
+    const chords = iiVI();
+    for (let trial = 0; trial < 10; trial++) {
+      const notes = generatePianoComping(chords, {
+        style: "swing", humanize: false, density: 100, strum: false,
+      });
+      expect(notes.length).toBeGreaterThanOrEqual(chords.length);
+    }
+  });
+
+  it("density 0 produces sparser output than density 100", () => {
+    const chords = iiVI();
+    let sparse = 0, dense = 0;
+    for (let trial = 0; trial < 20; trial++) {
+      sparse += generatePianoComping(chords, { style: "swing", humanize: false, density: 0, strum: false }).length;
+      dense += generatePianoComping(chords, { style: "swing", humanize: false, density: 100, strum: false }).length;
+    }
+    expect(dense).toBeGreaterThan(sparse);
+  });
+});
+
+// ── Strum Spread ──
+
+describe("Piano Comping — strum spreading", () => {
+  it("strum spreads multi-pitch chords into single-pitch notes", () => {
+    const notes = generatePianoComping(iiVI(), {
+      style: "swing", humanize: false, strum: true, strumMs: 25, density: 50,
+    });
+    // All strummed notes should be single-pitch
+    for (const note of notes) {
+      expect(note.pitches.length).toBe(1);
+    }
+  });
+
+  it("strum off keeps multi-pitch voicings intact", () => {
+    const notes = generatePianoComping(iiVI(), {
+      style: "swing", humanize: false, strum: false, density: 50,
+    });
+    const multiPitch = notes.filter(n => n.pitches.length > 1);
+    expect(multiPitch.length).toBeGreaterThan(0);
+  });
+
+  it("strummed notes have decreasing velocity", () => {
+    const notes = generatePianoComping(
+      [makeChord("C", "7", 0, 4)],
+      { style: "swing", humanize: false, strum: true, strumMs: 25, density: 50 },
+    );
+    // Find consecutive notes near same time (strum group)
+    if (notes.length >= 2) {
+      const group = notes.filter(n => Math.abs(n.time - notes[0].time) < 0.15);
+      if (group.length >= 2) {
+        // Each successive note should have equal or lower velocity
+        for (let i = 1; i < group.length; i++) {
+          expect(group[i].velocity).toBeLessThanOrEqual(group[i - 1].velocity);
+        }
+      }
+    }
+  });
+});
+
+// ── Odd Meter Piano Comping ──
+
+describe("Piano Comping — odd meters", () => {
+  function makeMeterChords(beats: number): ChordEvent[] {
+    return [makeChord("D", "m7", 0, beats * 0.5), makeChord("G", "7", beats * 0.5, beats * 0.5)];
+  }
+
+  for (const meter of [5, 7]) {
+    it(`produces notes in ${meter}/4 time`, () => {
+      const chords = makeMeterChords(meter);
+      const notes = generatePianoComping(chords, {
+        style: "swing", humanize: false, strum: false, density: 50,
+      });
+      expect(notes.length).toBeGreaterThan(0);
+      // All notes within time bounds
+      const end = chords[chords.length - 1].time + chords[chords.length - 1].duration;
+      for (const n of notes) {
+        expect(n.time).toBeGreaterThanOrEqual(0);
+        expect(n.time).toBeLessThan(end + 0.01);
+      }
+    });
+  }
+});

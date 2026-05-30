@@ -1376,6 +1376,7 @@ function generateFullSong(
 // ── Main Generator ──
 
 export function generateJamSession(config: JamConfig): JamResult {
+  if (config.tempo <= 0) throw new RangeError(`tempo must be > 0, got ${config.tempo}`);
   const { key, form, style, tempo, timeSignature } = config;
 
   let chords: Chord[];

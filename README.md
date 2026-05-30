@@ -8,15 +8,19 @@ Zero dependencies. TypeScript. ESM + CJS.
 [![npm](https://img.shields.io/npm/v/@jmove/generator)](https://www.npmjs.com/package/@jmove/generator)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
+## Demo
+
+Try the live app at **[jmove.it.com](https://jmove.it.com)** — the Practice Player uses this package to generate all backing tracks in real time.
+
 ## Features
 
 - **Jam Session Generator** — random chord progressions across 17 jazz forms (blues, rhythm changes, AABA, modal, Coltrane matrix, and more)
-- **Walking Bass** — rule-based walking lines with chromatic approaches, style-specific patterns (swing, bossa, Latin tumbao)
-- **Piano Comping** — Bill Evans rootless voicings (Type A/B) with voice leading, rhythmic templates per style
+- **Walking Bass** — rule-based walking lines with chromatic approaches, 19 styles (swing, bossa, Latin tumbao, neo-soul, math rock, IDM)
+- **Piano Comping** — Bill Evans rootless voicings (Type A/B), quartal, shell, cluster — voice-led with rhythmic templates per style
 - **Drum Patterns** — 19 styles with humanization, ghost notes, groove templates based on GrooVAE research
-- **Style Presets** — 22 built-in presets from Classic Swing to IDM, with per-instrument style overrides and per-preset strum defaults
-- **Auto-Detect** — analyze a score's tempo, time signature, and chord content to recommend the best preset
-- **Full Song Form** — generate multi-section arrangements (intro → head → solo → bridge → outro) with dynamic shaping
+- **22 Style Presets** — Classic Swing to IDM, with per-instrument style overrides
+- **Auto-Detect** — analyze a score to recommend the best preset
+- **Full Song Form** — multi-section arrangements with dynamic shaping
 - **Groove Templates** — structured micro-timing offsets per instrument, not random jitter
 
 ## Install
@@ -69,7 +73,7 @@ interface JamConfig {
   key: JamKey;                    // 'C' | 'Db' | 'D' | ... | 'B'
   form: JamForm;                  // 'blues12' | 'rhythm32' | 'aaba32' | ...
   style: PracticeStyle;           // 'swing' | 'bossa' | 'funk' | ...
-  tempo: number;                  // BPM
+  tempo: number;                  // BPM (must be > 0)
   timeSignature: [number, number]; // e.g. [4, 4], [3, 4], [7, 8]
   measures?: number;              // override measure count (for 'free' form)
 }
@@ -327,9 +331,7 @@ ALL_TIME_SIGNATURES   // all supported time signatures
 
 ## Community Presets
 
-You can contribute new style presets! See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
-
-Quick version:
+Contribute new style presets! See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ```bash
 # Copy the template
@@ -349,7 +351,7 @@ Presets are validated against [`preset-schema.json`](preset-schema.json) and smo
 # Install
 npm install
 
-# Run tests (890 tests)
+# Run tests (996 tests)
 npm test
 
 # Watch mode

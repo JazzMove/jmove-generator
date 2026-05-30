@@ -1748,3 +1748,15 @@ describe("Jam Generator", () => {
     });
   });
 });
+
+// ── Tempo Validation ──
+
+describe("Jam Generator — tempo validation", () => {
+  it("throws RangeError for tempo = 0", () => {
+    expect(() => generateJamSession(makeConfig({ tempo: 0 }))).toThrow(RangeError);
+  });
+
+  it("throws RangeError for negative tempo", () => {
+    expect(() => generateJamSession(makeConfig({ tempo: -60 }))).toThrow(RangeError);
+  });
+});

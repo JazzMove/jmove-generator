@@ -1295,3 +1295,15 @@ describe("Drum Patterns — groove templates", () => {
     }
   });
 });
+
+// ── Tempo Validation ──
+
+describe("Drum Patterns — tempo validation", () => {
+  it("throws RangeError for tempo = 0", () => {
+    expect(() => generateDrumPattern({ tempo: 0 })).toThrow(RangeError);
+  });
+
+  it("throws RangeError for negative tempo", () => {
+    expect(() => generateDrumPattern({ tempo: -100 })).toThrow(RangeError);
+  });
+});

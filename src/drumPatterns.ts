@@ -2103,6 +2103,7 @@ export function getStylePatternSet(style: string): StylePatternSet {
 export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[] {
   const style = options.style ?? "swing";
   const tempo = options.tempo ?? 120;
+  if (tempo <= 0) throw new RangeError(`tempo must be > 0, got ${tempo}`);
   const numMeasures = options.measures ?? 4;
   const timeSig = options.timeSignature ?? [4, 4];
   const humanize = options.humanize ?? true;

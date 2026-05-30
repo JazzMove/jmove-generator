@@ -932,7 +932,7 @@ function pickVoicing(
 /** Reduce to 2-note shell voicing (3rd + 7th — the guide tones). */
 function toShellVoicing(pitches: number[]): number[] {
   if (pitches.length <= 2) return pitches;
-  // Shell = lowest and second-highest (typically 3rd and 7th in rootless voicings)
+  // Shell = lowest + third-by-pitch (3rd + 7th in rootless voicings, skipping 5th and tensions)
   const sorted = [...pitches].sort((a, b) => a - b);
   return [sorted[0], sorted[2] ?? sorted[1]];
 }
@@ -1118,6 +1118,7 @@ export function generatePianoComping(
 
   const style = options.style ?? "swing";
   const tempo = options.tempo ?? 120;
+  if (tempo <= 0) throw new RangeError(`tempo must be > 0, got ${tempo}`);
   const humanize = options.humanize ?? true;
   const density = options.density;
   const swingAmount = options.swingAmount ?? 100; // default: full triplet swing (matches drum default)
@@ -1141,7 +1142,7 @@ export function generatePianoComping(
     : 1.0;
 
   const useShell = density !== undefined && density < 35;
-  const baseRestChance = 0.15 * (1 - (density ?? 50) / 200);
+  const baseRestChance = 0.15 * (1 - (density ?? 50) / 100);
   const notes: CompNote[] = [];
   let prevPitches: number[] | null = null;
   let wasRest = false;

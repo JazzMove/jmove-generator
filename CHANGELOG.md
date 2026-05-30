@@ -4,6 +4,19 @@ All notable changes to `@jmove/generator` will be documented in this file.
 
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [1.0.4] - 2026-05-30
+
+### Fixed
+
+- **Density formula bug** — `baseRestChance` in piano comping used `/200` divisor instead of `/100`, compressing the 0-100 density range to half effect. Density 100 now correctly produces zero rests (max density)
+- **Shell voicing comment** — clarified misleading comment on `toShellVoicing()` (logic was correct: picks 3rd + 7th guide tones from rootless voicings by taking sorted[0] + sorted[2])
+- **Dead code** — removed unused `_BASS_MID` constant from walking bass module
+
+### Added
+
+- **Tempo validation** — all four public generators (`generateJamSession`, `generatePianoComping`, `generateWalkingBass`, `generateDrumPattern`) now throw `RangeError` for tempo <= 0 instead of producing `Infinity`/`NaN` downstream
+- **15 new tests** — density full-range behavior, strum spreading, odd-meter piano comping (5/4, 7/4), and tempo validation across all generators (996 total)
+
 ## [1.0.3] - 2026-05-26
 
 ### Added

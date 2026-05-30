@@ -21,7 +21,7 @@ export type { BassNote, WalkingBassOptions, ChordEvent };
 
 const BASS_LOW = 28;  // E1
 const BASS_HIGH = 55; // G3
-const _BASS_MID = 40;  // E2 — preferred center
+
 
 const ROOT_SEMITONES: Record<string, number> = {
   C: 0, "C#": 1, Db: 1, D: 2, "D#": 3, Eb: 3,
@@ -1604,6 +1604,7 @@ export function generateWalkingBass(
 
   const style = options.style ?? "swing";
   const tempo = options.tempo ?? 120;
+  if (tempo <= 0) throw new RangeError(`tempo must be > 0, got ${tempo}`);
   const humanize = options.humanize ?? false;
   const beatDuration = 60 / tempo;
 
