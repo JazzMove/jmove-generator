@@ -4,6 +4,12 @@ All notable changes to `@jmove/generator` will be documented in this file.
 
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [1.0.5] - 2026-06-02
+
+### Added
+
+- **Story links in README** — 6 deep technical articles about the generator's algorithms, architecture, and music theory (backlinks to upfusion.net/stories)
+
 ## [1.0.4] - 2026-05-30
 
 ### Fixed

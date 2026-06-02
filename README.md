@@ -12,6 +12,17 @@ Zero dependencies. TypeScript. ESM + CJS.
 
 Try the live app at **[jmove.it.com](https://jmove.it.com)** — the Practice Player uses this package to generate all backing tracks in real time.
 
+### Stories
+
+Deep technical articles about how JMove and the generator work:
+
+- [Inside @jmove/generator: Every Algorithm Explained](https://upfusion.net/stories/open-source-jazz-generator) — Evans voicings, stochastic drum comping, groove templates, 996 tests
+- [Building JMove: Architecture of a Jazz Practice Tool](https://upfusion.net/stories/building-jmove) — three engines, two languages, 45 chord qualities, 26 style presets
+- [Walking Bass from First Principles](https://upfusion.net/stories/walking-bass-from-first-principles) — contour-first planning, approach weights, two-bar phrasing arcs
+- [1,511 Jazz Standards in Your Browser](https://upfusion.net/stories/jazz-standards-browser) — iReal Pro URI decoding, 43-rule quality map, 748KB offline database
+- [Five Ways to See a Chord](https://upfusion.net/stories/five-notation-views) — Zustand sync, DFS fretboard search, Viterbi voice-leading optimizer
+- [14 Ways to Reharmonize a Jazz Standard](https://upfusion.net/stories/14-ways-to-reharmonize) — tritone subs to Coltrane changes, every technique with history and theory
+
 ## Features
 
 - **Jam Session Generator** — random chord progressions across 17 jazz forms (blues, rhythm changes, AABA, modal, Coltrane matrix, and more)
