@@ -136,6 +136,8 @@ export interface WalkingBassOptions {
   humanize?: boolean;
   measureInfo?: { totalMeasures: number; measureDuration: number; sections?: SongSection[] };
   kickTimes?: number[];
+  random?: () => number;
+  bandContext?: BandContext;
 }
 
 export interface ChordEvent {
@@ -163,6 +165,8 @@ export interface PianoCompingOptions {
   strum?: boolean;
   strumMs?: number;
   measureInfo?: { totalMeasures: number; measureDuration: number; sections?: SongSection[] };
+  random?: () => number;
+  bandContext?: BandContext;
 }
 
 // ── Drum Pattern Types ──
@@ -172,6 +176,13 @@ export interface DrumHit {
   time: number;
   duration: number;
   velocity: number;
+}
+
+export interface DrumState {
+  variationIdx: number;
+  barsOnPattern: number;
+  patternHoldBars: number;
+  tendency: unknown;  // CompingTendency | null, kept opaque for type boundary
 }
 
 export interface DrumPatternOptions {
@@ -186,6 +197,12 @@ export interface DrumPatternOptions {
   formMarkers?: number[];
   sectionMarkers?: number[];
   measureInfo?: { totalMeasures: number; measureDuration: number; sections?: SongSection[] };
+  random?: () => number;
+  bandContext?: BandContext;
+  /** Streaming: hint that this measure should contain a fill (next measure is a boundary) */
+  fillHint?: "section" | "phrase" | "setup" | false;
+  /** Streaming: persisted drum state for phrase continuity across 1-measure calls */
+  drumState?: DrumState;
 }
 
 // ── Groove Template Types ──
@@ -222,3 +239,65 @@ export interface StylePreset {
 // ── Instrument Role (for swing utils) ──
 
 export type InstrumentRole = "drums" | "bass" | "piano";
+
+// ── Ensemble Coordination Types ──
+
+export type RandomFn = () => number;
+
+export interface PhraseMap {
+  boundaries: number[];       // measure indices where phrases start
+  phraseLength: number;       // current phrase length (2, 4, or 8 bars)
+  motifSeeds: number[];       // per-phrase PRNG seed for motif repetition
+}
+
+export interface BandContext {
+  // drums → bass
+  kickTimes: number[];
+  kickDensity: number;            // kicks per measure (0-8)
+  hihatPattern: "8ths" | "16ths" | "quarters" | "sparse";
+
+  // drums → piano
+  drumDensity: number;            // normalized 0-1
+  crashTimes: number[];           // phrase boundary markers
+
+  // bass → piano
+  bassRegister: "low" | "mid" | "high";
+  bassRhythm: "walking" | "half" | "pedal" | "syncopated";
+  bassTimes: number[];
+
+  // shared
+  phraseMap: PhraseMap;
+  currentSection: SongSection | null;
+  sectionEnergy: number;          // 0-1
+}
+
+export interface EnsembleOptions {
+  chordEvents: ChordEvent[];
+  style: PracticeStyle;
+  tempo: number;
+  timeSignature?: [number, number];
+  measures: number;
+  sections?: SongSection[];
+  density?: number;               // 0-100
+  swingAmount?: number;           // 0-100
+  strumMs?: number;               // 0-30
+  seed?: number;                  // omit = random, provide = deterministic
+  instrumentStyles?: InstrumentStyles;
+  measureInfo?: { totalMeasures: number; measureDuration: number; sections?: SongSection[] };
+}
+
+export interface EnsembleResult {
+  drums: DrumHit[];
+  bass: BassNote[];
+  piano: CompNote[];
+  seed: number;                   // always returned (for replay)
+  context: BandContext;
+}
+
+export interface MeasureSlice {
+  measure: number;
+  drums: DrumHit[];
+  bass: BassNote[];
+  piano: CompNote[];
+  context: BandContext;
+}

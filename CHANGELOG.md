@@ -4,6 +4,49 @@ All notable changes to `@jmove/generator` will be documented in this file.
 
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] - 2026-07-12
+
+### Added
+
+- **Ensemble Coordination Layer** — new `generateEnsemble()` function produces drums, bass, and piano as a coordinated band rather than independent parts. Instruments inform each other: kick pattern shapes bass timing, bass register guides piano voicing placement, drum density modulates piano rhythmic activity
+- **Seedable PRNG** — deterministic generation via `createPRNG(seed)`. Pass a seed to `generateEnsemble()` or individual generators (via `random` option) for reproducible output. Save `result.seed` to replay a "good take"
+- **Streaming iterator** — `generateEnsembleMeasures()` yields measure-by-measure slices for incremental generation without full upfront computation
+- **BandContext coordination** — shared context flows between instruments (kick times, drum density, bass register, hi-hat pattern, crash positions, phrase map)
+- **Phrase-aware generation** — `PhraseMap` computes 2/4/8-bar phrase boundaries from song sections or chord repetition, enabling section-driven dynamics and fills at structural boundaries
+- **Section energy scaling** — `SongSection.dynamicLevel` automatically modulates density (intro sparse, shout dense) across all instruments
+- **Independent PRNG streams** — per-instrument streams (`deriveStream`) ensure changes to one generator's logic don't cascade to others
+- **Built-in alignment** — ensemble function aligns kick↔bass (15ms snap) and bass↔piano (15ms snap with anticipation preservation) internally, eliminating need for post-hoc alignment in consumers
+- **71 ensemble tests** — PRNG determinism/distribution/period, ensemble coordination, all 19 styles smoke test, streaming iterator, streaming fills, streaming phrase continuity, stochastic comping verification, dynamicLevel=0 audibility, MIDI velocity bounds, empty chords graceful handling, per-section energy in streaming, uncovered section default energy, alfaMist grace note non-negative time, performance benchmark (1081 total)
+
+### Fixed
+
+- **Generators deaf to bandContext** — all 3 generators accepted `bandContext` in options but never read it. Wired in energy/density/register reading for actual ensemble-aware dynamics
+- **`getSectionEnergy` divided by 100** — `dynamicLevel` already 0-1 scale, dividing by 100 clamped all sections to minimum energy 0.3. Removed erroneous division
+- **Batch path used measure-0 energy only** — single `getSectionEnergy(0, ...)` call applied first section's energy to entire piece. Fixed with weighted average across all sections
+- **Streaming never updated drumDensity** — stayed 0 forever, piano never reacted to drum density. Added `totalDrumHits` running accumulator
+- **Streaming never updated bassRegister** — stayed "mid" forever, piano never shifted voicings. Added per-measure avgPitch calculation
+- **Drums `dynamicMultiplier` always position 0 in streaming** — loop var `m` reset to 0 each streaming call. Fixed to use `measureStart / measureDuration` for absolute measure index
+- **Bass `dynamicMultiplier` always position 0 in streaming** — relative chord time collapsed to ~0 in streaming. Fixed to use absolute `chord.time / measureDuration`
+- **Double velocity scaling** — `dynamicMultiplier` already multiplies by `section.dynamicLevel`; energy velocity multiplier in each generator applied a second scaling. Quiet sections crushed to ~33% velocity. Fixed: energy multiplier only applies when no sections exist (fallback path)
+- **Streaming never generated drum fills** — `generateDrumPattern(measures: 1)` has `m=0` always, fill guard `m > 0` blocked all fills. Lookahead logic can't work in 1-measure calls. Fixed via `fillHint` option precomputed in ensemble.ts
+- **Streaming lost drum phrase continuity** — each 1-measure call re-initialized `variationIdx`, `barsOnPattern`, `tendency`. Pattern changed every measure instead of holding 2-4 bars. Fixed via persistent `DrumState` across calls
+- **Streaming stochastic comping never activated** — for 9 styles (swing, hardBop, coolJazz, modal, ballad, contemporaryJazz, ecm, metheny, holdsworth), `tendency` was `null` forever in streaming. Fixed: sentinel-based initialization lets first call bootstrap tendency via same rng path as batch
+- **PRNG divergence in streaming** — `variationIdx` hardcoded to 0 instead of rng-picked on first call. Fixed: sentinel -1 triggers proper rng initialization
+- **DrumState not exported** — `DrumState` interface missing from package `index.ts` exports. Added
+- **Non-deterministic tendency shuffle** — `pickTendency` used `sort(() => rng() - 0.5)` which consumes variable rng calls depending on JS engine sort algorithm. Replaced with Fisher-Yates shuffle
+- **`dynamicMultiplier` no floor on `dynamicLevel`** — `dynamicLevel = 0` produced velocity 0 (silent output) while `getSectionEnergy` clamped to 0.3. Added matching `Math.max(0.3, ...)` floor
+- **Piano `measureDuration` division guard missing** — `chord.time / measureDuration` without `|| 1` fallback. Division by zero produced `Infinity`. Added guard
+- **Bass velocity not clamped at 127** — `dynamicMultiplier * energyMult` could push velocity above MIDI max. Added `Math.min(127, ...)` upper clamp
+- **Streaming O(n²) array growth** — `kickTimes` and `bassTimes` rebuilt via spread (`[...old, ...new]`) each measure. Switched to `push()` for O(n) total
+- **Velocity not clamped when humanize=false** — `humanizeVelocity` in drums and piano returned raw velocity without MIDI [1-127] clamp when humanization disabled. Added clamp to both paths
+- **Grace notes produce negative time** — `applyGraceNotes` in pianoComping placed notes 30ms before main note. When first chord starts at time=0, grace note time = -0.030s — invalid for MIDI scheduling/export. Fixed: skip grace note when main note time < 30ms
+
+### Changed
+
+- All generators (`generateDrumPattern`, `generateWalkingBass`, `generatePianoComping`) now accept optional `random?: () => number` parameter for seeded generation. Defaults to `Math.random` — fully backward compatible
+- All generators accept optional `bandContext?: BandContext` for coordination when used within ensemble (ignored when standalone)
+- `applyGroove()`, `humanizeTime()`, `humanizeVelocity()`, `applyMicroVariation()`, `interlockKickHihat()`, `getMeterPatternSet()` gain optional `random` parameter for deterministic humanization
+
 ## [1.0.5] - 2026-06-02
 
 ### Added

@@ -53,6 +53,7 @@ export type {
   PianoCompingOptions,
   DrumHit,
   DrumPatternOptions,
+  DrumState,
 
   // Groove types
   ElementTiming,
@@ -60,6 +61,14 @@ export type {
 
   // Preset types
   StylePreset,
+
+  // Ensemble coordination types
+  RandomFn,
+  PhraseMap,
+  BandContext,
+  EnsembleOptions,
+  EnsembleResult,
+  MeasureSlice,
 } from "./types";
 
 // ── Jam Generator ──
@@ -108,3 +117,9 @@ export { tempoSwingMultiplier, instrumentSwingFactor, dynamicMultiplier } from "
 
 // ── Style Mapping ──
 export { irealStyleToPracticeStyle } from "./styleMapping";
+
+// ── Ensemble ──
+export { generateEnsemble, generateEnsembleMeasures } from "./ensemble";
+
+// ── PRNG ──
+export { createPRNG, randomSeed, deriveStream, STREAM_DRUMS, STREAM_BASS, STREAM_PIANO } from "./prng";

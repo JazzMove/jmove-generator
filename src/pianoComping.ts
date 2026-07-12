@@ -16,6 +16,9 @@ import type { CompNote, PianoStyle, PianoCompingOptions, ChordEvent } from "./ty
 
 export type { CompNote, PianoStyle, PianoCompingOptions, ChordEvent };
 
+// ── Module-level PRNG ──
+let _rng: () => number = Math.random;
+
 // ── Constants ──
 
 const PIANO_LOW = 48;  // C3
@@ -686,7 +689,7 @@ function buildAlfaMistInversionVoicing(root: string, quality: string): number[] 
     [0, third, 7, 14],
   ];
 
-  const intervals = shapes[Math.floor(Math.random() * shapes.length)];
+  const intervals = shapes[Math.floor(_rng() * shapes.length)];
 
   for (let k = 3; k <= 5; k++) {
     const base = 12 * k + rootPC;
@@ -869,7 +872,7 @@ function pickVoicing(
 ): number[] {
   // Pat Metheny: 65% wide open voicings (guitar translation), 35% quartal (variety)
   if (style === "metheny") {
-    return Math.random() < 0.65
+    return _rng() < 0.65
       ? buildOpenVoicing(root, quality)
       : buildQuartalVoicing(root);
   }
@@ -877,7 +880,7 @@ function pickVoicing(
   // Alfa Mist: 45% cluster (tight, dreamy), 20% warm inversions (1st/2nd inv + 9th),
   // 35% standard Evans (variety). Self-taught ear-based voicing approach.
   if (style === "alfaMist") {
-    const roll = Math.random();
+    const roll = _rng();
     if (roll < 0.45) return buildClusterVoicing(root, quality);
     if (roll < 0.65) return buildAlfaMistInversionVoicing(root, quality);
     return buildStandardVoicing(root, quality, prevPitches, shell);
@@ -885,12 +888,12 @@ function pickVoicing(
 
   // Modal: 60% quartal (McCoy Tyner), 40% standard rootless (variety)
   if (style === "modal") {
-    return Math.random() < 0.60 ? buildQuartalVoicing(root) : buildStandardVoicing(root, quality, prevPitches, shell);
+    return _rng() < 0.60 ? buildQuartalVoicing(root) : buildStandardVoicing(root, quality, prevPitches, shell);
   }
 
   // ECM: 70% quartal (Nordic clarity), 30% standard
   if (style === "ecm") {
-    return Math.random() < 0.70 ? buildQuartalVoicing(root) : buildStandardVoicing(root, quality, prevPitches, shell);
+    return _rng() < 0.70 ? buildQuartalVoicing(root) : buildStandardVoicing(root, quality, prevPitches, shell);
   }
 
   // Cool Jazz: always shell voicings (2-note guide tones) for lighter texture
@@ -900,7 +903,7 @@ function pickVoicing(
 
   // Holdsworth: 40% open 5ths (wide intervals), 35% quartal (4th stacks), 25% open voicings
   if (style === "holdsworth") {
-    const roll = Math.random();
+    const roll = _rng();
     if (roll < 0.40) return buildOpen5thsVoicing(root, quality);
     if (roll < 0.75) return buildQuartalVoicing(root);
     return buildOpenVoicing(root, quality);
@@ -908,11 +911,11 @@ function pickVoicing(
 
   // Fusion: 50% quartal (Herbie Hancock), 50% open voicings
   if (style === "fusion") {
-    return Math.random() < 0.50 ? buildQuartalVoicing(root) : buildOpenVoicing(root, quality);
+    return _rng() < 0.50 ? buildQuartalVoicing(root) : buildOpenVoicing(root, quality);
   }
 
   // Neo-Soul: 55% cluster voicings (Glasper, higher register), 45% standard
-  if (style === "neoSoul" && Math.random() < 0.55) {
+  if (style === "neoSoul" && _rng() < 0.55) {
     return buildClusterVoicing(root, quality);
   }
 
@@ -976,7 +979,7 @@ function pickRhythm(
   if (density !== undefined && patterns.length > 1) {
     const sorted = [...patterns].sort((a, b) => a.length - b.length);
     const idx = Math.floor((density / 100) * (sorted.length - 0.01));
-    if (Math.random() < 0.7) {
+    if (_rng() < 0.7) {
       const picked = sorted[Math.min(idx, sorted.length - 1)];
       return { rhythm: picked, index: patterns.indexOf(picked) };
     }
@@ -990,14 +993,14 @@ function pickRhythm(
       return 1.0;
     });
     const total = weights.reduce((a, b) => a + b, 0);
-    let r = Math.random() * total;
+    let r = _rng() * total;
     for (let i = 0; i < weights.length; i++) {
       r -= weights[i];
       if (r <= 0) return { rhythm: patterns[i], index: i };
     }
   }
 
-  const idx = Math.floor(Math.random() * patterns.length);
+  const idx = Math.floor(_rng() * patterns.length);
   return { rhythm: patterns[idx], index: idx };
 }
 
@@ -1006,12 +1009,12 @@ function humanizeTime(time: number, enabled: boolean, style?: string, beatOffset
   const template = getGrooveTemplate(style ?? "swing");
   const isAnticipation = beatOffset !== undefined && beatOffset >= 3.5;
   const element = isAnticipation ? template.pianoAnticipation : template.piano;
-  return applyGroove(time, element);
+  return applyGroove(time, element, _rng);
 }
 
 function humanizeVelocity(vel: number, enabled: boolean): number {
-  if (!enabled) return vel;
-  return Math.max(40, Math.min(127, vel + Math.floor((Math.random() - 0.5) * 10)));
+  if (!enabled) return Math.max(40, Math.min(127, vel));
+  return Math.max(40, Math.min(127, vel + Math.floor((_rng() - 0.5) * 10)));
 }
 
 /** Expand multi-pitch CompNotes into staggered single-pitch notes.
@@ -1054,7 +1057,7 @@ function applyBrokenVoicings(
 
   const result: CompNote[] = [];
   for (const note of notes) {
-    if (note.pitches.length !== 4 || Math.random() >= 0.20) {
+    if (note.pitches.length !== 4 || _rng() >= 0.20) {
       result.push(note);
       continue;
     }
@@ -1115,10 +1118,12 @@ export function generatePianoComping(
   options: PianoCompingOptions = {},
 ): CompNote[] {
   if (chords.length === 0) return [];
+  const prevRng = _rng;
+  _rng = options.random ?? Math.random;
 
   const style = options.style ?? "swing";
   const tempo = options.tempo ?? 120;
-  if (tempo <= 0) throw new RangeError(`tempo must be > 0, got ${tempo}`);
+  if (tempo <= 0) { _rng = prevRng; throw new RangeError(`tempo must be > 0, got ${tempo}`); }
   const humanize = options.humanize ?? true;
   const density = options.density;
   const swingAmount = options.swingAmount ?? 100; // default: full triplet swing (matches drum default)
@@ -1141,8 +1146,12 @@ export function generatePianoComping(
     : style === "alfaMist" ? 0.80
     : 1.0;
 
+  const bandCtx = options.bandContext;
   const useShell = density !== undefined && density < 35;
-  const baseRestChance = 0.15 * (1 - (density ?? 50) / 100);
+  // BandContext: when drums are dense, piano rests more to avoid mud
+  const drumDensityRestBoost = bandCtx && bandCtx.drumDensity > 0.6
+    ? 0.08 * bandCtx.drumDensity : 0;
+  const baseRestChance = 0.15 * (1 - (density ?? 50) / 100) + drumDensityRestBoost;
   const notes: CompNote[] = [];
   let prevPitches: number[] | null = null;
   let wasRest = false;
@@ -1173,7 +1182,7 @@ export function generatePianoComping(
 
     // Rest bar: skip chord for natural breathing (never first, never last, never consecutive)
     const isLast = ci === chords.length - 1;
-    if (ci > 0 && !isLast && !wasRest && Math.random() < restChance) {
+    if (ci > 0 && !isLast && !wasRest && _rng() < restChance) {
       wasRest = true;
       continue;
     }
@@ -1194,7 +1203,7 @@ export function generatePianoComping(
       if (recentRhythmIndices.length > 2) recentRhythmIndices.pop();
       if (style === "alfaMist") {
         loopRhythm = rhythm;
-        loopBarsLeft = 1 + Math.floor(Math.random() * 3); // hold 2-4 bars total (1 remaining + current)
+        loopBarsLeft = 1 + Math.floor(_rng() * 3); // hold 2-4 bars total (1 remaining + current)
       }
     }
 
@@ -1223,11 +1232,25 @@ export function generatePianoComping(
       );
 
       const dynMult = options.measureInfo
-        ? dynamicMultiplier(Math.floor(chord.time / options.measureInfo.measureDuration), options.measureInfo.totalMeasures, style, options.measureInfo.sections)
+        ? dynamicMultiplier(Math.floor(chord.time / (options.measureInfo.measureDuration || 1)), options.measureInfo.totalMeasures, style, options.measureInfo.sections)
         : 1.0;
-      const baseVel = Math.round((beatOffset === 0 ? 80 : 70) * velScale * dynMult);
+      // BandContext: energy-scaled velocity (quiet sections = softer piano).
+      // Skip when dynamicMultiplier already incorporates section.dynamicLevel
+      // to avoid double-scaling quiet sections.
+      const hasSectionDynamics = options.measureInfo?.sections && options.measureInfo.sections.length > 0;
+      const energyMult = (bandCtx && !hasSectionDynamics) ? (0.7 + bandCtx.sectionEnergy * 0.3) : 1.0;
+      const baseVel = Math.round((beatOffset === 0 ? 80 : 70) * velScale * dynMult * energyMult);
+
+      // BandContext: avoid bass register collision — shift voicings up when bass is high
+      let finalPitches = usePitches;
+      if (bandCtx?.bassRegister === "high") {
+        const lowestPitch = Math.min(...usePitches);
+        if (lowestPitch < 60) {
+          finalPitches = usePitches.map(p => p + 12);
+        }
+      }
       notes.push({
-        pitches: [...usePitches],
+        pitches: [...finalPitches],
         time: humanizeTime(time, humanize, style, rawBeatOffset),
         duration: duration * 0.95,
         velocity: humanizeVelocity(baseVel, humanize),
@@ -1243,6 +1266,7 @@ export function generatePianoComping(
   const graced = style === "alfaMist" ? applyGraceNotes(broken, 0.20) : broken;
 
   graced.sort((a, b) => a.time - b.time);
+  _rng = prevRng;
   return doStrum ? strumSpread(graced, strumMs) : graced;
 }
 
@@ -1254,18 +1278,18 @@ export function generatePianoComping(
 function applyGraceNotes(notes: CompNote[], probability: number): CompNote[] {
   const result: CompNote[] = [];
   for (const note of notes) {
-    if (note.pitches.length < 3 || Math.random() >= probability) {
+    if (note.pitches.length < 3 || _rng() >= probability) {
       result.push(note);
       continue;
     }
     // Pick an inner tone (not lowest, not highest) to approach from below
     const sorted = [...note.pitches].sort((a, b) => a - b);
-    const innerIdx = 1 + Math.floor(Math.random() * (sorted.length - 2));
+    const innerIdx = 1 + Math.floor(_rng() * (sorted.length - 2));
     const target = sorted[innerIdx];
     const gracePitch = target - 1; // half-step below
 
-    if (gracePitch >= PIANO_LOW) {
-      // Insert grace note 30ms before main note
+    if (gracePitch >= PIANO_LOW && note.time >= 0.030) {
+      // Insert grace note 30ms before main note (skip if too close to time 0)
       result.push({
         pitches: [gracePitch],
         time: note.time - 0.030,

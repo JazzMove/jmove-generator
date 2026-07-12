@@ -1797,13 +1797,19 @@ interface CompingTendency {
   barsRemaining: number;
 }
 
-function pickTendency(table: StochasticTable): CompingTendency {
+function pickTendency(table: StochasticTable, rng: () => number = Math.random): CompingTendency {
   const positions = Object.keys(table.slots);
-  const count = 2 + Math.floor(Math.random() * 2); // 2-3 favored positions
-  const shuffled = [...positions].sort(() => Math.random() - 0.5);
+  const count = 2 + Math.floor(rng() * 2); // 2-3 favored positions
+  // Fisher-Yates shuffle: deterministic rng consumption (exactly positions.length - 1 calls)
+  // unlike sort(() => rng() - 0.5) which varies by engine's sort algorithm.
+  const shuffled = [...positions];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
   return {
     favored: shuffled.slice(0, count),
-    barsRemaining: 2 + Math.floor(Math.random() * 3), // 2-4 bars
+    barsRemaining: 2 + Math.floor(rng() * 3), // 2-4 bars
   };
 }
 
@@ -1811,6 +1817,7 @@ function generateStochasticComping(
   table: StochasticTable,
   density: number,
   tendency: CompingTendency,
+  rng: () => number = Math.random,
 ): PatternHit[] {
   const densityScale = 0.5 + (density / 100) * 1.0;
   const hits: PatternHit[] = [];
@@ -1820,7 +1827,7 @@ function generateStochasticComping(
     for (const slot of slots) {
       const tendencyBoost = tendency.favored.includes(beatStr) ? 2.0 : 1.0;
       const adjustedProb = Math.min(1.0, slot.probability * densityScale * tendencyBoost);
-      if (Math.random() < adjustedProb) {
+      if (rng() < adjustedProb) {
         hits.push({ drum: slot.drum, beat, velocity: slot.velocity, ghost: slot.ghost });
       }
     }
@@ -1846,18 +1853,19 @@ function generateStochasticComping(
 
 // ── Helpers ──
 
-export function humanizeTime(time: number, enabled: boolean, style?: string, drumPitch?: number): number {
+export function humanizeTime(time: number, enabled: boolean, style?: string, drumPitch?: number, random?: () => number): number {
   if (!enabled) return time;
   const template = getGrooveTemplate(style ?? "swing");
   const elementKey = drumPitch !== undefined ? drumPitchToElement(drumPitch) : "ride" as const;
   const element = template[elementKey];
-  return applyGroove(time, element);
+  return applyGroove(time, element, random);
 }
 
-export function humanizeVelocity(vel: number, ghost: boolean, enabled: boolean): number {
-  if (ghost) return Math.max(35, Math.min(50, vel + (enabled ? Math.floor((Math.random() - 0.5) * 10) : 0)));
-  if (!enabled) return vel;
-  return Math.max(45, Math.min(127, vel + Math.floor((Math.random() - 0.5) * 12)));
+export function humanizeVelocity(vel: number, ghost: boolean, enabled: boolean, random?: () => number): number {
+  const rng = random ?? Math.random;
+  if (ghost) return Math.max(35, Math.min(50, vel + (enabled ? Math.floor((rng() - 0.5) * 10) : 0)));
+  if (!enabled) return Math.max(45, Math.min(127, vel));
+  return Math.max(45, Math.min(127, vel + Math.floor((rng() - 0.5) * 12)));
 }
 
 // ── Beat-to-Beat Micro-Variation ──
@@ -1877,48 +1885,50 @@ export function applyMicroVariation(
   style: string,
   density: number,
   humanize: boolean,
+  random?: () => number,
 ): void {
+  const rng = random ?? Math.random;
   if (!MICRO_VARIATION_STYLES.has(style)) return;
   if (density < 30) return;
 
   // Ghost kick on beat 3 (~15%)
-  if (Math.random() < 0.15 && beatsPerMeasure >= 4) {
+  if (rng() < 0.15 && beatsPerMeasure >= 4) {
     const time = measureStart + 2 * beatDuration;
     const hasKick = hits.some(h => h.pitch === GM_DRUMS.KICK && Math.abs(h.time - time) < beatDuration * 0.1);
     if (!hasKick) {
       hits.push({
         pitch: GM_DRUMS.KICK,
-        time: humanizeTime(time, humanize),
+        time: humanizeTime(time, humanize, undefined, undefined, rng),
         duration: 0.08,
-        velocity: humanizeVelocity(45, true, humanize),
+        velocity: humanizeVelocity(45, true, humanize, rng),
       });
     }
   }
 
   // Snare ghost on random "and" (~10%)
-  if (Math.random() < 0.10) {
-    const beat = Math.floor(Math.random() * Math.min(beatsPerMeasure, 4));
+  if (rng() < 0.10) {
+    const beat = Math.floor(rng() * Math.min(beatsPerMeasure, 4));
     const time = measureStart + (beat + 0.5) * beatDuration;
     const hasSnare = hits.some(h => h.pitch === GM_DRUMS.SNARE && Math.abs(h.time - time) < beatDuration * 0.2);
     if (!hasSnare) {
       hits.push({
         pitch: GM_DRUMS.SNARE,
-        time: humanizeTime(time, humanize),
+        time: humanizeTime(time, humanize, undefined, undefined, rng),
         duration: 0.08,
-        velocity: humanizeVelocity(35, true, humanize),
+        velocity: humanizeVelocity(35, true, humanize, rng),
       });
     }
   }
 
   // Hi-hat open splash on "and" of 2 or 4 (~8%)
-  if (Math.random() < 0.08 && beatsPerMeasure >= 4) {
-    const beat = Math.random() < 0.5 ? 1 : 3;
+  if (rng() < 0.08 && beatsPerMeasure >= 4) {
+    const beat = rng() < 0.5 ? 1 : 3;
     const time = measureStart + (beat + 0.5) * beatDuration;
     hits.push({
       pitch: GM_DRUMS.HI_HAT_OPEN,
-      time: humanizeTime(time, humanize),
+      time: humanizeTime(time, humanize, undefined, undefined, rng),
       duration: 0.08,
-      velocity: humanizeVelocity(55, false, humanize),
+      velocity: humanizeVelocity(55, false, humanize, rng),
     });
   }
 }
@@ -1950,36 +1960,36 @@ function getFunkPatternSet(): StylePatternSet {
   return { base: [...FUNK_HIHAT], variations: FUNK_KICK_SNARE };
 }
 
-function getFusionPatternSet(): StylePatternSet {
+function getFusionPatternSet(rng: () => number = Math.random): StylePatternSet {
   // 30% linear patterns (full kit in one array, no separate base)
-  if (Math.random() < 0.3) {
+  if (rng() < 0.3) {
     return { base: [], variations: [FUSION_LINEAR_A, FUSION_LINEAR_B] };
   }
   // 35% ride bell timekeeping instead of hi-hat
-  const base = Math.random() < 0.35 ? [...FUSION_RIDE_BELL] : [...FUSION_HIHAT];
+  const base = rng() < 0.35 ? [...FUSION_RIDE_BELL] : [...FUSION_HIHAT];
   return { base, variations: FUSION_KICK_SNARE };
 }
 
-function getAlfaMistPatternSet(): StylePatternSet {
+function getAlfaMistPatternSet(rng: () => number = Math.random): StylePatternSet {
   // 50/50 between full 16th shimmer and broken-gap hi-hat
-  const hihat = Math.random() < 0.50 ? ALFA_MIST_HIHAT : ALFA_MIST_HIHAT_BROKEN;
+  const hihat = rng() < 0.50 ? ALFA_MIST_HIHAT : ALFA_MIST_HIHAT_BROKEN;
   return { base: [...hihat], variations: ALFA_MIST_KICK_SNARE };
 }
 
-function getMethenyPatternSet(): StylePatternSet {
+function getMethenyPatternSet(rng: () => number = Math.random): StylePatternSet {
   // 40% brush-like ride for timbral variety (Bob Moses)
-  const ride = Math.random() < 0.4 ? [...METHENY_RIDE_BRUSHES] : [...METHENY_RIDE];
+  const ride = rng() < 0.4 ? [...METHENY_RIDE_BRUSHES] : [...METHENY_RIDE];
   return { base: [...ride, ...METHENY_HIHAT], variations: METHENY_KICK_SNARE };
 }
 
-function getHoldsworthPatternSet(): StylePatternSet {
+function getHoldsworthPatternSet(rng: () => number = Math.random): StylePatternSet {
   // 30% bell ride for timbral variation (Wackerman)
-  const ride = Math.random() < 0.3 ? [...HOLDSWORTH_RIDE_BELL] : [...HOLDSWORTH_RIDE];
+  const ride = rng() < 0.3 ? [...HOLDSWORTH_RIDE_BELL] : [...HOLDSWORTH_RIDE];
   return { base: [...ride, ...HOLDSWORTH_HIHAT], variations: HOLDSWORTH_KICK_SNARE };
 }
 
-function getNeoSoulPatternSet(): StylePatternSet {
-  const base = Math.random() < 0.5 ? [...NEO_SOUL_HIHAT] : [...NEO_SOUL_HIHAT_B];
+function getNeoSoulPatternSet(rng: () => number = Math.random): StylePatternSet {
+  const base = rng() < 0.5 ? [...NEO_SOUL_HIHAT] : [...NEO_SOUL_HIHAT_B];
   return { base, variations: NEO_SOUL_KICK_SNARE };
 }
 
@@ -1987,13 +1997,13 @@ function getContemporaryJazzPatternSet(): StylePatternSet {
   return { base: [...CONTEMP_RIDE, ...CONTEMP_HIHAT], variations: CONTEMP_KICK_SNARE };
 }
 
-function getMathRockPatternSet(): StylePatternSet {
-  const base = Math.random() < 0.5 ? [...MATH_HIHAT_5] : [...MATH_HIHAT_3];
+function getMathRockPatternSet(rng: () => number = Math.random): StylePatternSet {
+  const base = rng() < 0.5 ? [...MATH_HIHAT_5] : [...MATH_HIHAT_3];
   return { base, variations: MATH_KICK_SNARE };
 }
 
-function getIdmPatternSet(): StylePatternSet {
-  const r = Math.random();
+function getIdmPatternSet(rng: () => number = Math.random): StylePatternSet {
+  const r = rng();
   const base = r < 0.33 ? [...IDM_HIHAT] : r < 0.67 ? [...IDM_HIHAT_B] : [...IDM_HIHAT_C];
   return { base, variations: IDM_KICK_SNARE };
 }
@@ -2022,8 +2032,8 @@ function getFiveFourPatternSet(): StylePatternSet {
   return { base: [...FIVE_FOUR_RIDE_3_2, ...FIVE_FOUR_HIHAT], variations: FIVE_FOUR_KICK_SNARE };
 }
 
-function getSevenEighthPatternSet(): StylePatternSet {
-  const base = Math.random() < 0.6 ? [...SEVEN_EIGHT_RIDE_223] : [...SEVEN_EIGHT_RIDE_322];
+function getSevenEighthPatternSet(rng: () => number = Math.random): StylePatternSet {
+  const base = rng() < 0.6 ? [...SEVEN_EIGHT_RIDE_223] : [...SEVEN_EIGHT_RIDE_322];
   return { base, variations: SEVEN_EIGHT_KICK_SNARE };
 }
 
@@ -2048,12 +2058,12 @@ function getElevenEighthPatternSet(): StylePatternSet {
 }
 
 /** Get meter-specific pattern set. Returns null if no special pattern exists (use style default). */
-export function getMeterPatternSet(timeSig: [number, number]): StylePatternSet | null {
+export function getMeterPatternSet(timeSig: [number, number], random?: () => number): StylePatternSet | null {
   const [n, d] = timeSig;
   if (n === 3 && d === 4) return getJazzWaltzPatternSet();
   if (n === 5 && d === 4) return getFiveFourPatternSet();
   if (n === 6 && d === 8) return getSixEighthPatternSet();
-  if (n === 7 && d === 8) return getSevenEighthPatternSet();
+  if (n === 7 && d === 8) return getSevenEighthPatternSet(random);
   if (n === 9 && d === 8) return getNineEighthPatternSet();
   if (n === 6 && d === 4) return getSixFourPatternSet();
   if (n === 7 && d === 4) return getSevenFourPatternSet();
@@ -2101,6 +2111,7 @@ export function getStylePatternSet(style: string): StylePatternSet {
  * before switching to a new variation, mimicking how real drummers play.
  */
 export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[] {
+  const rng = options.random ?? Math.random;
   const style = options.style ?? "swing";
   const tempo = options.tempo ?? 120;
   if (tempo <= 0) throw new RangeError(`tempo must be > 0, got ${tempo}`);
@@ -2113,13 +2124,14 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
   const swingAmount = options.swingAmount ?? 100;
   const formMarkers = options.formMarkers ?? [];
   const sectionMarkers = options.sectionMarkers ?? [];
+  const bandCtx = options.bandContext;
   const beatDuration = 60 / tempo;
   const beatsPerMeasure = timeSig[0] * (4 / timeSig[1]);
   const measureDuration = beatsPerMeasure * beatDuration;
 
   // Select pattern set: meter-specific patterns override style when in odd meters
   // (e.g., 5/4 or 7/8 need specific grouping patterns regardless of style)
-  const meterPatternSet = getMeterPatternSet(timeSig);
+  const meterPatternSet = getMeterPatternSet(timeSig, rng);
   const isOddMeter = meterPatternSet !== null && !(timeSig[0] === 4 && timeSig[1] === 4) && !(timeSig[0] === 3 && timeSig[1] === 4 && style === "jazzWaltz");
 
   let patternSet: StylePatternSet;
@@ -2131,20 +2143,20 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
       case "latin": patternSet = getLatinPatternSet(); break;
       case "ballad": patternSet = getBalladPatternSet(); break;
       case "funk": patternSet = getFunkPatternSet(); break;
-      case "fusion": patternSet = getFusionPatternSet(); break;
+      case "fusion": patternSet = getFusionPatternSet(rng); break;
       case "ecm": patternSet = getEcmPatternSet(); break;
       case "hardBop": patternSet = getHardBopPatternSet(); break;
       case "coolJazz": patternSet = getCoolJazzPatternSet(); break;
       case "modal": patternSet = getModalPatternSet(); break;
       case "jazzWaltz": patternSet = getJazzWaltzPatternSet(); break;
       case "shuffleBlues": patternSet = getShuffleBluesPatternSet(); break;
-      case "neoSoul": patternSet = getNeoSoulPatternSet(); break;
+      case "neoSoul": patternSet = getNeoSoulPatternSet(rng); break;
       case "contemporaryJazz": patternSet = getContemporaryJazzPatternSet(); break;
-      case "mathRock": patternSet = getMathRockPatternSet(); break;
-      case "idm": patternSet = getIdmPatternSet(); break;
-      case "holdsworth": patternSet = getHoldsworthPatternSet(); break;
-      case "alfaMist": patternSet = getAlfaMistPatternSet(); break;
-      case "metheny": patternSet = getMethenyPatternSet(); break;
+      case "mathRock": patternSet = getMathRockPatternSet(rng); break;
+      case "idm": patternSet = getIdmPatternSet(rng); break;
+      case "holdsworth": patternSet = getHoldsworthPatternSet(rng); break;
+      case "alfaMist": patternSet = getAlfaMistPatternSet(rng); break;
+      case "metheny": patternSet = getMethenyPatternSet(rng); break;
       case "swing":
       default: patternSet = getSwingPatternSet(); break;
     }
@@ -2152,14 +2164,24 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
 
   // Phrase continuity: hold kick/snare variation for 2-4 bars before switching
   // For stochastic styles, "tendency" replaces fixed variation rotation.
+  // In streaming (measures=1), state is restored from options.drumState to maintain
+  // continuity across calls.
   const isStochastic = STOCHASTIC_STYLES.has(style);
   const stochasticTable = isStochastic ? STOCHASTIC_TABLES[style] : null;
-  let tendency: CompingTendency | null = isStochastic && stochasticTable
-    ? pickTendency(stochasticTable) : null;
+  const ds = options.drumState;
+  // When drumState is provided with sentinel values (variationIdx < 0, tendency null),
+  // initialize them using rng so PRNG consumption matches the batch (no drumState) path.
+  let tendency: CompingTendency | null = (ds && ds.tendency !== null)
+    ? ds.tendency as CompingTendency
+    : (isStochastic && stochasticTable ? pickTendency(stochasticTable, rng) : null);
 
-  let variationIdx = Math.floor(Math.random() * patternSet.variations.length);
-  let barsOnPattern = 0;
-  let patternHoldBars = 2 + Math.floor(Math.random() * 3);
+  let variationIdx = (ds && ds.variationIdx >= 0)
+    ? ds.variationIdx
+    : Math.floor(rng() * patternSet.variations.length);
+  let barsOnPattern = ds ? ds.barsOnPattern : 0;
+  let patternHoldBars = (ds && ds.patternHoldBars >= 0)
+    ? ds.patternHoldBars
+    : 2 + Math.floor(rng() * 3);
 
   const hits: DrumHit[] = [];
 
@@ -2168,7 +2190,7 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
     if (isStochastic && tendency) {
       tendency.barsRemaining--;
       if (tendency.barsRemaining <= 0) {
-        tendency = pickTendency(stochasticTable!);
+        tendency = pickTendency(stochasticTable!, rng);
       }
     }
 
@@ -2177,64 +2199,77 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
       if (patternSet.variations.length > 2) {
         const candidates = Array.from({ length: patternSet.variations.length }, (_, i) => i)
           .filter((i) => i !== variationIdx);
-        variationIdx = candidates[Math.floor(Math.random() * candidates.length)];
+        variationIdx = candidates[Math.floor(rng() * candidates.length)];
       } else {
         variationIdx = 1 - variationIdx;
       }
-      patternHoldBars = 2 + Math.floor(Math.random() * 3);
+      patternHoldBars = 2 + Math.floor(rng() * 3);
       barsOnPattern = 0;
     }
 
     const measureStart = startTime + m * measureDuration;
+
+    // BandContext: section energy scales intensity (0.3=sparse intro, 1.0=dense shout)
+    const energy = bandCtx?.sectionEnergy ?? 0.7;
 
     // Crash cymbal on form boundaries — louder at section boundaries
     // Alfa Mist: crashes only on section starts or 30% of phrase boundaries (sparse, not every 4 bars)
     if (formMarkers.includes(m)) {
       const isSectionStart = sectionMarkers.includes(m);
       const crashProb = style === "alfaMist" ? (isSectionStart ? 0.8 : 0.25) : 1.0;
-      if (m === 0 || Math.random() < crashProb) {
+      if (m === 0 || rng() < crashProb) {
+        // BandContext: crash velocity scales with energy (soft intros, big climaxes)
+        const crashBaseVel = isSectionStart ? 85 : 70;
+        const crashVel = Math.round(crashBaseVel * (0.6 + energy * 0.4));
         hits.push({
           pitch: GM_DRUMS.CRASH,
-          time: humanizeTime(measureStart, humanize, style, GM_DRUMS.CRASH),
+          time: humanizeTime(measureStart, humanize, style, GM_DRUMS.CRASH, rng),
           duration: isSectionStart ? 0.15 : 0.08,
-          velocity: humanizeVelocity(isSectionStart ? 85 : 70, false, humanize),
+          velocity: humanizeVelocity(crashVel, false, humanize, rng),
         });
       }
     }
 
     // Structure-aware fills: size matches form position
+    // BandContext: fill probability scales with energy — sparse sections rarely fill
+    // In streaming (measures=1), fillHint from ensemble.ts provides lookahead info
+    // since the single-measure loop can't look at m+1/m+2.
     let fillPattern: Pattern | null = null;
-    if (FILL_STYLES.has(style) && m > 0) {
-      const isBeforeSectionMarker = sectionMarkers.includes(m + 1);
-      const isBeforeFormMarker = formMarkers.includes(m + 1);
-      const isSetupBar = sectionMarkers.includes(m + 2);
+    const fillHint = options.fillHint;
+    if (FILL_STYLES.has(style) && (m > 0 || fillHint)) {
+      const isBeforeSectionMarker = fillHint === "section" || sectionMarkers.includes(m + 1);
+      const isBeforeFormMarker = fillHint === "phrase" || formMarkers.includes(m + 1);
+      const isSetupBar = fillHint === "setup" || sectionMarkers.includes(m + 2);
+
+      // Energy multiplier: at energy 0.3 fills are 40% as likely, at 1.0 fully likely
+      const energyFillMult = 0.2 + energy * 0.8;
 
       // Alfa Mist: fills are rarer and subtler (broken-beat, not flashy jazz)
-      const sectionProb = style === "alfaMist" ? 0.35 : 0.6;
-      const phraseProb = style === "alfaMist" ? 0.20 : 0.4;
+      const sectionProb = (style === "alfaMist" ? 0.35 : 0.6) * energyFillMult;
+      const phraseProb = (style === "alfaMist" ? 0.20 : 0.4) * energyFillMult;
 
-      if (isBeforeSectionMarker && Math.random() < sectionProb) {
+      if (isBeforeSectionMarker && rng() < sectionProb) {
         // Big fill before major section boundary
         const pool = style === "holdsworth" ? HOLDSWORTH_FILLS
           : style === "alfaMist" ? ALFA_MIST_FILLS
           : style === "fusion" ? FUSION_FILLS : JAZZ_FILLS_BIG;
-        fillPattern = pool[Math.floor(Math.random() * pool.length)];
-      } else if (isBeforeFormMarker && Math.random() < phraseProb) {
+        fillPattern = pool[Math.floor(rng() * pool.length)];
+      } else if (isBeforeFormMarker && rng() < phraseProb) {
         // Medium or small fill before phrase boundary
         const pool = style === "holdsworth" ? HOLDSWORTH_FILLS
           : style === "alfaMist" ? ALFA_MIST_FILLS
           : style === "fusion" ? FUSION_FILLS : JAZZ_FILLS;
-        fillPattern = pool[Math.floor(Math.random() * pool.length)];
-      } else if (isSetupBar && Math.random() < 0.25) {
+        fillPattern = pool[Math.floor(rng() * pool.length)];
+      } else if (isSetupBar && rng() < 0.25 * energyFillMult) {
         // Setup fill: subtle anticipation 2 bars before section
-        fillPattern = SETUP_FILLS[Math.floor(Math.random() * SETUP_FILLS.length)];
+        fillPattern = SETUP_FILLS[Math.floor(rng() * SETUP_FILLS.length)];
       }
     }
 
     // Comping: stochastic per-beat generation for jazz styles, fixed arrays for others
     let compHits: PatternHit[];
     if (isStochastic && stochasticTable && tendency) {
-      compHits = generateStochasticComping(stochasticTable, density, tendency);
+      compHits = generateStochasticComping(stochasticTable, density, tendency, rng);
     } else {
       compHits = patternSet.variations[variationIdx];
     }
@@ -2243,11 +2278,14 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
     const variationHits = fillPattern ? compHits.filter((h) => h.beat < 2) : compHits;
     const pattern = [...patternSet.base, ...variationHits, ...(fillPattern ?? [])];
 
+    // BandContext: energy-aware ghost note threshold — low energy strips ghosts earlier
+    const ghostThreshold = bandCtx ? Math.round(15 + (1 - energy) * 20) : 15;
+
     for (const hit of pattern) {
       if (hit.beat >= beatsPerMeasure) continue;
 
-      // Density filtering: ghost notes removed at low density
-      if (hit.ghost && density < 15) continue;
+      // Density filtering: ghost notes removed at low density (threshold rises in quiet sections)
+      if (hit.ghost && density < ghostThreshold) continue;
 
       // Apply swingAmount to pre-swung skip notes (0.67 positions → parametric)
       let beat = hit.beat;
@@ -2263,25 +2301,39 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
       if (humanize && (hit.drum === GM_DRUMS.RIDE || hit.drum === GM_DRUMS.RIDE_BELL) && Math.abs(frac - 0.67) < 0.02) {
         time += 0.005;
       }
+      const absoluteMeasureIdx = Math.round(measureStart / measureDuration);
       const dynMult = options.measureInfo
-        ? dynamicMultiplier(m, options.measureInfo.totalMeasures, undefined, options.measureInfo.sections)
+        ? dynamicMultiplier(absoluteMeasureIdx, options.measureInfo.totalMeasures, undefined, options.measureInfo.sections)
         : 1.0;
+      // BandContext: velocity scaled by energy (quiet sections play softer).
+      // Skip when dynamicMultiplier already incorporates section.dynamicLevel
+      // to avoid double-scaling quiet sections.
+      const hasSectionDynamics = options.measureInfo?.sections && options.measureInfo.sections.length > 0;
+      const energyVelMult = (bandCtx && !hasSectionDynamics) ? (0.7 + energy * 0.3) : 1.0;
       hits.push({
         pitch: hit.drum,
-        time: humanizeTime(time, humanize, style, hit.drum),
+        time: humanizeTime(time, humanize, style, hit.drum, rng),
         duration: 0.08,
-        velocity: humanizeVelocity(Math.round(hit.velocity * dynMult), hit.ghost ?? false, humanize),
+        velocity: humanizeVelocity(Math.round(hit.velocity * dynMult * energyVelMult), hit.ghost ?? false, humanize, rng),
       });
     }
 
-    applyMicroVariation(hits, measureStart, beatDuration, beatsPerMeasure, style, density, humanize);
+    applyMicroVariation(hits, measureStart, beatDuration, beatsPerMeasure, style, density, humanize, rng);
 
     barsOnPattern++;
   }
 
+  // Persist state for streaming continuity across 1-measure calls
+  if (ds) {
+    ds.variationIdx = variationIdx;
+    ds.barsOnPattern = barsOnPattern;
+    ds.patternHoldBars = patternHoldBars;
+    ds.tendency = tendency;
+  }
+
   hits.sort((a, b) => a.time - b.time);
 
-  interlockKickHihat(hits, style);
+  interlockKickHihat(hits, style, rng);
 
   return hits;
 }
@@ -2290,8 +2342,9 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
 
 const INTERLOCK_STYLES = new Set(["swing", "hardBop", "coolJazz", "modal", "neoSoul", "contemporaryJazz", "holdsworth", "alfaMist"]);
 
-export function interlockKickHihat(hits: DrumHit[], style: string): void {
+export function interlockKickHihat(hits: DrumHit[], style: string, random?: () => number): void {
   if (!INTERLOCK_STYLES.has(style)) return;
+  const rng = random ?? Math.random;
 
   const kicks = hits.filter(h => h.pitch === GM_DRUMS.KICK);
   for (const kick of kicks) {
@@ -2299,7 +2352,7 @@ export function interlockKickHihat(hits: DrumHit[], style: string): void {
       if (hit.pitch !== GM_DRUMS.HI_HAT_CLOSED) continue;
       if (Math.abs(hit.time - kick.time) > 0.02) continue;
 
-      if (Math.random() < 0.6) {
+      if (rng() < 0.6) {
         hit.pitch = GM_DRUMS.HI_HAT_OPEN;
         hit.velocity = Math.min(hit.velocity + 10, 70);
         hit.duration = 0.12;

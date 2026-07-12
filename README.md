@@ -25,6 +25,8 @@ Deep technical articles about how JMove and the generator work:
 
 ## Features
 
+- **Ensemble Coordination** — `generateEnsemble()` produces drums, bass, and piano as a coordinated band. Kick patterns shape bass timing, bass register guides piano voicings, drum density modulates comping activity
+- **Seedable & Reproducible** — deterministic PRNG (xoshiro128**) with per-instrument streams. Save a seed, replay the exact same take
 - **Jam Session Generator** — random chord progressions across 17 jazz forms (blues, rhythm changes, AABA, modal, Coltrane matrix, and more)
 - **Walking Bass** — rule-based walking lines with chromatic approaches, 19 styles (swing, bossa, Latin tumbao, neo-soul, math rock, IDM)
 - **Piano Comping** — Bill Evans rootless voicings (Type A/B), quartal, shell, cluster — voice-led with rhythmic templates per style
@@ -32,6 +34,8 @@ Deep technical articles about how JMove and the generator work:
 - **22 Style Presets** — Classic Swing to IDM, with per-instrument style overrides
 - **Auto-Detect** — analyze a score to recommend the best preset
 - **Full Song Form** — multi-section arrangements with dynamic shaping
+- **Phrase-Aware Generation** — 2/4/8-bar phrase boundaries with section-driven dynamics (intro sparse, shout dense)
+- **Streaming Iterator** — `generateEnsembleMeasures()` yields measure-by-measure for incremental generation
 - **Groove Templates** — structured micro-timing offsets per instrument, not random jitter
 
 ## Install
@@ -44,16 +48,12 @@ Requires Node.js 20+.
 
 ## Quick Start
 
-```typescript
-import {
-  generateJamSession,
-  generateWalkingBass,
-  generatePianoComping,
-  generateDrumPattern,
-  scoreChordsToEvents,
-} from '@jmove/generator';
+### Ensemble (recommended)
 
-// Generate a 12-bar blues in Bb at 140 BPM
+```typescript
+import { generateJamSession, generateEnsemble, scoreChordsToEvents } from '@jmove/generator';
+
+// Generate a 12-bar blues in Bb
 const session = generateJamSession({
   key: 'Bb',
   form: 'blues12',
@@ -62,10 +62,33 @@ const session = generateJamSession({
   timeSignature: [4, 4],
 });
 
-// Extract chord events from the score
+// Generate coordinated ensemble (drums → bass → piano)
 const chords = scoreChordsToEvents(session.score.measures);
+const result = generateEnsemble({
+  chordEvents: chords,
+  style: 'swing',
+  tempo: 140,
+  measures: 12,
+  seed: 42,  // deterministic — omit for random
+});
 
-// Generate individual instrument parts
+console.log(result.drums.length, 'drum hits');
+console.log(result.bass.length, 'bass notes');
+console.log(result.piano.length, 'piano chords');
+console.log('Replay with seed:', result.seed);
+```
+
+### Individual Generators
+
+```typescript
+import {
+  generateWalkingBass,
+  generatePianoComping,
+  generateDrumPattern,
+  scoreChordsToEvents,
+} from '@jmove/generator';
+
+// Generate individual instrument parts (standalone, no coordination)
 const bass = generateWalkingBass(chords, { style: 'swing', tempo: 140 });
 const piano = generatePianoComping(chords, { style: 'swing', tempo: 140 });
 const drums = generateDrumPattern({ style: 'swing', tempo: 140, measures: 12 });
@@ -199,6 +222,58 @@ GM_DRUMS.HI_HAT_OPEN  // 46
 GM_DRUMS.RIDE          // 51
 GM_DRUMS.CRASH         // 49
 // ... and more
+```
+
+### Ensemble
+
+#### `generateEnsemble(options: EnsembleOptions): EnsembleResult`
+
+Generate a coordinated ensemble with built-in alignment and phrase awareness.
+
+```typescript
+interface EnsembleOptions {
+  chordEvents: ChordEvent[];
+  style: PracticeStyle;
+  tempo: number;
+  measures: number;
+  timeSignature?: [number, number];
+  sections?: SongSection[];        // section-driven dynamics
+  density?: number;                // 0-100
+  swingAmount?: number;            // 0-100
+  strumMs?: number;                // 0-30
+  seed?: number;                   // omit = random, provide = deterministic
+  instrumentStyles?: InstrumentStyles;
+}
+
+interface EnsembleResult {
+  drums: DrumHit[];
+  bass: BassNote[];
+  piano: CompNote[];
+  seed: number;                    // always returned for replay
+  context: BandContext;            // coordination state (kick times, bass register, etc.)
+}
+```
+
+#### `generateEnsembleMeasures(options: EnsembleOptions): Generator<MeasureSlice>`
+
+Streaming version — yields one measure at a time for incremental generation.
+
+```typescript
+for (const slice of generateEnsembleMeasures(options)) {
+  schedule(slice.drums, slice.bass, slice.piano);
+}
+```
+
+#### `createPRNG(seed: number): RandomFn`
+
+Create a seedable random function (xoshiro128**). Pass to any generator via the `random` option for deterministic output.
+
+```typescript
+import { createPRNG, generateDrumPattern } from '@jmove/generator';
+
+const rng = createPRNG(42);
+const drums = generateDrumPattern({ style: 'swing', measures: 4, random: rng });
+// Same seed → same drums every time
 ```
 
 ### Style Presets
@@ -362,7 +437,7 @@ Presets are validated against [`preset-schema.json`](preset-schema.json) and smo
 # Install
 npm install
 
-# Run tests (996 tests)
+# Run tests (1064 tests)
 npm test
 
 # Watch mode
@@ -385,6 +460,8 @@ npm run validate-preset -- --all
 src/
   index.ts              Barrel exports (public API)
   types.ts              All public type definitions
+  ensemble.ts           Ensemble coordination layer (generateEnsemble)
+  prng.ts               Seedable PRNG (xoshiro128**)
   jamGenerator.ts       Chord progression generation (17 forms)
   walkingBass.ts        Walking bass line generation
   pianoComping.ts       Piano voicing + comping patterns

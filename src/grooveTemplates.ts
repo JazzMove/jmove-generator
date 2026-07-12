@@ -287,8 +287,9 @@ export function getGrooveTemplate(style: string): GrooveTemplate {
  * Apply groove template timing to a time value.
  * Returns time + bias + random jitter from template.
  */
-export function applyGroove(time: number, element: ElementTiming): number {
-  return time + element.bias + (Math.random() - 0.5) * 2 * element.jitter;
+export function applyGroove(time: number, element: ElementTiming, random?: () => number): number {
+  const rng = random ?? Math.random;
+  return time + element.bias + (rng() - 0.5) * 2 * element.jitter;
 }
 
 /**

@@ -47,8 +47,9 @@ export function dynamicMultiplier(measureIndex: number, totalMeasures: number, s
       const localIdx = measureIndex - section.startMeasure;
       // Micro arc: existing style curve applied within this section
       const micro = dynamicMultiplier(localIdx, sectionLen, style);
-      // Macro arc: section's energy level scales the micro curve
-      return micro * section.dynamicLevel;
+      // Macro arc: section's energy level scales the micro curve.
+      // Floor at 0.3 matches getSectionEnergy clamping — prevents silent output.
+      return micro * Math.max(0.3, section.dynamicLevel);
     }
   }
 

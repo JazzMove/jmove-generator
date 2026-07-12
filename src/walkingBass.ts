@@ -17,6 +17,11 @@ import type { BassNote, WalkingBassOptions, ChordEvent } from "./types";
 
 export type { BassNote, WalkingBassOptions, ChordEvent };
 
+// ── Module-level PRNG ──
+// Set at generateWalkingBass entry, used by all internal helpers.
+// Safe: JS is single-threaded and generation is synchronous.
+let _rng: () => number = Math.random;
+
 // ── Constants ──
 
 const BASS_LOW = 28;  // E1
@@ -194,7 +199,7 @@ const APPROACH_VOCAB: Record<string, ApproachWeights> = {
 /** Approach tone to target with per-style vocabulary. */
 function approachTone(target: number, fromAbove: boolean, scaleTones?: number[], style?: string): number {
   const weights = APPROACH_VOCAB[style ?? ""] ?? { chromatic: 0.80, diatonic: 0.12, doubleChrm: 0.08 };
-  const roll = Math.random();
+  const roll = _rng();
 
   // Double chromatic: two half-steps from same direction (e.g., Eb-D approaching C from above)
   if (roll < weights.doubleChrm) {
@@ -260,7 +265,7 @@ function clamp(pitch: number): number {
 
 /** Pick random from array (deterministic seed for testing not needed here). */
 function pick<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)];
+  return arr[Math.floor(_rng() * arr.length)];
 }
 
 // ── Walking Pattern Templates ──
@@ -365,10 +370,10 @@ function generateSwingMeasure(
     target = clamp(target);
 
     // Two-bar phrasing: bias target octave to alternate contour direction
-    if (prevDirection === "up" && target >= beat1 && Math.random() < 0.6) {
+    if (prevDirection === "up" && target >= beat1 && _rng() < 0.6) {
       const lower = clamp(target - 12);
       if (lower >= BASS_LOW) target = lower;
-    } else if (prevDirection === "down" && target <= beat1 && Math.random() < 0.6) {
+    } else if (prevDirection === "down" && target <= beat1 && _rng() < 0.6) {
       const higher = clamp(target + 12);
       if (higher <= BASS_HIGH) target = higher;
     }
@@ -379,7 +384,7 @@ function generateSwingMeasure(
       beat4 = third;
     } else {
       let fromAbove = beat1 > target;
-      if (Math.random() < 0.3) fromAbove = !fromAbove;
+      if (_rng() < 0.3) fromAbove = !fromAbove;
       const nextScale = nextChord ? getScaleTones(nextChord.root, nextChord.quality) : scaleTones;
       beat4 = approachTone(target, fromAbove, nextScale, style);
     }
@@ -434,14 +439,14 @@ function generateSwingMeasure(
 
   // Eighth-note enclosure on beat 4 (~15%, not on last chord)
   const nearBoundary = pitches[3] <= BASS_LOW + 2 || pitches[3] >= BASS_HIGH - 2;
-  const doEnclosure = !isLastChord && !nearBoundary && Math.random() < 0.15;
+  const doEnclosure = !isLastChord && !nearBoundary && _rng() < 0.15;
 
   if (doEnclosure) {
     const target = pitches[3];
     const above = clamp(target + 1);
     const below = clamp(target - 1);
     if (above !== below && above !== pitches[2] && below !== pitches[2]) {
-      const [first, second] = Math.random() < 0.5 ? [above, below] : [below, above];
+      const [first, second] = _rng() < 0.5 ? [above, below] : [below, above];
 
       const beat4Time = chord.time + beatDuration * 3;
       const eighthDur = beatDuration * 0.5;
@@ -548,7 +553,7 @@ function generateFusionMeasure(
   const fifth = clamp(startPitch + 7);
   const octave = clamp(startPitch + 12);
 
-  const r = Math.random();
+  const r = _rng();
   if (r < 0.3) {
     // Pattern A: Syncopated 16th groove (Jaco-style off-beat emphasis)
     return [
@@ -600,7 +605,7 @@ function generateEcmMeasure(
   const ninth = clamp(rootMidi + 14);  // color tone
   const fourth = clamp(rootMidi + 5);  // sus quality
 
-  const r = Math.random();
+  const r = _rng();
   if (r < 0.35) {
     // Sustained root — pedal point (Peacock style)
     return [
@@ -643,14 +648,14 @@ function generateHardBopMeasure(
   const scaleTones = getScaleTones(chord.root, chord.quality);
 
   const startPitch = prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi;
-  const pitches: number[] = [Math.random() < 0.8 ? startPitch : clamp(startPitch + 7)];
+  const pitches: number[] = [_rng() < 0.8 ? startPitch : clamp(startPitch + 7)];
 
   // Determine direction based on next root, biased by two-bar phrasing
   const nextRoot = nextChord ? rootToMidi(nextChord.root) : rootMidi;
   const target = closestOctave(nextRoot, startPitch);
   let ascending = target >= startPitch;
-  if (prevDirection === "up" && Math.random() < 0.65) ascending = false;
-  else if (prevDirection === "down" && Math.random() < 0.65) ascending = true;
+  if (prevDirection === "up" && _rng() < 0.65) ascending = false;
+  else if (prevDirection === "down" && _rng() < 0.65) ascending = true;
 
   // Beat 2: chord tone — pick directionally toward target, sorted by proximity to beat 1
   const nearCT = chordTones
@@ -703,8 +708,8 @@ function generateCoolJazzMeasure(
   const nextRoot = nextChord ? rootToMidi(nextChord.root) : rootMidi;
   const target = closestOctave(nextRoot, startPitch);
   let ascending = target >= startPitch;
-  if (prevDirection === "up" && Math.random() < 0.65) ascending = false;
-  else if (prevDirection === "down" && Math.random() < 0.65) ascending = true;
+  if (prevDirection === "up" && _rng() < 0.65) ascending = false;
+  else if (prevDirection === "down" && _rng() < 0.65) ascending = true;
 
   // Steps 2-3: scale-wise (prefer small intervals, stepwise motion)
   const nearby = scaleTones
@@ -745,7 +750,7 @@ function generateModalMeasure(
   const ninth = clamp(rootMidi + 14);
   const fourth = clamp(rootMidi + 5);
 
-  const r = Math.random();
+  const r = _rng();
   if (r < 0.25) {
     // Sustained root — full pedal (Chambers on Kind of Blue)
     return [
@@ -794,8 +799,8 @@ function generateJazzWaltzMeasure(
   const nextRoot = nextChord ? rootToMidi(nextChord.root) : rootMidi;
   const target = closestOctave(nextRoot, startPitch);
   let ascending = target >= startPitch;
-  if (prevDirection === "up" && Math.random() < 0.65) ascending = false;
-  else if (prevDirection === "down" && Math.random() < 0.65) ascending = true;
+  if (prevDirection === "up" && _rng() < 0.65) ascending = false;
+  else if (prevDirection === "down" && _rng() < 0.65) ascending = true;
 
   // Beat 2: scale tone (nearby, stepwise, directional)
   const nearby = scaleTones
@@ -803,7 +808,7 @@ function generateJazzWaltzMeasure(
       ? (t > startPitch && t <= startPitch + 5)
       : (t < startPitch && t >= startPitch - 5))
     .sort((a, b) => Math.abs(a - startPitch) - Math.abs(b - startPitch));
-  pitches.push(nearby.length > 0 ? nearby[Math.floor(Math.random() * Math.min(nearby.length, 2))] : clamp(startPitch + (ascending ? 3 : -3)));
+  pitches.push(nearby.length > 0 ? nearby[Math.floor(_rng() * Math.min(nearby.length, 2))] : clamp(startPitch + (ascending ? 3 : -3)));
 
   // Beat 3: chromatic approach to next bar
   pitches.push(clamp(target - 1));
@@ -836,7 +841,7 @@ function generateShuffleBluesMeasure(
   const target = closestOctave(nextRoot, startPitch);
 
   // Pick pattern randomly for variety
-  const roll = Math.random();
+  const roll = _rng();
   let pitches: number[];
 
   if (roll < 0.30) {
@@ -936,7 +941,7 @@ function generateNeoSoulMeasure(
     ],
   ];
 
-  const chosen = patterns[Math.floor(Math.random() * patterns.length)];
+  const chosen = patterns[Math.floor(_rng() * patterns.length)];
   return chosen.map(n => ({
     pitch: n.pitch,
     time: chord.time + n.time * beatDuration,
@@ -959,7 +964,7 @@ function generateContemporaryJazzMeasure(
   const thirdInt = chordTones.length > 1 ? chordTones[1] - chordTones[0] : 4;
 
   // Avishai Cohen style: melodic walking with wider intervals and 8th-note runs
-  const doEighthRun = Math.random() < 0.4;
+  const doEighthRun = _rng() < 0.4;
 
   if (doEighthRun) {
     // 8th-note run on beats 3-4
@@ -983,7 +988,7 @@ function generateContemporaryJazzMeasure(
   const fifth = clamp(startPitch + 7);
   const nextRoot = nextChord ? rootToMidi(nextChord.root) : rootMidi;
   const target = closestOctave(nextRoot, startPitch);
-  const approach = clamp(target - (Math.random() < 0.5 ? 1 : -1));
+  const approach = clamp(target - (_rng() < 0.5 ? 1 : -1));
 
   return [
     { pitch: startPitch, time: chord.time, duration: beatDuration * 0.9, velocity: 95 },
@@ -1042,7 +1047,7 @@ function generateMathRockMeasure(
     ],
   ];
 
-  const chosen = patterns[Math.floor(Math.random() * patterns.length)];
+  const chosen = patterns[Math.floor(_rng() * patterns.length)];
   return chosen.map(n => ({
     pitch: n.pitch,
     time: chord.time + n.time * beatDuration,
@@ -1062,13 +1067,13 @@ function generateIdmMeasure(
   const octBelow = clamp(rootMidi - 12);
 
   // Sub-bass pedal: sustained root, occasional octave drop
-  if (Math.random() < 0.5) {
+  if (_rng() < 0.5) {
     // Just root, sustained whole note
     return [
       { pitch: rootMidi, time: chord.time, duration: beatDuration * 3.8, velocity: 60 },
     ];
   }
-  if (Math.random() < 0.5) {
+  if (_rng() < 0.5) {
     // Root + octave below drop
     return [
       { pitch: rootMidi, time: chord.time, duration: beatDuration * 1.8, velocity: 60 },
@@ -1108,11 +1113,11 @@ function generateHoldsworthMeasure(
   const ninth = clamp(startPitch + 14);
   const eleventh = clamp(startPitch + 17);
 
-  const r = Math.random();
+  const r = _rng();
 
   // 20% pedal tone with chromatic approach — Johnson anchoring
   if (r < 0.20) {
-    const pickup = clamp(startPitch + (Math.random() < 0.5 ? -1 : 2));
+    const pickup = clamp(startPitch + (_rng() < 0.5 ? -1 : 2));
     return [
       { pitch: startPitch, time: chord.time, duration: beatDuration * 2.8, velocity: 80 },
       { pitch: pickup, time: chord.time + beatDuration * 3, duration: beatDuration * 0.5, velocity: 65 },
@@ -1141,7 +1146,7 @@ function generateHoldsworthMeasure(
 
   // 20% chromatic approach line — leading into next bar
   if (r < 0.80) {
-    const chromTarget = clamp(startPitch + (Math.random() < 0.5 ? 7 : 12));
+    const chromTarget = clamp(startPitch + (_rng() < 0.5 ? 7 : 12));
     const chrom1 = clamp(chromTarget - 2);
     const chrom2 = clamp(chromTarget - 1);
     return [
@@ -1191,7 +1196,7 @@ function generateAlfaMistMeasure(
     ? clamp(electricPitch + (chordTones[1] - chordTones[0]))
     : clamp(electricPitch + 3);
 
-  const r = Math.random();
+  const r = _rng();
 
   // 15% syncopated root groove: locks with broken-beat kick, dotted-eighth feel
   if (r < 0.15) {
@@ -1289,7 +1294,7 @@ function generateMethenyMeasure(
     ? clamp(startPitch + (chordTones[3] - chordTones[0]))
     : clamp(startPitch + 11);
 
-  const r = Math.random();
+  const r = _rng();
 
   // 20% singing melody: root → 5th → octave (wide leaps, fretless singing)
   if (r < 0.20) {
@@ -1378,7 +1383,7 @@ function generate5_4Measure(
   const ascending = target >= startPitch;
 
   const patterns = ascending ? ASCENDING_PATTERNS : DESCENDING_PATTERNS;
-  const pat = patterns[Math.floor(Math.random() * patterns.length)];
+  const pat = patterns[Math.floor(_rng() * patterns.length)];
 
   // 5 notes: R, scale, scale, passing, approach
   const pitches: number[] = [startPitch];
@@ -1601,10 +1606,12 @@ export function generateWalkingBass(
   options: WalkingBassOptions = {},
 ): BassNote[] {
   if (chords.length === 0) return [];
+  const prevRng = _rng;
+  _rng = options.random ?? Math.random;
 
   const style = options.style ?? "swing";
   const tempo = options.tempo ?? 120;
-  if (tempo <= 0) throw new RangeError(`tempo must be > 0, got ${tempo}`);
+  if (tempo <= 0) { _rng = prevRng; throw new RangeError(`tempo must be > 0, got ${tempo}`); }
   const humanize = options.humanize ?? false;
   const beatDuration = 60 / tempo;
 
@@ -1721,8 +1728,8 @@ export function generateWalkingBass(
         const n = measureNotes[ni];
         const isOffbeat = ni % 2 !== 0;
         const element = isOffbeat ? template.bassOffbeat : template.bass;
-        n.time = applyGroove(n.time, element);
-        n.velocity = Math.max(40, Math.min(127, n.velocity + Math.floor((Math.random() - 0.5) * 10)));
+        n.time = applyGroove(n.time, element, _rng);
+        n.velocity = Math.max(40, Math.min(127, n.velocity + Math.floor((_rng() - 0.5) * 10)));
       }
     }
 
@@ -1744,10 +1751,15 @@ export function generateWalkingBass(
 
     // Dynamic arc: scale velocity by chorus position
     if (options.measureInfo) {
-      const mIdx = Math.floor((chord.time - (chords[0]?.time ?? 0)) / (options.measureInfo.measureDuration || 1));
+      const mIdx = Math.floor(chord.time / (options.measureInfo.measureDuration || 1));
       const dynMult = dynamicMultiplier(mIdx, options.measureInfo.totalMeasures, style, options.measureInfo.sections);
+      // BandContext: energy-scaled velocity (quiet sections = softer bass).
+      // Skip when dynamicMultiplier already incorporates section.dynamicLevel
+      // to avoid double-scaling quiet sections.
+      const hasSectionDynamics = options.measureInfo.sections && options.measureInfo.sections.length > 0;
+      const energyMult = (options.bandContext && !hasSectionDynamics) ? (0.75 + options.bandContext.sectionEnergy * 0.25) : 1.0;
       for (const n of measureNotes) {
-        n.velocity = Math.max(40, Math.round(n.velocity * dynMult));
+        n.velocity = Math.min(127, Math.max(40, Math.round(n.velocity * dynMult * energyMult)));
       }
     }
 
@@ -1797,6 +1809,7 @@ export function generateWalkingBass(
     notes[i].duration = notes[i + 1].time - notes[i].time;
   }
 
+  _rng = prevRng;
   return notes;
 }
 
