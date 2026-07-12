@@ -179,22 +179,6 @@ function scaleDensity(baseDensity: number, sectionEnergy: number): number {
   return Math.round(Math.min(100, Math.max(0, baseDensity * scale)));
 }
 
-// ── Piano Register Biasing (coordination with bass) ──
-
-function adjustPianoChords(pianoNotes: CompNote[], bassRegister: "low" | "mid" | "high"): void {
-  // When bass is high, push piano voicings up to maintain separation
-  // When bass is low, piano can sit comfortably in mid range
-  if (bassRegister === "high") {
-    for (const note of pianoNotes) {
-      // If any pitch is below C4 (60) and bass is high, shift voicing up an octave
-      const lowestPitch = Math.min(...note.pitches);
-      if (lowestPitch < 60) {
-        note.pitches = note.pitches.map(p => p + 12);
-      }
-    }
-  }
-}
-
 // ── Built-in Alignment (replaces post-hoc snapping) ──
 
 function alignBassToKicks(bassNotes: BassNote[], kickTimes: number[]): void {
@@ -360,9 +344,6 @@ export function generateEnsemble(options: EnsembleOptions): EnsembleResult {
     random: pianoRng,
     bandContext: context,
   });
-
-  // Register adjustment now handled inside generatePianoComping via bandContext.
-  // adjustPianoChords kept as fallback for non-ensemble callers.
 
   // Built-in alignment: snap piano to nearest bass note
   alignPianoToBass(pianoNotes, context.bassTimes);

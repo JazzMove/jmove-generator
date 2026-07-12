@@ -4,6 +4,13 @@ All notable changes to `@jmove/generator` will be documented in this file.
 
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [1.1.1] - 2026-07-12
+
+### Fixed
+
+- **Lint: unused `adjustPianoChords`** — dead code left after register adjustment moved into `generatePianoComping` via bandContext. Removed function and stale comment. Fixes CI eslint failure
+- **npm audit: js-yaml, vite vulnerabilities** — updated devDependencies (remaining esbuild low-severity is Windows-only dev server issue, locked by tsup)
+
 ## [1.1.0] - 2026-07-12
 
 ### Added
