@@ -65,6 +65,8 @@ export type {
   // Ensemble coordination types
   RandomFn,
   PhraseMap,
+  PhraseIntent,
+  PhraseArc,
   BandContext,
   EnsembleOptions,
   EnsembleResult,

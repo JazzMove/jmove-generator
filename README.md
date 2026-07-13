@@ -25,13 +25,14 @@ Deep technical articles about how JMove and the generator work:
 
 ## Features
 
+- **Musicality Engine** — phrase-level intelligence: dynamic drops, air gaps, harmonic anticipation, passing chords, conversation dynamics, motif memory. Four parameters (creativity, conversation, airGaps, harmonicFreedom) control how musical and surprising the output sounds
 - **Ensemble Coordination** — `generateEnsemble()` produces drums, bass, and piano as a coordinated band. Kick patterns shape bass timing, bass register guides piano voicings, drum density modulates comping activity
 - **Seedable & Reproducible** — deterministic PRNG (xoshiro128**) with per-instrument streams. Save a seed, replay the exact same take
 - **Jam Session Generator** — random chord progressions across 17 jazz forms (blues, rhythm changes, AABA, modal, Coltrane matrix, and more)
 - **Walking Bass** — rule-based walking lines with chromatic approaches, 19 styles (swing, bossa, Latin tumbao, neo-soul, math rock, IDM)
 - **Piano Comping** — Bill Evans rootless voicings (Type A/B), quartal, shell, cluster — voice-led with rhythmic templates per style
 - **Drum Patterns** — 19 styles with humanization, ghost notes, groove templates based on GrooVAE research
-- **22 Style Presets** — Classic Swing to IDM, with per-instrument style overrides
+- **23 Style Presets** — Classic Swing to IDM, with per-instrument style overrides and tuned musicality parameters
 - **Auto-Detect** — analyze a score to recommend the best preset
 - **Full Song Form** — multi-section arrangements with dynamic shaping
 - **Phrase-Aware Generation** — 2/4/8-bar phrase boundaries with section-driven dynamics (intro sparse, shout dense)
@@ -243,6 +244,10 @@ interface EnsembleOptions {
   strumMs?: number;                // 0-30
   seed?: number;                   // omit = random, provide = deterministic
   instrumentStyles?: InstrumentStyles;
+  creativity?: number;             // 0-100: surprise frequency
+  conversation?: number;           // 0-100: inter-instrument responsiveness
+  airGaps?: number;                // 0-100: intentional silence
+  harmonicFreedom?: number;        // 0-100: reharmonization intensity
 }
 
 interface EnsembleResult {
@@ -280,7 +285,7 @@ const drums = generateDrumPattern({ style: 'swing', measures: 4, random: rng });
 
 #### `STYLE_PRESETS: StylePreset[]`
 
-22 built-in presets:
+23 built-in presets:
 
 | Category | Presets |
 |----------|---------|
@@ -306,6 +311,10 @@ interface StylePreset {
     swingAmount: number;   // 0-100
     density: number;       // 0-100
     strumMs?: number;      // 0-30: piano chord strum spread in ms
+    creativity?: number;   // 0-100: surprise frequency
+    conversation?: number; // 0-100: inter-instrument responsiveness
+    airGaps?: number;      // 0-100: intentional silence
+    harmonicFreedom?: number; // 0-100: reharmonization intensity
   };
   tempoRange: [number, number];
 }
@@ -437,7 +446,7 @@ Presets are validated against [`preset-schema.json`](preset-schema.json) and smo
 # Install
 npm install
 
-# Run tests (1064 tests)
+# Run tests (1081 tests)
 npm test
 
 # Watch mode

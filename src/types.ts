@@ -24,6 +24,11 @@ export interface StyleParameters {
   swingAmount: number;  // 0-100: 0=straight 8ths, 50=light swing, 100=hard triplet
   density: number;      // 0-100: sparse vs busy
   strumMs?: number;     // 0-30: piano chord strum spread in ms (0=no strum)
+  // ── Musicality Parameters ──
+  creativity?: number;       // 0-100: surprise frequency — drops, harmonic subs, rhythmic displacement
+  conversation?: number;     // 0-100: how much instruments listen and respond to each other
+  airGaps?: number;          // 0-100: intentional silence frequency — breathing room
+  harmonicFreedom?: number;  // 0-100: reharmonization, passing chords, anticipation
 }
 
 export interface InstrumentStyles {
@@ -244,10 +249,26 @@ export type InstrumentRole = "drums" | "bass" | "piano";
 
 export type RandomFn = () => number;
 
+export type PhraseArc = "build" | "sustain" | "release" | "drop" | "climax";
+
+export interface PhraseIntent {
+  arc: PhraseArc;                         // overall energy trajectory for this phrase
+  dropMeasures: number[];                 // measure indices where dynamic drops occur (ride-only / pedal bass)
+  pianoRests: number[];                   // measures where piano deliberately rests
+  bassRests: number[];                    // measures where bass deliberately rests (rare — usually pedal instead)
+  drumsMinimal: number[];                 // measures where drums thin to ride + hi-hat only
+  anticipationChance: number;             // 0-1: probability of piano anticipating next chord on beat 4-and
+  passingChordChance: number;             // 0-1: probability of chromatic approach chord between changes
+  motifLockBars: number;                  // how many bars piano/bass hold their current pattern
+  crescendo: boolean;                     // gradual push within this phrase
+  conversationLeader: "piano" | "bass" | "drums" | null; // who "speaks" — others listen/support
+}
+
 export interface PhraseMap {
   boundaries: number[];       // measure indices where phrases start
   phraseLength: number;       // current phrase length (2, 4, or 8 bars)
   motifSeeds: number[];       // per-phrase PRNG seed for motif repetition
+  intents: PhraseIntent[];    // per-phrase musical intent (parallel to boundaries)
 }
 
 export interface BandContext {
@@ -269,6 +290,13 @@ export interface BandContext {
   phraseMap: PhraseMap;
   currentSection: SongSection | null;
   sectionEnergy: number;          // 0-1
+
+  // ── Musicality / Conversation State ──
+  currentPhraseIntent: PhraseIntent | null;  // active phrase's musical plan
+  creativity: number;                        // 0-100 from parameters
+  conversation: number;                      // 0-100 from parameters
+  airGaps: number;                           // 0-100 from parameters
+  harmonicFreedom: number;                   // 0-100 from parameters
 }
 
 export interface EnsembleOptions {
@@ -284,6 +312,11 @@ export interface EnsembleOptions {
   seed?: number;                  // omit = random, provide = deterministic
   instrumentStyles?: InstrumentStyles;
   measureInfo?: { totalMeasures: number; measureDuration: number; sections?: SongSection[] };
+  // ── Musicality Parameters ──
+  creativity?: number;            // 0-100: surprise frequency
+  conversation?: number;          // 0-100: inter-instrument responsiveness
+  airGaps?: number;               // 0-100: intentional silence frequency
+  harmonicFreedom?: number;       // 0-100: reharmonization, passing chords
 }
 
 export interface EnsembleResult {

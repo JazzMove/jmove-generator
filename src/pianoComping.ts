@@ -1126,15 +1126,11 @@ export function generatePianoComping(
   if (tempo <= 0) { _rng = prevRng; throw new RangeError(`tempo must be > 0, got ${tempo}`); }
   const humanize = options.humanize ?? true;
   const density = options.density;
-  const swingAmount = options.swingAmount ?? 100; // default: full triplet swing (matches drum default)
-  // Strum: caller controls via strumMs (0=off). Generator defaults to 20ms strum on.
+  const swingAmount = options.swingAmount ?? 100;
   const strumMs = options.strumMs ?? 20;
   const doStrum = strumMs > 0 && options.strum !== false;
   const beatDuration = 60 / tempo;
 
-  // Style-specific velocity scaling
-  // Velocity scaling per style: balances instrument volumes in the mix.
-  // ECM/coolJazz bumped from 0.75 → 0.88: soft but audible against sparse drums.
   const velScale = style === "ecm" ? 0.88
     : style === "coolJazz" ? 0.85
     : style === "hardBop" ? 1.1
@@ -1148,7 +1144,6 @@ export function generatePianoComping(
 
   const bandCtx = options.bandContext;
   const useShell = density !== undefined && density < 35;
-  // BandContext: when drums are dense, piano rests more to avoid mud
   const drumDensityRestBoost = bandCtx && bandCtx.drumDensity > 0.6
     ? 0.08 * bandCtx.drumDensity : 0;
   const baseRestChance = 0.15 * (1 - (density ?? 50) / 100) + drumDensityRestBoost;
@@ -1157,30 +1152,77 @@ export function generatePianoComping(
   let wasRest = false;
   const recentRhythmIndices: number[] = [];
 
-  // Alfa Mist rhythm looping: hip-hop producer mentality — same pattern repeats
-  // 2-4 bars before switching. Creates memorable, loop-based comping feel.
-  // "He thinks in loops — repetitive, memorably emotive piano lines" (research).
+  // ── Musicality Parameters ──
+  const creativity = (bandCtx?.creativity ?? 35) / 100;
+  const conversation = (bandCtx?.conversation ?? 30) / 100;
+  const harmonicFreedom = (bandCtx?.harmonicFreedom ?? 25) / 100;
+  const intent = bandCtx?.currentPhraseIntent ?? null;
+
+  // ── Motif Memory (all styles, not just alfaMist) ──
+  // Holds same rhythm pattern for multiple bars. Creates compositional coherence.
+  // alfaMist: hip-hop loop mentality. metheny: sustained concept. holdsworth: conversational development.
   let loopRhythm: RhythmHit[] | null = null;
   let loopBarsLeft = 0;
+  // Base lock duration from intent, fallback to style-based defaults
+  const motifLockBase = intent?.motifLockBars ??
+    (style === "metheny" || style === "ecm" ? 4
+    : style === "alfaMist" ? 3
+    : style === "holdsworth" ? 2
+    : style === "fusion" ? 2
+    : creativity < 0.3 ? 3 : 2);
 
-  // Infer time signature from chord durations for odd-meter rhythm selection
+  // ── Harmonic Anticipation State ──
+  // Probability of playing next chord voicing on beat 4-and, creating forward motion.
+  const anticipationProb = intent?.anticipationChance ?? harmonicFreedom * 0.35;
+  // Passing chord probability: insert chromatic approach chord between changes
+  const passingChordProb = intent?.passingChordChance ?? harmonicFreedom * 0.25;
+
   const inferredTimeSig: [number, number] | undefined = chords.length > 0
     ? inferCompTimeSig(chords[0].duration, beatDuration)
     : undefined;
+
+  // Measure duration for phrase intent lookups
+  const measureDuration = options.measureInfo?.measureDuration ?? (chords.length > 0 ? chords[0].duration : beatDuration * 4);
 
   for (let ci = 0; ci < chords.length; ci++) {
     const chord = chords[ci];
     const nextChord = ci + 1 < chords.length ? chords[ci + 1] : null;
 
-    // Form-aware density: sparse opening, full at climax, slight pullback
+    // ── Phrase Intent: Air Gap / Rest Decisions ──
+    const measureIdx = Math.floor(chord.time / measureDuration);
+    const phraseIntent = bandCtx?.phraseMap
+      ? getPhraseIntentForMeasure(measureIdx, bandCtx.phraseMap)
+      : intent;
+
+    // Intent-driven rest: if this measure is in pianoRests, skip it
+    if (phraseIntent?.pianoRests?.includes(measureIdx)) {
+      wasRest = true;
+      continue;
+    }
+
+    // Intent-driven drop: play very softly with minimal voicing
+    const isDrop = phraseIntent?.dropMeasures?.includes(measureIdx) ?? false;
+
+    // ── Conversation Awareness ──
+    // When another instrument is the "leader", piano lays back (sparser, softer).
+    // When piano is the leader, play more actively.
+    const isLeader = phraseIntent?.conversationLeader === "piano";
+    const isListening = phraseIntent?.conversationLeader != null && !isLeader;
+    const conversationDensityMult = isLeader ? 1.2 : isListening ? 0.6 : 1.0;
+
+    // Form-aware density
     const formPct = chords.length > 1 ? ci / chords.length : 0.5;
     const formDensityMult = formPct < 0.15 ? 0.6
       : formPct < 0.50 ? 0.8
       : formPct < 0.80 ? 1.0
       : 0.9;
-    const restChance = baseRestChance / formDensityMult; // higher rest chance = sparser
 
-    // Rest bar: skip chord for natural breathing (never first, never last, never consecutive)
+    // Crescendo boost within phrase
+    const crescendoMult = phraseIntent?.crescendo ? (0.85 + formPct * 0.2) : 1.0;
+
+    const restChance = (baseRestChance / formDensityMult) / conversationDensityMult;
+
+    // Rest bar: skip chord (never first, never last, never consecutive)
     const isLast = ci === chords.length - 1;
     if (ci > 0 && !isLast && !wasRest && _rng() < restChance) {
       wasRest = true;
@@ -1191,9 +1233,11 @@ export function generatePianoComping(
     const pitches = pickVoicing(chord.root, chord.quality, prevPitches, style, useShell);
     prevPitches = pitches;
 
-    // Rhythm selection: alfaMist holds same pattern for 2-4 bars (loop lock)
+    // ── Motif Memory: Rhythm Selection ──
+    // All styles now benefit from motif lock — holds pattern for N bars.
+    // Creates the "composed" feel that separates algorithmic from musical.
     let rhythm: RhythmHit[];
-    if (style === "alfaMist" && loopBarsLeft > 0 && loopRhythm) {
+    if (loopBarsLeft > 0 && loopRhythm) {
       rhythm = loopRhythm;
       loopBarsLeft--;
     } else {
@@ -1201,20 +1245,59 @@ export function generatePianoComping(
       rhythm = picked.rhythm;
       recentRhythmIndices.unshift(picked.index);
       if (recentRhythmIndices.length > 2) recentRhythmIndices.pop();
-      if (style === "alfaMist") {
-        loopRhythm = rhythm;
-        loopBarsLeft = 1 + Math.floor(_rng() * 3); // hold 2-4 bars total (1 remaining + current)
-      }
+      loopRhythm = rhythm;
+      // Lock duration: base + random variation. Higher creativity = more variation.
+      loopBarsLeft = Math.max(0, motifLockBase - 1 + Math.floor(_rng() * 2));
+    }
+
+    // ── Drop Measure: Minimal Voicing ──
+    // During drops, play just a sustained shell voicing (2 notes, very soft)
+    if (isDrop) {
+      const shellPitches = toShellVoicing(pitches);
+      notes.push({
+        pitches: [...shellPitches],
+        time: humanizeTime(chord.time, humanize, style, 0),
+        duration: chord.duration * 0.9,
+        velocity: humanizeVelocity(Math.round(45 * velScale), humanize),
+      });
+      continue;
     }
 
     for (const [rawBeatOffset, durMult] of rhythm) {
-      // Chord anticipation: hits at beat 3.5+ use next chord's voicing
+      // ── Harmonic Anticipation ──
+      // On beat 3.5+, possibly play NEXT chord's voicing (creates forward pull).
+      // Controlled by harmonicFreedom parameter.
       let usePitches = pitches;
       if (rawBeatOffset >= 3.5 && nextChord) {
+        // Original behavior + enhanced by harmonicFreedom
+        usePitches = pickVoicing(nextChord.root, nextChord.quality, prevPitches, style, useShell);
+      } else if (rawBeatOffset >= 3.0 && rawBeatOffset < 3.5 && nextChord && _rng() < anticipationProb) {
+        // NEW: Early anticipation on beat 3-and (harmonicFreedom-controlled)
+        // Creates forward motion — piano "hears" the next chord before it arrives.
+        // Metheny does this constantly. Holdsworth's keys player does it conversationally.
         usePitches = pickVoicing(nextChord.root, nextChord.quality, prevPitches, style, useShell);
       }
 
-      // Apply swing to off-beat 8th positions (x.5 → swung position)
+      // ── Passing Chord Insertion ──
+      // Between current and next chord, insert a chromatic approach voicing.
+      // Creates movement and harmonic interest. Controlled by harmonicFreedom.
+      if (rawBeatOffset >= 2.5 && rawBeatOffset < 3.0 && nextChord && _rng() < passingChordProb) {
+        // Chromatic approach: voice the chord a half-step above next root
+        const passingRoot = chromaticApproachRoot(nextChord.root, _rng() < 0.5);
+        const passingPitches = pickVoicing(passingRoot, nextChord.quality, prevPitches, style, useShell);
+        const passingTime = chord.time + rawBeatOffset * beatDuration;
+        if (passingTime < chord.time + chord.duration) {
+          notes.push({
+            pitches: [...passingPitches],
+            time: humanizeTime(passingTime, humanize, style, rawBeatOffset),
+            duration: beatDuration * 0.4,
+            velocity: humanizeVelocity(Math.round(60 * velScale), humanize),
+          });
+        }
+        continue; // passing chord replaces normal hit at this position
+      }
+
+      // Apply swing
       let beatOffset = rawBeatOffset;
       const frac = beatOffset % 1;
       if (Math.abs(frac - 0.5) < 0.01) {
@@ -1223,7 +1306,6 @@ export function generatePianoComping(
         beatOffset = Math.floor(beatOffset) + 0.5 + swingOffset;
       }
       const time = chord.time + beatOffset * beatDuration;
-      // Don't place notes past end of chord
       if (time >= chord.time + chord.duration) break;
 
       const duration = Math.min(
@@ -1234,14 +1316,14 @@ export function generatePianoComping(
       const dynMult = options.measureInfo
         ? dynamicMultiplier(Math.floor(chord.time / (options.measureInfo.measureDuration || 1)), options.measureInfo.totalMeasures, style, options.measureInfo.sections)
         : 1.0;
-      // BandContext: energy-scaled velocity (quiet sections = softer piano).
-      // Skip when dynamicMultiplier already incorporates section.dynamicLevel
-      // to avoid double-scaling quiet sections.
       const hasSectionDynamics = options.measureInfo?.sections && options.measureInfo.sections.length > 0;
       const energyMult = (bandCtx && !hasSectionDynamics) ? (0.7 + bandCtx.sectionEnergy * 0.3) : 1.0;
-      const baseVel = Math.round((beatOffset === 0 ? 80 : 70) * velScale * dynMult * energyMult);
 
-      // BandContext: avoid bass register collision — shift voicings up when bass is high
+      // Conversation velocity adjustment
+      const convVelMult = isListening ? 0.75 : isLeader ? 1.05 : 1.0;
+      const baseVel = Math.round((beatOffset === 0 ? 80 : 70) * velScale * dynMult * energyMult * convVelMult * crescendoMult);
+
+      // BandContext: avoid bass register collision
       let finalPitches = usePitches;
       if (bandCtx?.bassRegister === "high") {
         const lowestPitch = Math.min(...usePitches);
@@ -1260,14 +1342,39 @@ export function generatePianoComping(
 
   const broken = applyBrokenVoicings(notes, style, beatDuration, swingAmount, tempo);
 
-  // Alfa Mist: probabilistic grace notes — approach chord tone from half-step below.
-  // "Liquid Rhodes licks and clever chord inversions" (Qwest TV interview).
-  // Targets 3rd or 7th of voicing (~20% of notes, quick ~30ms grace).
-  const graced = style === "alfaMist" ? applyGraceNotes(broken, 0.20) : broken;
+  // Grace notes: alfaMist always, others based on creativity
+  const graceProb = style === "alfaMist" ? 0.20
+    : style === "holdsworth" ? creativity * 0.12
+    : style === "metheny" ? creativity * 0.08
+    : style === "neoSoul" ? creativity * 0.15
+    : creativity > 0.5 ? creativity * 0.10
+    : 0;
+  const graced = graceProb > 0 ? applyGraceNotes(broken, graceProb) : broken;
 
   graced.sort((a, b) => a.time - b.time);
   _rng = prevRng;
   return doStrum ? strumSpread(graced, strumMs) : graced;
+}
+
+// ── Phrase Intent Lookup (piano-side) ──
+function getPhraseIntentForMeasure(measure: number, phraseMap: { boundaries: number[]; intents?: Array<{ pianoRests: number[]; dropMeasures: number[]; conversationLeader: string | null; crescendo: boolean; anticipationChance: number; passingChordChance: number; motifLockBars: number; arc: string }> }): { pianoRests: number[]; dropMeasures: number[]; conversationLeader: string | null; crescendo: boolean; anticipationChance: number; passingChordChance: number; motifLockBars: number; arc: string } | null {
+  if (!phraseMap.intents || phraseMap.intents.length === 0) return null;
+  for (let i = phraseMap.boundaries.length - 1; i >= 0; i--) {
+    if (measure >= phraseMap.boundaries[i]) {
+      return phraseMap.intents[i] ?? null;
+    }
+  }
+  return null;
+}
+
+// ── Chromatic Approach Root ──
+// Returns root name a half-step above or below target root.
+function chromaticApproachRoot(targetRoot: string, fromAbove: boolean): string {
+  const ROOTS = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
+  const idx = ROOTS.indexOf(targetRoot);
+  if (idx < 0) return targetRoot;
+  const offset = fromAbove ? 1 : -1;
+  return ROOTS[(idx + offset + 12) % 12];
 }
 
 /**

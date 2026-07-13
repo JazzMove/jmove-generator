@@ -2212,6 +2212,34 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
     // BandContext: section energy scales intensity (0.3=sparse intro, 1.0=dense shout)
     const energy = bandCtx?.sectionEnergy ?? 0.7;
 
+    // ── Musicality: Drums Minimal (ride + pedal hat only) ──
+    // When phrase intent says this measure should be minimal, strip to timekeeping only.
+    // Creates dramatic breathing room — silence is the most powerful musical tool.
+    const absoluteM = Math.round(measureStart / measureDuration);
+    const phraseIntent = bandCtx?.currentPhraseIntent;
+    if (phraseIntent?.drumsMinimal?.includes(absoluteM)) {
+      // Minimal drums: just ride quarters and pedal hat on 2&4
+      for (let b = 0; b < beatsPerMeasure; b++) {
+        const t = measureStart + b * beatDuration;
+        hits.push({
+          pitch: GM_DRUMS.RIDE,
+          time: humanizeTime(t, humanize, style, GM_DRUMS.RIDE, rng),
+          duration: 0.08,
+          velocity: humanizeVelocity(b === 0 ? 55 : 45, false, humanize, rng),
+        });
+        if (b === 1 || b === 3) {
+          hits.push({
+            pitch: GM_DRUMS.HI_HAT_PEDAL,
+            time: humanizeTime(t, humanize, style, GM_DRUMS.HI_HAT_PEDAL, rng),
+            duration: 0.05,
+            velocity: humanizeVelocity(35, false, humanize, rng),
+          });
+        }
+      }
+      barsOnPattern++;
+      continue;
+    }
+
     // Crash cymbal on form boundaries — louder at section boundaries
     // Alfa Mist: crashes only on section starts or 30% of phrase boundaries (sparse, not every 4 bars)
     if (formMarkers.includes(m)) {

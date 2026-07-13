@@ -21,6 +21,8 @@ import { createPRNG, randomSeed, deriveStream, STREAM_DRUMS, STREAM_BASS, STREAM
 import type {
   BandContext,
   PhraseMap,
+  PhraseIntent,
+  PhraseArc,
   EnsembleOptions,
   EnsembleResult,
   MeasureSlice,
@@ -79,12 +81,157 @@ function computePhraseMap(options: EnsembleOptions, masterRng: () => number): Ph
     motifSeeds.push(Math.floor(masterRng() * 0xFFFFFFFF));
   }
 
-  return { boundaries, phraseLength, motifSeeds };
+  return { boundaries, phraseLength, motifSeeds, intents: [] };
+}
+
+// ── Phrase Intent Planner ──
+// Pre-plans musical decisions for each phrase BEFORE any instrument generates.
+// This is the "bandleader" — decides the arc, who speaks, where to breathe.
+
+function planMusicalIntents(
+  phraseMap: PhraseMap,
+  options: EnsembleOptions,
+  rng: () => number,
+): PhraseIntent[] {
+  const creativity = (options.creativity ?? 35) / 100;       // 0-1
+  const conversation = (options.conversation ?? 30) / 100;
+  const airGaps = (options.airGaps ?? 20) / 100;
+  const harmonicFreedom = (options.harmonicFreedom ?? 25) / 100;
+  const totalPhrases = phraseMap.boundaries.length;
+  const intents: PhraseIntent[] = [];
+  const leaders: Array<"piano" | "bass" | "drums"> = ["piano", "bass", "drums"];
+
+  for (let pi = 0; pi < totalPhrases; pi++) {
+    const pct = totalPhrases > 1 ? pi / (totalPhrases - 1) : 0.5;
+    const phraseStart = phraseMap.boundaries[pi];
+    const phraseEnd = pi + 1 < totalPhrases ? phraseMap.boundaries[pi + 1] : options.measures;
+    const phraseLen = phraseEnd - phraseStart;
+
+    // ── Arc Selection ──
+    // Natural arc: build toward middle, release toward end, with creative drops
+    let arc: PhraseArc;
+    if (pi === 0) {
+      // Opening phrase: always sustain or build (set the stage)
+      arc = rng() < 0.6 ? "sustain" : "build";
+    } else if (pi === totalPhrases - 1) {
+      // Final phrase: release or sustain (resolve)
+      arc = rng() < 0.7 ? "release" : "sustain";
+    } else if (pct > 0.5 && pct < 0.8 && rng() < creativity * 0.6) {
+      // Mid-late: climax moment (creativity-dependent)
+      arc = "climax";
+    } else if (rng() < creativity * 0.4) {
+      // Creative drop: sudden quiet for contrast (creativity-dependent)
+      arc = "drop";
+    } else if (pct < 0.5) {
+      arc = rng() < 0.65 ? "build" : "sustain";
+    } else {
+      arc = rng() < 0.5 ? "sustain" : "release";
+    }
+
+    // ── Dynamic Drop Measures ──
+    // Within a phrase, specific measures where everyone gets quiet
+    const dropMeasures: number[] = [];
+    if (arc === "drop") {
+      // Drop arc: first 1-2 measures of phrase are quiet
+      dropMeasures.push(phraseStart);
+      if (phraseLen > 2 && rng() < 0.5) dropMeasures.push(phraseStart + 1);
+    } else if (creativity > 0.4 && rng() < creativity * 0.3) {
+      // Surprise drop mid-phrase (not first, not last measure)
+      if (phraseLen > 3) {
+        const dropIdx = phraseStart + 1 + Math.floor(rng() * (phraseLen - 2));
+        dropMeasures.push(dropIdx);
+      }
+    }
+
+    // ── Air Gaps: Instrument Rests ──
+    const pianoRests: number[] = [];
+    const bassRests: number[] = [];
+    const drumsMinimal: number[] = [];
+
+    // Piano rests: controlled by airGaps parameter
+    for (let m = phraseStart; m < phraseEnd; m++) {
+      if (m === phraseStart && pi === 0) continue; // never rest on very first measure
+      if (m === phraseEnd - 1 && pi === totalPhrases - 1) continue; // never rest on very last
+      if (dropMeasures.includes(m)) continue; // drops handled separately
+
+      if (rng() < airGaps * 0.25) {
+        pianoRests.push(m);
+      }
+    }
+
+    // Bass rests: very rare (bass is the anchor), only at high airGaps + creativity
+    if (airGaps > 0.5 && creativity > 0.5 && phraseLen > 3) {
+      for (let m = phraseStart + 1; m < phraseEnd - 1; m++) {
+        if (rng() < airGaps * 0.08) bassRests.push(m);
+      }
+    }
+
+    // Drums minimal: ride + pedal hat only (creates space)
+    if (arc === "drop") {
+      for (const dm of dropMeasures) drumsMinimal.push(dm);
+    } else if (creativity > 0.3 && rng() < creativity * 0.2) {
+      if (phraseLen > 2) {
+        const minIdx = phraseStart + 1 + Math.floor(rng() * (phraseLen - 2));
+        drumsMinimal.push(minIdx);
+      }
+    }
+
+    // ── Harmonic Anticipation ──
+    // Higher harmonicFreedom → more likely piano plays next chord early
+    const anticipationChance = harmonicFreedom * 0.35; // max 35%
+    const passingChordChance = harmonicFreedom * 0.25; // max 25%
+
+    // ── Motif Lock Duration ──
+    // How many bars piano/bass hold their pattern before changing.
+    // Higher creativity = shorter lock (more variation), lower = longer (more repetition).
+    // Metheny/ECM: long locks (sustained feel). HardBop/Fusion: shorter locks.
+    const baseLock = options.style === "metheny" || options.style === "ecm" ? 4
+      : options.style === "alfaMist" ? 3  // alfaMist already has loop behavior
+      : options.style === "holdsworth" ? 2 // conversational — changes faster
+      : options.style === "fusion" ? 2
+      : 3;
+    const lockVariation = Math.floor(rng() * 2) - 1; // -1, 0, or 1
+    const motifLockBars = Math.max(1, baseLock + lockVariation - Math.floor(creativity * 2));
+
+    // ── Crescendo ──
+    const crescendo = arc === "build" || (arc === "climax" && rng() < 0.7);
+
+    // ── Conversation Leader ──
+    // Who "speaks" this phrase — others should listen/support.
+    // High conversation = more instrument trading. Low = parallel playing.
+    let conversationLeader: "piano" | "bass" | "drums" | null = null;
+    if (conversation > 0.3 && rng() < conversation * 0.5) {
+      // Pick a leader, weighted: piano most often, then bass, then drums
+      const roll = rng();
+      if (roll < 0.45) conversationLeader = "piano";
+      else if (roll < 0.75) conversationLeader = "bass";
+      else conversationLeader = "drums";
+      // Don't repeat same leader consecutively
+      if (intents.length > 0 && intents[intents.length - 1].conversationLeader === conversationLeader) {
+        conversationLeader = leaders[(leaders.indexOf(conversationLeader) + 1) % 3];
+      }
+    }
+
+    intents.push({
+      arc,
+      dropMeasures,
+      pianoRests,
+      bassRests,
+      drumsMinimal,
+      anticipationChance,
+      passingChordChance,
+      motifLockBars,
+      crescendo,
+      conversationLeader,
+    });
+  }
+
+  return intents;
 }
 
 // ── Context Initialization ──
 
-function initContext(phraseMap: PhraseMap): BandContext {
+function initContext(phraseMap: PhraseMap, options: EnsembleOptions): BandContext {
   return {
     kickTimes: [],
     kickDensity: 0,
@@ -97,7 +244,25 @@ function initContext(phraseMap: PhraseMap): BandContext {
     phraseMap,
     currentSection: null,
     sectionEnergy: 0.7,
+    currentPhraseIntent: null,
+    creativity: options.creativity ?? 35,
+    conversation: options.conversation ?? 30,
+    airGaps: options.airGaps ?? 20,
+    harmonicFreedom: options.harmonicFreedom ?? 25,
   };
+}
+
+// ── Phrase Intent Lookup ──
+
+function getPhraseIntent(measure: number, phraseMap: PhraseMap): PhraseIntent | null {
+  if (!phraseMap.intents || phraseMap.intents.length === 0) return null;
+  // Find which phrase this measure belongs to
+  for (let i = phraseMap.boundaries.length - 1; i >= 0; i--) {
+    if (measure >= phraseMap.boundaries[i]) {
+      return phraseMap.intents[i] ?? null;
+    }
+  }
+  return null;
 }
 
 // ── Context Extraction from Generated Parts ──
@@ -244,9 +409,10 @@ export function generateEnsemble(options: EnsembleOptions): EnsembleResult {
   const density = options.density ?? 50;
   const swingAmount = options.swingAmount ?? 100;
 
-  // Compute phrase structure
+  // Compute phrase structure and musical intent
   const phraseMap = computePhraseMap(options, masterRng);
-  const context = initContext(phraseMap);
+  phraseMap.intents = planMusicalIntents(phraseMap, options, masterRng);
+  const context = initContext(phraseMap, options);
 
   // Determine section energy for density scaling.
   // Batch path: compute weighted average energy across all measures so that
@@ -283,6 +449,9 @@ export function generateEnsemble(options: EnsembleOptions): EnsembleResult {
     measureDuration,
     sections: options.sections,
   };
+
+  // Set initial phrase intent for batch generation
+  context.currentPhraseIntent = getPhraseIntent(0, phraseMap);
 
   // ── Step 1: Generate Drums ──
   const scaledDrumDensity = scaleDensity(density, energy);
@@ -383,7 +552,8 @@ export function* generateEnsembleMeasures(options: EnsembleOptions): Generator<M
   const swingAmount = options.swingAmount ?? 100;
 
   const phraseMap = computePhraseMap(options, masterRng);
-  const context = initContext(phraseMap);
+  phraseMap.intents = planMusicalIntents(phraseMap, options, masterRng);
+  const context = initContext(phraseMap, options);
 
   const drumStyle = options.instrumentStyles?.drums ?? options.style;
   const bassStyle = options.instrumentStyles?.bass ?? options.style;
@@ -410,6 +580,7 @@ export function* generateEnsembleMeasures(options: EnsembleOptions): Generator<M
     const { section, energy } = getSectionEnergy(m, options.sections);
     context.currentSection = section;
     context.sectionEnergy = energy;
+    context.currentPhraseIntent = getPhraseIntent(m, phraseMap);
 
     // Determine form/section markers for this measure
     const formMarkers = phraseMap.boundaries.includes(m) ? [0] : [];

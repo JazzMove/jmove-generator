@@ -4,6 +4,40 @@ All notable changes to `@jmove/generator` will be documented in this file.
 
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] - 2026-07-13
+
+### Added
+
+- **Phrase Intent Planner** (`ensemble.ts`) — `planMusicalIntents()` pre-plans each phrase before any instrument generates. Selects a `PhraseArc` (build / sustain / release / drop / climax) based on position, schedules dynamic drops, air gaps, conversation leader, harmonic probabilities, and motif lock durations
+- **Musicality Parameters** — Four new optional `StyleParameters` fields:
+  - `creativity` (0-100): Surprise frequency — dynamic drops, arc variety, grace notes
+  - `conversation` (0-100): Inter-instrument responsiveness — leader/follower dynamics, velocity differentiation
+  - `airGaps` (0-100): Intentional silence — piano rests, bass drops, drums-minimal measures
+  - `harmonicFreedom` (0-100): Reharmonization — chord anticipation, chromatic passing chords
+- **`PhraseIntent` and `PhraseArc` types** — New types exported from package. `PhraseIntent` carries: arc, dropMeasures, pianoRests, bassRests, drumsMinimal, anticipationChance, passingChordChance, motifLockBars, crescendo, conversationLeader
+- **`PhraseMap.intents`** — Parallel array to boundaries, one `PhraseIntent` per phrase
+- **`BandContext` extended** — New fields: `currentPhraseIntent`, `creativity`, `conversation`, `airGaps`, `harmonicFreedom`
+- **Piano motif memory for all styles** — Rhythm patterns held for multiple bars (was alfaMist only). Lock duration tuned per style: Metheny=4 bars, Holdsworth=2, Fusion=2, default=3
+- **Harmonic anticipation** — Piano plays next chord's voicing early on beat 3 (probability = harmonicFreedom × 0.35). `chromaticApproachRoot()` helper added
+- **Passing chord insertion** — Chromatic approach voicings between chord changes (probability = harmonicFreedom × 0.25)
+- **Grace notes for all styles** — Extended from alfaMist-only to creativity-dependent: Holdsworth=12%, Metheny=8%, Neo-Soul=15%
+- **Drums minimal measures** — Phrase intent can thin drums to ride quarters + pedal hat on 2&4 only
+- **Bass dynamic drops** — Sustained pedal root at velocity 50 during drop measures. Bass rests (complete silence) on high airGaps + creativity
+- **Conversation-driven velocity** — Leader instrument: 1.1-1.2× velocity/density. Listener: 0.6-0.8× density, 0.75× velocity
+
+### Changed
+
+- **`EnsembleOptions`** accepts optional `creativity`, `conversation`, `airGaps`, `harmonicFreedom` parameters
+- **All 23 style presets** updated with tuned musicality parameters:
+  - Pat Metheny: creativity=40, conversation=60, airGaps=45, harmonicFreedom=45
+  - Holdsworth: creativity=55, conversation=65, airGaps=25, harmonicFreedom=60
+  - Alfa Mist: creativity=45, conversation=35, airGaps=20, harmonicFreedom=35
+  - ECM: creativity=35, conversation=40, airGaps=45, harmonicFreedom=30
+  - Funk: creativity=25, conversation=30, airGaps=5, harmonicFreedom=10
+- **Piano comping** — Main generation loop rewritten for phrase intent awareness, conversation dynamics, and harmonic enrichment
+- **Walking bass** — Phrase intent awareness: rest/drop/conversation support in main generation loop
+- **Drum patterns** — Drums minimal support in per-measure loop
+
 ## [1.1.1] - 2026-07-12
 
 ### Fixed

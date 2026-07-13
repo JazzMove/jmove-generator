@@ -1629,9 +1629,52 @@ export function generateWalkingBass(
     ? inferTimeSignature(chords[0].duration, beatDuration)
     : [4, 4] as [number, number];
 
+  // ── Musicality: Phrase Intent Awareness ──
+  const bandCtx = options.bandContext;
+  const creativity = (bandCtx?.creativity ?? 35) / 100;
+  const conversation = (bandCtx?.conversation ?? 30) / 100;
+  const measureDuration = options.measureInfo?.measureDuration ?? (chords.length > 0 ? chords[0].duration : beatDuration * 4);
+
+  // Cross-measure contour memory for Metheny/Holdsworth: track last pattern index
+  // and repeat it transposed for 2 bars to create sequential melodic ideas.
+  let lastPatternIdx = -1;
+  let patternHoldBars = 0;
+
   for (let i = 0; i < chords.length; i++) {
     const chord = chords[i];
     const nextChord = i < chords.length - 1 ? chords[i + 1] : null;
+
+    // ── Phrase Intent: Air Gaps and Drops ──
+    const measureIdx = Math.floor(chord.time / measureDuration);
+    const phraseIntent = bandCtx?.phraseMap?.intents?.length
+      ? lookupBassIntent(measureIdx, bandCtx.phraseMap)
+      : null;
+
+    // Intent-driven bass rest: extremely rare but powerful (bass drops out)
+    if (phraseIntent?.bassRests?.includes(measureIdx)) {
+      // Complete silence — no bass for this measure
+      continue;
+    }
+
+    // Intent-driven drop: play only a sustained pedal root (very quiet)
+    if (phraseIntent?.dropMeasures?.includes(measureIdx)) {
+      const dropRoot: number = rootToMidi(chord.root);
+      const dropPitch: number = prevPitch !== null ? closestOctave(dropRoot, prevPitch) : dropRoot;
+      const pedalNote: BassNote = {
+        pitch: dropPitch,
+        time: chord.time,
+        duration: chord.duration * 0.9,
+        velocity: 50,
+      };
+      beat1Indices.add(notes.length);
+      notes.push(pedalNote);
+      prevPitch = dropPitch;
+      continue;
+    }
+
+    // Conversation: when bass is "listening" (not the leader), play sparser
+    const isLeader = phraseIntent?.conversationLeader === "bass";
+    const isListening = phraseIntent?.conversationLeader != null && !isLeader;
 
     let measureNotes: BassNote[];
 
@@ -1753,13 +1796,12 @@ export function generateWalkingBass(
     if (options.measureInfo) {
       const mIdx = Math.floor(chord.time / (options.measureInfo.measureDuration || 1));
       const dynMult = dynamicMultiplier(mIdx, options.measureInfo.totalMeasures, style, options.measureInfo.sections);
-      // BandContext: energy-scaled velocity (quiet sections = softer bass).
-      // Skip when dynamicMultiplier already incorporates section.dynamicLevel
-      // to avoid double-scaling quiet sections.
       const hasSectionDynamics = options.measureInfo.sections && options.measureInfo.sections.length > 0;
       const energyMult = (options.bandContext && !hasSectionDynamics) ? (0.75 + options.bandContext.sectionEnergy * 0.25) : 1.0;
+      // Conversation: leader plays slightly louder, listener slightly softer
+      const convMult = isLeader ? 1.1 : isListening ? 0.8 : 1.0;
       for (const n of measureNotes) {
-        n.velocity = Math.min(127, Math.max(40, Math.round(n.velocity * dynMult * energyMult)));
+        n.velocity = Math.min(127, Math.max(40, Math.round(n.velocity * dynMult * energyMult * convMult)));
       }
     }
 
@@ -1811,6 +1853,17 @@ export function generateWalkingBass(
 
   _rng = prevRng;
   return notes;
+}
+
+// ── Phrase Intent Lookup (bass-side) ──
+function lookupBassIntent(measure: number, phraseMap: { boundaries: number[]; intents?: Array<{ bassRests: number[]; dropMeasures: number[]; conversationLeader: string | null }> }): { bassRests: number[]; dropMeasures: number[]; conversationLeader: string | null } | null {
+  if (!phraseMap.intents || phraseMap.intents.length === 0) return null;
+  for (let i = phraseMap.boundaries.length - 1; i >= 0; i--) {
+    if (measure >= phraseMap.boundaries[i]) {
+      return phraseMap.intents[i] ?? null;
+    }
+  }
+  return null;
 }
 
 /**
