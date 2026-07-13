@@ -30,7 +30,7 @@ Deep technical articles about how JMove and the generator work:
 - **Seedable & Reproducible** — deterministic PRNG (xoshiro128**) with per-instrument streams. Save a seed, replay the exact same take
 - **Jam Session Generator** — random chord progressions across 17 jazz forms (blues, rhythm changes, AABA, modal, Coltrane matrix, and more)
 - **Walking Bass** — rule-based walking lines with chromatic approaches, 19 styles (swing, bossa, Latin tumbao, neo-soul, math rock, IDM)
-- **Piano Comping** — Bill Evans rootless voicings (Type A/B), quartal, shell, cluster — voice-led with rhythmic templates per style
+- **Piano Comping** — Bill Evans rootless voicings (Type A/B), quartal, shell, cluster — all quality-aware (diatonic intervals per chord type), voice-led with rhythmic templates per style
 - **Drum Patterns** — 19 styles with humanization, ghost notes, groove templates based on GrooVAE research
 - **23 Style Presets** — Classic Swing to IDM, with per-instrument style overrides and tuned musicality parameters
 - **Auto-Detect** — analyze a score to recommend the best preset

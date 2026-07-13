@@ -442,21 +442,21 @@ const ALFA_MIST_RHYTHMS: RhythmHit[][] = [
   [[0, 0.75], [1.25, 0.75], [2.5, 1.3]],
 ];
 
-// Holdsworth keyboard: Pasqua/Hunt — wide voicings, conversational comping,
-// syncopated entries that respond to drums. NOT passive pads.
+// Holdsworth keyboard: Pasqua/Husband — sustained wide voicings, long tones,
+// occasional conversational punctuation. NOT rhythm guitar stabs.
 const HOLDSWORTH_RHYTHMS: RhythmHit[][] = [
-  // Sustained pad — anchor chord (less frequent now)
+  // Sustained pad — full bar, let voicing ring (primary feel)
   [[0, 3.8]],
-  // Syncopated stab + release — punchy, articulate
-  [[0.5, 0.8], [2.5, 1.2]],
-  // Off-beat anticipation — push ahead of downbeat
-  [[3.5, 0.6], [0, 1.5]],
-  // Conversational — short stabs with breath
-  [[0, 0.7], [1.5, 0.7], [3, 0.8]],
-  // Delayed entry with syncopation
-  [[1.5, 0.8], [3, 1.0]],
-  // Two-hit dialogue — call and response
-  [[0, 1.2], [2.5, 0.6]],
+  // Delayed sustained — breathe, then commit
+  [[1, 2.8]],
+  // Two sustained entries — wide spacing, both ring out
+  [[0, 1.8], [2.5, 1.5]],
+  // Offbeat sustained — push ahead, long tone
+  [[0.5, 2.5]],
+  // Conversational — two entries with sustain (not stabs)
+  [[0, 1.5], [2.5, 1.3]],
+  // Anticipation into next bar — sustained pickup
+  [[3, 1.8]],
 ];
 
 // Pat Metheny: open, spacious voicings — Lexicon PCM delay fills gaps.
@@ -721,15 +721,36 @@ function buildOpenVoicing(root: string, quality: string): number[] {
   } else if (q.includes("#11") || q.includes("lyd")) {
     // Lydian: 3-#11-9 (span 16) — wide, shimmering
     intervals = [4, 6, 14];
+  } else if (q.includes("m7b5") || q.includes("ø")) {
+    // Half-dim open: b3-b5-b7 (locrian tones)
+    intervals = [3, 6, 10];
+  } else if (q.includes("m(maj7)")) {
+    // Minor-major open: 9-5-maj7 (melodic minor tones)
+    intervals = [2, 7, 11];
   } else if (q.startsWith("m") && !q.startsWith("maj")) {
     // Minor open: 9-5-b7 (span 12) — warm open 5th
     intervals = [2, 7, 10];
   } else if (q.includes("69") || q.includes("6")) {
     // 6/9: 3-6-9 (span 11) — bright, open
     intervals = [4, 9, 14];
-  } else if (q.includes("9") || q.includes("7")) {
-    // Maj/dom with extension: 3-7-9 (span 12)
+  } else if (q.includes("alt")) {
+    // Altered: 3-b7-b9 (all altered scale tones)
+    intervals = [4, 10, 13];
+  } else if (q.includes("7b9")) {
+    // HW dim: 3-b7-b9 (keeps natural 5th context)
+    intervals = [4, 10, 13];
+  } else if (q.includes("7#9")) {
+    // Dom #9: 3-b7-#9
+    intervals = [4, 10, 15];
+  } else if (q.includes("7#5") || q.includes("aug7")) {
+    // Augmented dom: 3-#5-b7
+    intervals = [4, 8, 10];
+  } else if (q.includes("maj7") || q.includes("maj9")) {
+    // Major with extension: 3-maj7-9 (span 12)
     intervals = [4, 11, 14];
+  } else if (q.includes("9") || q.includes("7") || q.includes("13")) {
+    // Dominant with extension: 3-b7-9 (span 12)
+    intervals = [4, 10, 14];
   } else {
     // Major open: 3-5-9 (span 12) — open triad + 9th
     intervals = [4, 7, 14];
@@ -753,13 +774,57 @@ function buildOpenVoicing(root: string, quality: string): number[] {
   }).sort((a, b) => a - b);
 }
 
-/** Build quartal voicing (stacked 4ths) for modal/ECM styles. */
-function buildQuartalVoicing(root: string): number[] {
+/** Build quartal voicing (stacked diatonic 4ths) for modal/ECM styles.
+ *  Uses quality-derived scale tones so voicings are harmonically correct.
+ *  Real quartal voicings stack 4ths FROM THE SCALE, not chromatic P4ths. */
+function buildQuartalVoicing(root: string, quality?: string): number[] {
   const rootPC = rootMidi(root);
-  // Stacked perfect 4ths: root + P4 + P4 + P4 (intervals 0, 5, 10, 15)
-  const base = 48 + rootPC; // Start around C3
-  const pitches = [base, base + 5, base + 10, base + 15];
-  // Fold into range
+  const q = (quality ?? "").replace(/\/.*$/, "");
+
+  // Quality-aware quartal templates (diatonic 4th stacks from scale tones).
+  // Each set picks 4 notes from the implied scale that form roughly quartal spacing.
+  let intervals: number[];
+  if (q.includes("m(maj7)")) {
+    // Minor-major: melodic minor quartal — b3-5-7-9 (all melodic minor tones, avoids b7)
+    intervals = [3, 7, 11, 14];
+  } else if (q.includes("maj7") || q.includes("maj9") || q.includes("maj")) {
+    // Ionian/Lydian: stack from 3rd → E-A-D-G for Cmaj7
+    intervals = [4, 9, 14, 19];
+  } else if (q.includes("m7b5") || q.includes("ø") || q.includes("dim")) {
+    // Locrian/diminished: b3-b6-b2-b5 → Eb-Ab-Db-Gb for Cm7b5
+    intervals = [3, 8, 13, 18];
+  } else if ((q.includes("m") && !q.includes("maj")) || q.includes("min")) {
+    // Dorian/Aeolian: root-based P4 stack works for minor (all dorian tones)
+    intervals = [0, 5, 10, 15];
+  } else if (q.includes("sus")) {
+    // Sus: root-4-b7-3(or 11) → open quartal
+    intervals = [0, 5, 10, 17];
+  } else if (q.includes("alt")) {
+    // Altered: b7-#9-b13-b9 (all altered scale tones)
+    intervals = [10, 15, 20, 25];
+  } else if (q.includes("7b9")) {
+    // HW diminished: b7-b9-3-5 (half-whole dim tones, keeps natural 5th)
+    intervals = [10, 13, 16, 19];
+  } else if (q.includes("7#9")) {
+    // Dominant #9: b7-#9-3-5
+    intervals = [10, 15, 16, 19];
+  } else if (q.includes("7#5") || q.includes("aug7")) {
+    // Augmented dom: b7-3-#5-9
+    intervals = [10, 16, 20, 26];
+  } else if (q.includes("7b5")) {
+    // Lydian dom / tritone sub: b7-3-b5-9
+    intervals = [10, 16, 18, 26];
+  } else if (q.includes("7") || q.includes("9") || q.includes("13")) {
+    // Dominant/Mixolydian: stack from b7 → Bb-E-A-D for C7
+    intervals = [10, 16, 21, 26];
+  } else {
+    // Major triad default: same as maj7
+    intervals = [4, 9, 14, 19];
+  }
+
+  const base = 48 + rootPC;
+  const pitches = intervals.map(i => base + i);
+  // Fold into playable range
   return pitches.map((p) => {
     while (p > PIANO_HIGH) p -= 12;
     while (p < PIANO_LOW) p += 12;
@@ -774,21 +839,26 @@ function buildOpen5thsVoicing(root: string, quality: string): number[] {
   const q = quality.replace(/\/.*$/, "");
   const base = 48 + r; // C3
 
-  // Determine 3rd quality
-  const isMinor = q.includes("m") && !q.includes("maj");
+  // Determine 3rd quality — m(maj7) is minor despite containing "maj"
+  const isMinor = (q.includes("m") && !q.includes("maj")) || q.includes("m(maj7)");
   const thirdInterval = isMinor ? 3 : 4;
 
   // Wide voicing: root low, 5th up, 3rd higher, 7th highest
   // Spread across 2 octaves for open sound
   let seventh: number;
-  if (q.includes("maj7") || q.includes("maj9")) seventh = 11;
+  if (q.includes("m(maj7)")) seventh = 11;
+  else if (q.includes("maj7") || q.includes("maj9")) seventh = 11;
   else if (q.includes("7") || q.includes("9") || q.includes("13")) seventh = 10;
-  else if (q.includes("m(maj7)")) seventh = 11;
   else seventh = 10;
+
+  // Use correct 5th for the chord quality
+  let fifth = 7; // perfect 5th
+  if (q.includes("b5") || q.includes("ø") || q.includes("dim")) fifth = 6;
+  else if (q.includes("#5") || q.includes("aug") || q.includes("alt")) fifth = 8;
 
   const pitches = [
     base,                    // root (low)
-    base + 7,                // 5th
+    base + fifth,            // 5th (quality-aware)
     base + 12 + thirdInterval, // 3rd (octave up)
     base + 12 + seventh,     // 7th (octave up)
   ];
@@ -862,38 +932,67 @@ function buildRootPositionVoicing(root: string, quality: string): number[] {
   }).sort((a, b) => a - b);
 }
 
-/** Pick best voicing type (A or B) based on voice leading from previous. */
+/** Pick best voicing type based on style, with variety tracking.
+ *  `lastType` is a mutable ref [value] — avoids picking same voicing type consecutively. */
 function pickVoicing(
   root: string,
   quality: string,
   prevPitches: number[] | null,
   style?: string,
   shell = false,
+  lastType?: [number],
 ): number[] {
+  // Helper: pick from weighted options, avoiding lastType when possible
+  const pickWithVariety = (options: [number, () => number[]][]): number[] => {
+    // Build cumulative weights
+    const total = options.reduce((s, o) => s + o[0], 0);
+    let roll = _rng() * total;
+    let chosen = options.length - 1;
+    for (let i = 0; i < options.length; i++) {
+      roll -= options[i][0];
+      if (roll <= 0) { chosen = i; break; }
+    }
+    // If same as last type and there are alternatives, re-roll once
+    if (lastType && chosen === lastType[0] && options.length > 1) {
+      const alt = (chosen + 1 + Math.floor(_rng() * (options.length - 1))) % options.length;
+      chosen = alt;
+    }
+    if (lastType) lastType[0] = chosen;
+    return options[chosen][1]();
+  };
+
   // Pat Metheny: 65% wide open voicings (guitar translation), 35% quartal (variety)
   if (style === "metheny") {
-    return _rng() < 0.65
-      ? buildOpenVoicing(root, quality)
-      : buildQuartalVoicing(root);
+    return pickWithVariety([
+      [65, () => buildOpenVoicing(root, quality)],
+      [35, () => buildQuartalVoicing(root, quality)],
+    ]);
   }
 
   // Alfa Mist: 45% cluster (tight, dreamy), 20% warm inversions (1st/2nd inv + 9th),
   // 35% standard Evans (variety). Self-taught ear-based voicing approach.
   if (style === "alfaMist") {
-    const roll = _rng();
-    if (roll < 0.45) return buildClusterVoicing(root, quality);
-    if (roll < 0.65) return buildAlfaMistInversionVoicing(root, quality);
-    return buildStandardVoicing(root, quality, prevPitches, shell);
+    return pickWithVariety([
+      [45, () => buildClusterVoicing(root, quality)],
+      [20, () => buildAlfaMistInversionVoicing(root, quality)],
+      [35, () => buildStandardVoicing(root, quality, prevPitches, shell)],
+    ]);
   }
 
   // Modal: 60% quartal (McCoy Tyner), 40% standard rootless (variety)
   if (style === "modal") {
-    return _rng() < 0.60 ? buildQuartalVoicing(root) : buildStandardVoicing(root, quality, prevPitches, shell);
+    return pickWithVariety([
+      [60, () => buildQuartalVoicing(root, quality)],
+      [40, () => buildStandardVoicing(root, quality, prevPitches, shell)],
+    ]);
   }
 
   // ECM: 70% quartal (Nordic clarity), 30% standard
   if (style === "ecm") {
-    return _rng() < 0.70 ? buildQuartalVoicing(root) : buildStandardVoicing(root, quality, prevPitches, shell);
+    return pickWithVariety([
+      [70, () => buildQuartalVoicing(root, quality)],
+      [30, () => buildStandardVoicing(root, quality, prevPitches, shell)],
+    ]);
   }
 
   // Cool Jazz: always shell voicings (2-note guide tones) for lighter texture
@@ -903,15 +1002,19 @@ function pickVoicing(
 
   // Holdsworth: 40% open 5ths (wide intervals), 35% quartal (4th stacks), 25% open voicings
   if (style === "holdsworth") {
-    const roll = _rng();
-    if (roll < 0.40) return buildOpen5thsVoicing(root, quality);
-    if (roll < 0.75) return buildQuartalVoicing(root);
-    return buildOpenVoicing(root, quality);
+    return pickWithVariety([
+      [40, () => buildOpen5thsVoicing(root, quality)],
+      [35, () => buildQuartalVoicing(root, quality)],
+      [25, () => buildOpenVoicing(root, quality)],
+    ]);
   }
 
   // Fusion: 50% quartal (Herbie Hancock), 50% open voicings
   if (style === "fusion") {
-    return _rng() < 0.50 ? buildQuartalVoicing(root) : buildOpenVoicing(root, quality);
+    return pickWithVariety([
+      [50, () => buildQuartalVoicing(root, quality)],
+      [50, () => buildOpenVoicing(root, quality)],
+    ]);
   }
 
   // Neo-Soul: 55% cluster voicings (Glasper, higher register), 45% standard
@@ -1107,6 +1210,45 @@ function inferCompTimeSig(measureDuration: number, beatDuration: number): [numbe
   return [4, 4];
 }
 
+// ── Motif Evolution ──
+
+/** Slightly modify a rhythm pattern on repeat bars instead of exact copy.
+ *  A human pianist evolves motifs — shifts a hit, drops a note, extends a duration.
+ *  `barsLeft` controls how much evolution: early repeats stay close, later ones drift. */
+function evolveMotif(
+  base: RhythmHit[],
+  barsLeft: number,
+  creativity: number,
+  rng: () => number,
+): RhythmHit[] {
+  // Low creativity or first repeat bar: keep original
+  if (creativity < 0.2 || rng() > creativity * 0.5) return base;
+
+  const evolved = base.map(([beat, dur]) => [beat, dur] as RhythmHit);
+  const idx = Math.floor(rng() * evolved.length);
+
+  const mutation = rng();
+  if (mutation < 0.35 && evolved.length > 1) {
+    // Drop a hit (creates space)
+    evolved.splice(idx, 1);
+  } else if (mutation < 0.6) {
+    // Shift timing slightly (±0.25 beats)
+    const shift = (rng() - 0.5) * 0.5;
+    evolved[idx] = [Math.max(0, Math.min(3.75, evolved[idx][0] + shift)), evolved[idx][1]];
+  } else if (mutation < 0.8) {
+    // Extend or shorten duration
+    const scale = 0.7 + rng() * 0.6; // 0.7x to 1.3x
+    evolved[idx] = [evolved[idx][0], evolved[idx][1] * scale];
+  } else if (evolved.length < 3) {
+    // Add a ghost hit (quiet, short)
+    const ghostBeat = rng() * 3.5;
+    evolved.push([ghostBeat, 0.4]);
+    evolved.sort((a, b) => a[0] - b[0]);
+  }
+
+  return evolved;
+}
+
 // ── Main Generator ──
 
 /**
@@ -1152,10 +1294,17 @@ export function generatePianoComping(
   let wasRest = false;
   const recentRhythmIndices: number[] = [];
 
+  // ── Register Drift State ──
+  // Tracks an octave offset that shifts up during builds/climaxes and down during releases/drops.
+  // Real pianists move register for narrative — low for intimate, high for energy.
+  let registerShift = 0; // semitones to add to voicings (multiples of 12)
+  const voicingTypeRef: [number] = [-1]; // mutable ref for voicing variety tracking
+
   // ── Musicality Parameters ──
-  const creativity = (bandCtx?.creativity ?? 35) / 100;
-  const conversation = (bandCtx?.conversation ?? 30) / 100;
-  const harmonicFreedom = (bandCtx?.harmonicFreedom ?? 25) / 100;
+  // Only active in ensemble mode (bandContext provided). Standalone calls get safe defaults.
+  const creativity = bandCtx ? (bandCtx.creativity ?? 35) / 100 : 0;
+  const conversation = bandCtx ? (bandCtx.conversation ?? 30) / 100 : 0;
+  const harmonicFreedom = bandCtx ? (bandCtx.harmonicFreedom ?? 25) / 100 : 0;
   const intent = bandCtx?.currentPhraseIntent ?? null;
 
   // ── Motif Memory (all styles, not just alfaMist) ──
@@ -1184,6 +1333,18 @@ export function generatePianoComping(
   // Measure duration for phrase intent lookups
   const measureDuration = options.measureInfo?.measureDuration ?? (chords.length > 0 ? chords[0].duration : beatDuration * 4);
 
+  // ── Velocity Contour ──
+  // Per-beat velocity shape within a bar. Real pianists don't play binary loud/soft —
+  // they create a dynamic curve. Beat 1 accented, mid-bar lighter, beat 3 lifts, beat 4 falls.
+  const velContour = (beatPos: number, beatsPerBar: number): number => {
+    if (beatsPerBar <= 0) return 78;
+    const pct = beatPos / beatsPerBar;
+    // Accent beat 1, dip mid-bar, slight lift beat 3 area, taper at end
+    // Curve: 85 → 68 → 75 → 65 (in 4/4)
+    return Math.round(85 - 20 * Math.sin(pct * Math.PI) + 10 * Math.sin(pct * 2 * Math.PI));
+  };
+  const beatsPerBar = inferredTimeSig ? inferredTimeSig[0] : 4;
+
   for (let ci = 0; ci < chords.length; ci++) {
     const chord = chords[ci];
     const nextChord = ci + 1 < chords.length ? chords[ci + 1] : null;
@@ -1208,7 +1369,9 @@ export function generatePianoComping(
     // When piano is the leader, play more actively.
     const isLeader = phraseIntent?.conversationLeader === "piano";
     const isListening = phraseIntent?.conversationLeader != null && !isLeader;
-    const conversationDensityMult = isLeader ? 1.2 : isListening ? 0.6 : 1.0;
+    // Scale effect with conversation parameter: low conversation = instruments play independently,
+    // high conversation = dramatic leader/listener contrast
+    const conversationDensityMult = isLeader ? 1 + 0.3 * conversation : isListening ? 1 - 0.5 * conversation : 1.0;
 
     // Form-aware density
     const formPct = chords.length > 1 ? ci / chords.length : 0.5;
@@ -1230,15 +1393,30 @@ export function generatePianoComping(
     }
     wasRest = false;
 
-    const pitches = pickVoicing(chord.root, chord.quality, prevPitches, style, useShell);
+    const pitches = pickVoicing(chord.root, chord.quality, prevPitches, style, useShell, voicingTypeRef);
     prevPitches = pitches;
+
+    // ── Register Drift ──
+    // Shift voicings up during builds/climaxes, down during releases/drops.
+    const arc = phraseIntent?.arc;
+    if (arc === "build" || arc === "climax") {
+      if (registerShift < 24) registerShift += (_rng() < 0.3 ? 12 : 0);
+    } else if (arc === "release" || arc === "drop") {
+      if (registerShift > -24) registerShift -= (_rng() < 0.3 ? 12 : 0);
+    } else {
+      // Sustain: drift back toward center
+      if (registerShift > 0 && _rng() < 0.2) registerShift -= 12;
+      if (registerShift < 0 && _rng() < 0.2) registerShift += 12;
+    }
 
     // ── Motif Memory: Rhythm Selection ──
     // All styles now benefit from motif lock — holds pattern for N bars.
     // Creates the "composed" feel that separates algorithmic from musical.
     let rhythm: RhythmHit[];
     if (loopBarsLeft > 0 && loopRhythm) {
-      rhythm = loopRhythm;
+      // Motif evolution: on repeat bars, slightly modify pattern instead of exact copy.
+      // A human pianist evolves a motif — adds a ghost hit, shifts timing, drops a note.
+      rhythm = evolveMotif(loopRhythm, loopBarsLeft, creativity, _rng);
       loopBarsLeft--;
     } else {
       const picked = pickRhythm(style, density, recentRhythmIndices, inferredTimeSig);
@@ -1270,12 +1448,12 @@ export function generatePianoComping(
       let usePitches = pitches;
       if (rawBeatOffset >= 3.5 && nextChord) {
         // Original behavior + enhanced by harmonicFreedom
-        usePitches = pickVoicing(nextChord.root, nextChord.quality, prevPitches, style, useShell);
+        usePitches = pickVoicing(nextChord.root, nextChord.quality, prevPitches, style, useShell, voicingTypeRef);
       } else if (rawBeatOffset >= 3.0 && rawBeatOffset < 3.5 && nextChord && _rng() < anticipationProb) {
         // NEW: Early anticipation on beat 3-and (harmonicFreedom-controlled)
         // Creates forward motion — piano "hears" the next chord before it arrives.
         // Metheny does this constantly. Holdsworth's keys player does it conversationally.
-        usePitches = pickVoicing(nextChord.root, nextChord.quality, prevPitches, style, useShell);
+        usePitches = pickVoicing(nextChord.root, nextChord.quality, prevPitches, style, useShell, voicingTypeRef);
       }
 
       // ── Passing Chord Insertion ──
@@ -1284,7 +1462,7 @@ export function generatePianoComping(
       if (rawBeatOffset >= 2.5 && rawBeatOffset < 3.0 && nextChord && _rng() < passingChordProb) {
         // Chromatic approach: voice the chord a half-step above next root
         const passingRoot = chromaticApproachRoot(nextChord.root, _rng() < 0.5);
-        const passingPitches = pickVoicing(passingRoot, nextChord.quality, prevPitches, style, useShell);
+        const passingPitches = pickVoicing(passingRoot, nextChord.quality, prevPitches, style, useShell, voicingTypeRef);
         const passingTime = chord.time + rawBeatOffset * beatDuration;
         if (passingTime < chord.time + chord.duration) {
           notes.push({
@@ -1320,15 +1498,22 @@ export function generatePianoComping(
       const energyMult = (bandCtx && !hasSectionDynamics) ? (0.7 + bandCtx.sectionEnergy * 0.3) : 1.0;
 
       // Conversation velocity adjustment
-      const convVelMult = isListening ? 0.75 : isLeader ? 1.05 : 1.0;
-      const baseVel = Math.round((beatOffset === 0 ? 80 : 70) * velScale * dynMult * energyMult * convVelMult * crescendoMult);
+      const convVelMult = isListening ? 1 - 0.3 * conversation : isLeader ? 1 + 0.1 * conversation : 1.0;
+      const contourVel = velContour(rawBeatOffset, beatsPerBar);
+      const baseVel = Math.round(contourVel * velScale * dynMult * energyMult * convVelMult * crescendoMult);
 
-      // BandContext: avoid bass register collision
-      let finalPitches = usePitches;
+      // Apply register drift + bass collision avoidance
+      let finalPitches = registerShift !== 0
+        ? usePitches.map(p => {
+            const shifted = p + registerShift;
+            // Clamp to playable piano range
+            return shifted > PIANO_HIGH ? shifted - 12 : shifted < PIANO_LOW ? shifted + 12 : shifted;
+          })
+        : usePitches;
       if (bandCtx?.bassRegister === "high") {
-        const lowestPitch = Math.min(...usePitches);
+        const lowestPitch = Math.min(...finalPitches);
         if (lowestPitch < 60) {
-          finalPitches = usePitches.map(p => p + 12);
+          finalPitches = finalPitches.map(p => p + 12);
         }
       }
       notes.push({

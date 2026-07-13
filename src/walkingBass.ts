@@ -13,7 +13,7 @@
 
 import { tempoSwingMultiplier, dynamicMultiplier, instrumentSwingFactor } from "./swingUtils";
 import { getGrooveTemplate, applyGroove } from "./grooveTemplates";
-import type { BassNote, WalkingBassOptions, ChordEvent } from "./types";
+import type { BassNote, WalkingBassOptions, ChordEvent, PhraseIntent } from "./types";
 
 export type { BassNote, WalkingBassOptions, ChordEvent };
 
@@ -1631,14 +1631,8 @@ export function generateWalkingBass(
 
   // ── Musicality: Phrase Intent Awareness ──
   const bandCtx = options.bandContext;
-  const creativity = (bandCtx?.creativity ?? 35) / 100;
   const conversation = (bandCtx?.conversation ?? 30) / 100;
   const measureDuration = options.measureInfo?.measureDuration ?? (chords.length > 0 ? chords[0].duration : beatDuration * 4);
-
-  // Cross-measure contour memory for Metheny/Holdsworth: track last pattern index
-  // and repeat it transposed for 2 bars to create sequential melodic ideas.
-  let lastPatternIdx = -1;
-  let patternHoldBars = 0;
 
   for (let i = 0; i < chords.length; i++) {
     const chord = chords[i];
@@ -1793,15 +1787,25 @@ export function generateWalkingBass(
     }
 
     // Dynamic arc: scale velocity by chorus position
+    // Conversation + arc awareness apply even without measureInfo (standalone calls)
+    const convMult = isLeader ? 1 + 0.15 * conversation : isListening ? 1 - 0.25 * conversation : 1.0;
+    const bassArc = phraseIntent?.arc;
+    const arcMult = bassArc === "climax" ? 1.12
+      : bassArc === "build" ? 1.05
+      : bassArc === "release" ? 0.9
+      : bassArc === "drop" ? 0.78
+      : 1.0;
     if (options.measureInfo) {
       const mIdx = Math.floor(chord.time / (options.measureInfo.measureDuration || 1));
       const dynMult = dynamicMultiplier(mIdx, options.measureInfo.totalMeasures, style, options.measureInfo.sections);
       const hasSectionDynamics = options.measureInfo.sections && options.measureInfo.sections.length > 0;
       const energyMult = (options.bandContext && !hasSectionDynamics) ? (0.75 + options.bandContext.sectionEnergy * 0.25) : 1.0;
-      // Conversation: leader plays slightly louder, listener slightly softer
-      const convMult = isLeader ? 1.1 : isListening ? 0.8 : 1.0;
       for (const n of measureNotes) {
-        n.velocity = Math.min(127, Math.max(40, Math.round(n.velocity * dynMult * energyMult * convMult)));
+        n.velocity = Math.min(127, Math.max(40, Math.round(n.velocity * dynMult * energyMult * convMult * arcMult)));
+      }
+    } else if (convMult !== 1.0 || arcMult !== 1.0) {
+      for (const n of measureNotes) {
+        n.velocity = Math.min(127, Math.max(40, Math.round(n.velocity * convMult * arcMult)));
       }
     }
 
@@ -1856,7 +1860,7 @@ export function generateWalkingBass(
 }
 
 // ── Phrase Intent Lookup (bass-side) ──
-function lookupBassIntent(measure: number, phraseMap: { boundaries: number[]; intents?: Array<{ bassRests: number[]; dropMeasures: number[]; conversationLeader: string | null }> }): { bassRests: number[]; dropMeasures: number[]; conversationLeader: string | null } | null {
+function lookupBassIntent(measure: number, phraseMap: { boundaries: number[]; intents?: PhraseIntent[] }): PhraseIntent | null {
   if (!phraseMap.intents || phraseMap.intents.length === 0) return null;
   for (let i = phraseMap.boundaries.length - 1; i >= 0; i--) {
     if (measure >= phraseMap.boundaries[i]) {

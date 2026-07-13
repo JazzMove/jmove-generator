@@ -35,7 +35,7 @@ import type {
 
 // ── Phrase Map Computation ──
 
-function computePhraseMap(options: EnsembleOptions, masterRng: () => number): PhraseMap {
+function computePhraseMap(options: EnsembleOptions): PhraseMap {
   const { measures, sections } = options;
 
   // Determine phrase length from sections or default
@@ -75,13 +75,7 @@ function computePhraseMap(options: EnsembleOptions, masterRng: () => number): Ph
 
   boundaries.sort((a, b) => a - b);
 
-  // Generate motif seeds for each phrase
-  const motifSeeds: number[] = [];
-  for (let i = 0; i < boundaries.length; i++) {
-    motifSeeds.push(Math.floor(masterRng() * 0xFFFFFFFF));
-  }
-
-  return { boundaries, phraseLength, motifSeeds, intents: [] };
+  return { boundaries, phraseLength, intents: [] };
 }
 
 // ── Phrase Intent Planner ──
@@ -108,24 +102,33 @@ function planMusicalIntents(
     const phraseLen = phraseEnd - phraseStart;
 
     // ── Arc Selection ──
-    // Natural arc: build toward middle, release toward end, with creative drops
+    // Natural arc with contrast: adjacent phrases should differ.
+    // Real music: build → climax → release → sustain → build (narrative, not random)
+    const prevArc = pi > 0 ? intents[pi - 1].arc : null;
     let arc: PhraseArc;
     if (pi === 0) {
-      // Opening phrase: always sustain or build (set the stage)
+      // Opening: set the stage
       arc = rng() < 0.6 ? "sustain" : "build";
     } else if (pi === totalPhrases - 1) {
-      // Final phrase: release or sustain (resolve)
+      // Final: resolve
       arc = rng() < 0.7 ? "release" : "sustain";
+    } else if (prevArc === "climax") {
+      // After climax: always release or drop (never sustain at peak)
+      arc = rng() < 0.6 ? "release" : "drop";
+    } else if (prevArc === "build" && pct > 0.4) {
+      // Build earned a climax (if past early section)
+      arc = rng() < 0.5 + creativity * 0.3 ? "climax" : "sustain";
+    } else if (prevArc === "drop") {
+      // After drop: rebuild energy
+      arc = rng() < 0.7 ? "build" : "sustain";
     } else if (pct > 0.5 && pct < 0.8 && rng() < creativity * 0.6) {
-      // Mid-late: climax moment (creativity-dependent)
       arc = "climax";
-    } else if (rng() < creativity * 0.4) {
-      // Creative drop: sudden quiet for contrast (creativity-dependent)
+    } else if (rng() < creativity * 0.35) {
       arc = "drop";
     } else if (pct < 0.5) {
-      arc = rng() < 0.65 ? "build" : "sustain";
+      arc = rng() < 0.6 ? "build" : "sustain";
     } else {
-      arc = rng() < 0.5 ? "sustain" : "release";
+      arc = rng() < 0.45 ? "release" : rng() < 0.5 ? "build" : "sustain";
     }
 
     // ── Dynamic Drop Measures ──
@@ -410,7 +413,7 @@ export function generateEnsemble(options: EnsembleOptions): EnsembleResult {
   const swingAmount = options.swingAmount ?? 100;
 
   // Compute phrase structure and musical intent
-  const phraseMap = computePhraseMap(options, masterRng);
+  const phraseMap = computePhraseMap(options);
   phraseMap.intents = planMusicalIntents(phraseMap, options, masterRng);
   const context = initContext(phraseMap, options);
 
@@ -551,7 +554,7 @@ export function* generateEnsembleMeasures(options: EnsembleOptions): Generator<M
   const density = options.density ?? 50;
   const swingAmount = options.swingAmount ?? 100;
 
-  const phraseMap = computePhraseMap(options, masterRng);
+  const phraseMap = computePhraseMap(options);
   phraseMap.intents = planMusicalIntents(phraseMap, options, masterRng);
   const context = initContext(phraseMap, options);
 

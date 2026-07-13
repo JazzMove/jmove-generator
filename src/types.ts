@@ -267,7 +267,6 @@ export interface PhraseIntent {
 export interface PhraseMap {
   boundaries: number[];       // measure indices where phrases start
   phraseLength: number;       // current phrase length (2, 4, or 8 bars)
-  motifSeeds: number[];       // per-phrase PRNG seed for motif repetition
   intents: PhraseIntent[];    // per-phrase musical intent (parallel to boundaries)
 }
 

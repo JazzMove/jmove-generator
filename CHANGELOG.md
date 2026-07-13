@@ -4,6 +4,22 @@ All notable changes to `@jmove/generator` will be documented in this file.
 
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [1.2.1] - 2026-07-13
+
+### Fixed
+
+- **Quality-aware quartal voicings** — `buildQuartalVoicing` now accepts chord quality and selects diatonic 4th intervals per quality: maj7→Ionian `[4,9,14,19]`, m7→Dorian `[0,5,10,15]`, m(maj7)→melodic minor `[3,7,11,14]`, dom7→Mixolydian `[10,16,21,26]`, alt→Altered `[10,15,20,25]`, m7b5→Locrian `[3,8,13,18]`, 7b9→HW Dim `[10,13,16,19]`, 7#9→`[10,15,16,19]`. Previously stacked chromatic perfect 4ths `[0,5,10,15]` for all chords
+- **Quality-aware open voicings** — `buildOpenVoicing` split into quality-specific branches: m(maj7) `[2,7,11]`, m7b5 `[3,6,10]`, alt `[4,10,13]`, 7b9 `[4,10,13]`, 7#9 `[4,10,15]`, 7#5 `[4,8,10]`, separate maj7 `[4,11,14]` vs dom7 `[4,10,14]`
+- **Quality-aware 5ths voicings** — `buildOpen5thsVoicing` detects b5/aug/#5 for correct 5th interval and m(maj7) for correct 3rd and 7th
+- **m(maj7) producing Bb instead of B** — Quartal, open, and open-5ths builders all routed m(maj7) through generic minor branches (interval 10 = Bb). Added dedicated m(maj7) branches with interval 11 (B natural) in all three builders
+- **Dominant 7th producing major 7th** — Open voicing used interval 11 (B natural) for C7/C9. Split maj7 and dom7 branches
+- **m7b5 producing natural 5th** — Quartal template had `[3,8,13,19]` where 19%12=7=G. Fixed to `[3,8,13,18]` (Gb)
+- **Stale drum phraseIntent in batch mode** — Drums used `currentPhraseIntent` (set once at ensemble start). Added per-measure `lookupDrumIntent()` matching bass/piano lookup pattern
+- **Ghost note threshold overflow** — High arc adjustment could push threshold past 40, stripping all ghost notes during drops. Capped at 40
+- **Bass arc/conversation awareness without measureInfo** — `convMult` and `arcMult` were scoped inside `if (options.measureInfo)` block. Moved outside so standalone bass calls get arc-driven velocity shaping
+- **Register drift boundary too tight** — ±12 semitone limit caused drift to stall after one octave. Expanded to ±24 with PIANO_LOW/PIANO_HIGH clamping
+- **Dead `motifSeeds` code** — Removed unused `motifSeeds` from `PhraseMap` type and `computePhraseMap`. Field was computed but never read by any generator
+
 ## [1.2.0] - 2026-07-13
 
 ### Added

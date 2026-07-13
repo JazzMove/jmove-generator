@@ -15,7 +15,7 @@
 
 import { tempoSwingMultiplier, dynamicMultiplier, instrumentSwingFactor } from "./swingUtils";
 import { getGrooveTemplate, applyGroove, drumPitchToElement } from "./grooveTemplates";
-import type { DrumHit, DrumPatternOptions } from "./types";
+import type { DrumHit, DrumPatternOptions, PhraseIntent } from "./types";
 
 export type { DrumHit, DrumPatternOptions };
 
@@ -2216,7 +2216,10 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
     // When phrase intent says this measure should be minimal, strip to timekeeping only.
     // Creates dramatic breathing room — silence is the most powerful musical tool.
     const absoluteM = Math.round(measureStart / measureDuration);
-    const phraseIntent = bandCtx?.currentPhraseIntent;
+    // Per-measure phrase intent lookup (not stale currentPhraseIntent)
+    const phraseIntent = bandCtx?.phraseMap
+      ? lookupDrumIntent(absoluteM, bandCtx.phraseMap)
+      : bandCtx?.currentPhraseIntent ?? null;
     if (phraseIntent?.drumsMinimal?.includes(absoluteM)) {
       // Minimal drums: just ride quarters and pedal hat on 2&4
       for (let b = 0; b < beatsPerMeasure; b++) {
@@ -2239,6 +2242,31 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
       barsOnPattern++;
       continue;
     }
+
+    // ── Phrase Arc Dynamics ──
+    // Drums respond to phrase arc: build/climax = busier+louder, release = sparser+softer.
+    // Without this, drums play identically regardless of musical narrative.
+    const arc = phraseIntent?.arc;
+    const isDrop = phraseIntent?.dropMeasures?.includes(absoluteM) ?? false;
+    const arcVelMult = isDrop ? 0.7
+      : arc === "climax" ? 1.15
+      : arc === "build" ? 1.05 + (phraseIntent?.crescendo ? 0.05 : 0)
+      : arc === "release" ? 0.88
+      : arc === "drop" ? 0.75
+      : 1.0;
+    // Build/climax: accept more ghost notes (lower threshold). Release/drop: strip ghosts.
+    const arcGhostAdjust = isDrop ? 20
+      : arc === "climax" ? -8
+      : arc === "build" ? -4
+      : arc === "release" ? 8
+      : arc === "drop" ? 15
+      : 0;
+
+    // ── Conversation Awareness ──
+    // When drums are the leader, play more actively. When listening, pull back.
+    const isLeader = phraseIntent?.conversationLeader === "drums";
+    const isListening = phraseIntent?.conversationLeader != null && !isLeader;
+    const convDrumVelMult = isLeader ? 1.08 : isListening ? 0.88 : 1.0;
 
     // Crash cymbal on form boundaries — louder at section boundaries
     // Alfa Mist: crashes only on section starts or 30% of phrase boundaries (sparse, not every 4 bars)
@@ -2307,7 +2335,9 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
     const pattern = [...patternSet.base, ...variationHits, ...(fillPattern ?? [])];
 
     // BandContext: energy-aware ghost note threshold — low energy strips ghosts earlier
-    const ghostThreshold = bandCtx ? Math.round(15 + (1 - energy) * 20) : 15;
+    // Arc adjustment: build/climax keep more ghosts (busier), release/drop strip them (sparser)
+    // Cap at 40 to always preserve some ghost notes (was uncapped to 55, stripping all ghosts in drops)
+    const ghostThreshold = bandCtx ? Math.min(40, Math.round(15 + (1 - energy) * 20 + arcGhostAdjust)) : 15;
 
     for (const hit of pattern) {
       if (hit.beat >= beatsPerMeasure) continue;
@@ -2342,7 +2372,7 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
         pitch: hit.drum,
         time: humanizeTime(time, humanize, style, hit.drum, rng),
         duration: 0.08,
-        velocity: humanizeVelocity(Math.round(hit.velocity * dynMult * energyVelMult), hit.ghost ?? false, humanize, rng),
+        velocity: humanizeVelocity(Math.round(hit.velocity * dynMult * energyVelMult * arcVelMult * convDrumVelMult), hit.ghost ?? false, humanize, rng),
       });
     }
 
@@ -2364,6 +2394,18 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
   interlockKickHihat(hits, style, rng);
 
   return hits;
+}
+
+// ── Phrase Intent Lookup (per-measure, not stale snapshot) ──
+
+function lookupDrumIntent(measure: number, phraseMap: { boundaries: number[]; intents?: PhraseIntent[] }): PhraseIntent | null {
+  if (!phraseMap.intents || phraseMap.intents.length === 0) return null;
+  for (let i = phraseMap.boundaries.length - 1; i >= 0; i--) {
+    if (measure >= phraseMap.boundaries[i]) {
+      return phraseMap.intents[i] ?? null;
+    }
+  }
+  return null;
 }
 
 // ── Kick-HiHat Interlocking ──
