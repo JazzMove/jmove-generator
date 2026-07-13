@@ -750,6 +750,122 @@ describe("Walking Bass — quality coverage (no missing chord tones)", () => {
   });
 });
 
+// ── Dissonance Filtering ──
+
+describe("Walking Bass — dissonance filtering", () => {
+  it("beats 2-3 avoid tritone from root (statistical)", () => {
+    // Generate many measures and count how often beat 2/3 form tritone (6 semitones) with root
+    let totalInner = 0;
+    let tritones = 0;
+    for (let run = 0; run < 50; run++) {
+      const chords = [
+        makeChord("C", "maj7", 0), makeChord("F", "maj7", 2),
+        makeChord("G", "7", 4), makeChord("C", "maj7", 6),
+      ];
+      const notes = generateWalkingBass(chords, { tempo: 120, style: "swing" });
+      // Check beats 2-3 of each measure (notes at index 1,2 per 4-note group)
+      for (let m = 0; m < 4; m++) {
+        const rootPC = notes[m * 4]?.pitch % 12;
+        for (const idx of [m * 4 + 1, m * 4 + 2]) {
+          const n = notes[idx];
+          if (!n) continue;
+          totalInner++;
+          const interval = ((n.pitch % 12) - rootPC + 12) % 12;
+          if (interval === 6) tritones++;
+        }
+      }
+    }
+    // Tritone should be rare (< 5% of inner notes)
+    expect(tritones / totalInner).toBeLessThan(0.05);
+  });
+});
+
+// ── Beat 2-3 Variety ──
+
+describe("Walking Bass — beat 2-3 variety", () => {
+  it("same chord progression produces varied beat-2 pitches across runs", () => {
+    const beat2Pitches = new Set<number>();
+    const chords = [
+      makeChord("D", "m7", 0), makeChord("G", "7", 2),
+      makeChord("C", "maj7", 4), makeChord("A", "7", 6),
+      makeChord("D", "m7", 8), makeChord("G", "7", 10),
+      makeChord("C", "maj7", 12), makeChord("C", "maj7", 14),
+    ];
+    for (let run = 0; run < 80; run++) {
+      const notes = generateWalkingBass(chords, { tempo: 120, style: "swing" });
+      // Collect beat-2 pitch of each 4-note measure
+      for (let m = 0; m < 8; m++) {
+        const n = notes[m * 4 + 1];
+        if (n) beat2Pitches.add(n.pitch);
+      }
+    }
+    // With randomization, should see at least 3 distinct beat-2 pitches across all measures
+    expect(beat2Pitches.size).toBeGreaterThanOrEqual(3);
+  });
+});
+
+// ── 11/8 Grouping ──
+
+describe("Walking Bass — 11/8 grouping", () => {
+  it("produces 5 notes in 11/8 (one per group)", () => {
+    const eighth = 0.25; // at 120bpm, quarter=0.5s, eighth=0.25s
+    const measureDur = 11 * eighth; // 2.75s
+    const notes = generateWalkingBass(
+      [makeChord("C", "m7", 0, measureDur), makeChord("F", "7", measureDur, measureDur)],
+      { tempo: 120, style: "swing" },
+    );
+    // First measure should have 5 notes (2+2+3+2+2 grouping)
+    const firstMeasure = notes.filter(n => n.time < measureDur);
+    expect(firstMeasure).toHaveLength(5);
+  });
+
+  it("11/8 note onsets follow 2+2+3+2+2 grouping", () => {
+    const eighth = 0.25;
+    const measureDur = 11 * eighth;
+    const notes = generateWalkingBass(
+      [makeChord("C", "maj7", 0, measureDur), makeChord("G", "7", measureDur, measureDur)],
+      { tempo: 120, style: "swing" },
+    );
+    const firstMeasure = notes.filter(n => n.time < measureDur);
+    // Expected onsets: 0, 2*eighth, 4*eighth, 7*eighth, 9*eighth
+    const expectedOnsets = [0, 0.5, 1.0, 1.75, 2.25];
+    for (let i = 0; i < Math.min(5, firstMeasure.length); i++) {
+      expect(firstMeasure[i].time).toBeCloseTo(expectedOnsets[i], 2);
+    }
+  });
+
+  it("11/8 all notes in bass range", () => {
+    const eighth = 0.25;
+    const measureDur = 11 * eighth;
+    const chords = [
+      makeChord("Bb", "m7", 0, measureDur),
+      makeChord("Eb", "7", measureDur, measureDur),
+      makeChord("Ab", "maj7", measureDur * 2, measureDur),
+    ];
+    const notes = generateWalkingBass(chords, { tempo: 120, style: "swing" });
+    for (const n of notes) {
+      expect(n.pitch).toBeGreaterThanOrEqual(BASS_LOW);
+      expect(n.pitch).toBeLessThanOrEqual(BASS_HIGH);
+    }
+  });
+});
+
+// ── Holdsworth Measure Scaling ──
+
+describe("Walking Bass — Holdsworth odd-meter scaling", () => {
+  it("Holdsworth notes span full measure in 11/8", () => {
+    const eighth = 0.25;
+    const measureDur = 11 * eighth; // 2.75s
+    const notes = generateWalkingBass(
+      [makeChord("C", "m7", 0, measureDur)],
+      { tempo: 120, style: "holdsworth" },
+    );
+    // Last note should start past halfway through the measure
+    const lastNote = notes[notes.length - 1];
+    expect(lastNote.time).toBeGreaterThan(measureDur * 0.5);
+  });
+});
+
 // ── Tempo Validation ──
 
 describe("Walking Bass — tempo validation", () => {

@@ -246,10 +246,20 @@ function passingTone(from: number, to: number, scaleTones: number[], chordTones:
   });
 
   if (candidates.length > 0) {
-    // Pick one closest to midpoint
+    // Filter out tritone/b2 from root region, then sort by proximity to midpoint
+    const rootPC = from % 12;
+    const safe = candidates.filter(p => {
+      const interval = ((p % 12) - rootPC + 12) % 12;
+      return interval !== 6 && interval !== 1;
+    });
+    const pool = safe.length > 0 ? safe : candidates;
     const mid = (from + to) / 2;
-    candidates.sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid));
-    return candidates[0];
+    pool.sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid));
+    // 35% chance pick from top 3 for variety (breaks repetition)
+    if (pool.length >= 2 && _rng() < 0.35) {
+      return pool[Math.min(Math.floor(_rng() * 3), pool.length - 1)];
+    }
+    return pool[0];
   }
 
   // Fallback: chromatic approach (half step toward target)
@@ -261,6 +271,18 @@ function clamp(pitch: number): number {
   while (pitch > BASS_HIGH) pitch -= 12;
   while (pitch < BASS_LOW) pitch += 12;
   return pitch;
+}
+
+/** Filter out pitches that form tritone (6) or minor 2nd (1) interval with root.
+ *  Falls back to unfiltered if all candidates removed (e.g., dim chords where b5 IS the chord). */
+function filterDissonant(candidates: number[], rootPitch: number): number[] {
+  if (candidates.length <= 1) return candidates;
+  const rootPC = rootPitch % 12;
+  const filtered = candidates.filter(p => {
+    const interval = ((p % 12) - rootPC + 12) % 12;
+    return interval !== 6 && interval !== 1;
+  });
+  return filtered.length > 0 ? filtered : candidates;
 }
 
 /** Pick random from array (deterministic seed for testing not needed here). */
@@ -407,13 +429,18 @@ function generateSwingMeasure(
     const third1 = beat1 + Math.round(span / 3) * direction;
     const third2 = beat1 + Math.round(2 * span / 3) * direction;
 
-    // Beat 2: chord tone nearest 1/3 position (strong harmonic anchor)
+    // Beat 2: chord tone near 1/3 position, with variety
     const ct2 = chordTones.filter(t => Math.abs(t - third1) <= 3 && t !== beat1);
     if (ct2.length > 0) {
       ct2.sort((a, b) => Math.abs(a - third1) - Math.abs(b - third1));
-      beat2 = ct2[0];
+      // 35% chance second-nearest for variety (breaks deterministic repetition)
+      beat2 = (ct2.length >= 2 && _rng() < 0.35) ? ct2[1] : ct2[0];
     } else {
-      beat2 = scaleDegreeToMidi(beat1, direction > 0 ? 1 : -1, scaleTones);
+      // Fallback: scale degree, filter dissonant
+      const deg1 = scaleDegreeToMidi(beat1, direction > 0 ? 1 : -1, scaleTones);
+      const deg2 = scaleDegreeToMidi(beat1, direction > 0 ? 2 : -2, scaleTones);
+      const opts = filterDissonant([deg1, deg2].filter(t => t !== beat1), beat1);
+      beat2 = opts.length > 0 ? opts[Math.floor(_rng() * opts.length)] : deg1;
     }
 
     // Beat 3: scale tone nearest 2/3 position (passing tone toward beat 4)
@@ -1114,56 +1141,65 @@ function generateHoldsworthMeasure(
   const eleventh = clamp(startPitch + 17);
 
   const r = _rng();
+  let notes: BassNote[];
 
   // 20% pedal tone with chromatic approach — Johnson anchoring
   if (r < 0.20) {
     const pickup = clamp(startPitch + (_rng() < 0.5 ? -1 : 2));
-    return [
+    notes = [
       { pitch: startPitch, time: chord.time, duration: beatDuration * 2.8, velocity: 80 },
       { pitch: pickup, time: chord.time + beatDuration * 3, duration: beatDuration * 0.5, velocity: 65 },
       { pitch: startPitch, time: chord.time + beatDuration * 3.5, duration: beatDuration * 0.4, velocity: 60 },
     ];
-  }
-
   // 20% wide leap counterpoint: root → 7th → 3rd (Jimmy Johnson skip motion)
-  if (r < 0.40) {
-    return [
+  } else if (r < 0.40) {
+    notes = [
       { pitch: startPitch, time: chord.time, duration: beatDuration * 0.7, velocity: 85 },
       { pitch: seventh, time: chord.time + beatDuration * 1.25, duration: beatDuration * 0.6, velocity: 72 },
       { pitch: third, time: chord.time + beatDuration * 2.5, duration: beatDuration * 0.7, velocity: 78 },
     ];
-  }
-
   // 20% upper structure: 9th and 11th extensions (harmonic sophistication)
-  if (r < 0.60) {
-    return [
+  } else if (r < 0.60) {
+    notes = [
       { pitch: startPitch, time: chord.time, duration: beatDuration * 0.5, velocity: 82 },
       { pitch: fifth, time: chord.time + beatDuration * 1, duration: beatDuration * 0.5, velocity: 72 },
       { pitch: ninth, time: chord.time + beatDuration * 2, duration: beatDuration * 0.5, velocity: 68 },
       { pitch: eleventh, time: chord.time + beatDuration * 3, duration: beatDuration * 0.5, velocity: 62 },
     ];
-  }
-
   // 20% chromatic approach line — leading into next bar
-  if (r < 0.80) {
+  } else if (r < 0.80) {
     const chromTarget = clamp(startPitch + (_rng() < 0.5 ? 7 : 12));
     const chrom1 = clamp(chromTarget - 2);
     const chrom2 = clamp(chromTarget - 1);
-    return [
+    notes = [
       { pitch: startPitch, time: chord.time, duration: beatDuration * 1.5, velocity: 82 },
       { pitch: chrom1, time: chord.time + beatDuration * 2, duration: beatDuration * 0.45, velocity: 70 },
       { pitch: chrom2, time: chord.time + beatDuration * 2.75, duration: beatDuration * 0.45, velocity: 68 },
       { pitch: chromTarget, time: chord.time + beatDuration * 3.5, duration: beatDuration * 0.4, velocity: 65 },
     ];
+  // 20% syncopated staccato groove — short, punchy, rhythmic
+  } else {
+    notes = [
+      { pitch: startPitch, time: chord.time, duration: beatDuration * 0.4, velocity: 85 },
+      { pitch: fifth, time: chord.time + beatDuration * 0.75, duration: beatDuration * 0.35, velocity: 72 },
+      { pitch: third, time: chord.time + beatDuration * 2, duration: beatDuration * 0.4, velocity: 75 },
+      { pitch: startPitch, time: chord.time + beatDuration * 3.25, duration: beatDuration * 0.35, velocity: 68 },
+    ];
   }
 
-  // 20% syncopated staccato groove — short, punchy, rhythmic
-  return [
-    { pitch: startPitch, time: chord.time, duration: beatDuration * 0.4, velocity: 85 },
-    { pitch: fifth, time: chord.time + beatDuration * 0.75, duration: beatDuration * 0.35, velocity: 72 },
-    { pitch: third, time: chord.time + beatDuration * 2, duration: beatDuration * 0.4, velocity: 75 },
-    { pitch: startPitch, time: chord.time + beatDuration * 3.25, duration: beatDuration * 0.35, velocity: 68 },
-  ];
+  // Scale note positions to fill actual measure length (11/8, 7/8, etc.)
+  // Patterns assume 4 quarter beats; stretch to actual chord duration when longer
+  const assumedLen = beatDuration * 4;
+  const measureLen = chord.duration > 0 ? chord.duration : assumedLen;
+  if (measureLen > assumedLen * 1.1) {
+    const scale = measureLen / assumedLen;
+    for (const n of notes) {
+      n.time = chord.time + (n.time - chord.time) * scale;
+      n.duration *= scale;
+    }
+  }
+
+  return notes;
 }
 
 // ── ALFA MIST ──
@@ -1551,7 +1587,8 @@ function generate7_4Measure(
 
 /**
  * Generate bass for 11/8 (5.5 quarter-note beats).
- * Grouping 2+2+3+2+2 eighths → root, chord tone, sustain, approach.
+ * Proper 2+2+3+2+2 eighth-note grouping: 5 notes at group onsets (eighths 0, 2, 4, 7, 9).
+ * Uses chord/scale tones with dissonance filtering, not hardcoded intervals.
  */
 function generate11_8Measure(
   chord: ChordEvent,
@@ -1560,17 +1597,42 @@ function generate11_8Measure(
   prevPitch: number | null,
 ): BassNote[] {
   const rootMidi = rootToMidi(chord.root);
+  const chordTones = getChordTones(chord.root, chord.quality);
+  const scaleTones = getScaleTones(chord.root, chord.quality);
   const startPitch = prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi;
-  const fifth = clamp(startPitch + 7);
   const nextRoot = nextChord ? rootToMidi(nextChord.root) : rootMidi;
   const target = closestOctave(nextRoot, startPitch);
 
-  return [
-    { pitch: startPitch, time: chord.time, duration: beatDuration * 0.9, velocity: 95 },
-    { pitch: fifth, time: chord.time + beatDuration * 1, duration: beatDuration * 0.9, velocity: 80 },
-    { pitch: clamp(startPitch + 5), time: chord.time + beatDuration * 2, duration: beatDuration * 1.3, velocity: 75 },
-    { pitch: approachTone(target, startPitch > target), time: chord.time + beatDuration * 3.5, duration: beatDuration * 1.8, velocity: 70 },
-  ];
+  const eighth = beatDuration / 2;
+  // 2+2+3+2+2 grouping → onsets at eighth positions 0, 2, 4, 7, 9
+  const onsets = [0, 2, 4, 7, 9].map(e => chord.time + e * eighth);
+  const groupDurs = [2, 2, 3, 2, 2].map(g => g * eighth * 0.85);
+
+  // Note 1: root (strong downbeat anchor)
+  const p1 = startPitch;
+  // Note 2: chord tone (3rd or 5th, variety via pick)
+  const ct = filterDissonant(chordTones.filter(t => t !== p1 && Math.abs(t - p1) <= 7), p1);
+  const p2 = ct.length > 0 ? pick(ct) : clamp(p1 + 3);
+  // Note 3 (long group): scale tone bridging toward target
+  const p3 = passingTone(p2, target, scaleTones, chordTones);
+  // Note 4: scale/chord tone stepping toward approach
+  const p4Cand = filterDissonant(
+    scaleTones.filter(t => Math.abs(t - target) <= 4 && t !== p3 && t !== target),
+    startPitch,
+  );
+  const p4 = p4Cand.length > 0 ? pick(p4Cand) : clamp(target + (_rng() < 0.5 ? 2 : -2));
+  // Note 5: approach to next root
+  const p5 = approachTone(target, p4 > target);
+
+  const pitches = [p1, p2, p3, p4, p5];
+  const velocities = [95, 80, 75, 72, 70];
+
+  return pitches.map((p, i) => ({
+    pitch: p,
+    time: onsets[i],
+    duration: groupDurs[i],
+    velocity: velocities[i],
+  }));
 }
 
 /**

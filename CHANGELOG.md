@@ -4,6 +4,15 @@ All notable changes to `@jmove/generator` will be documented in this file.
 
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [1.2.2] - 2026-07-13
+
+### Fixed
+
+- **Bass dissonance on strong beats** — Added `filterDissonant()` helper that removes tritone (6 semitones) and minor 2nd (1 semitone) intervals from candidate pitches on beats 2-3. Falls back to unfiltered for chords where those intervals are structural (e.g., diminished). Applied in `passingTone`, swing beat-2 fallback, and 11/8 generator
+- **Bass pattern repetition** — Beat 2 now has 35% chance of picking second-nearest chord tone instead of always nearest. `passingTone` has 35% chance of picking from top-3 scale tones instead of always nearest midpoint. Swing beat-2 fallback randomly selects from 2 filtered scale degrees. Same chord progression now produces varied lines across takes
+- **11/8 bass hardcoded to 4 notes at wrong positions** — `generate11_8Measure` rewritten with proper 2+2+3+2+2 eighth-note grouping: 5 notes at onsets 0, 2, 4, 7, 9 (eighths). Uses `getChordTones`/`getScaleTones` with dissonance filtering instead of hardcoded intervals (+5, +7). Durations reflect group lengths (short-short-long-short-short)
+- **Holdsworth bass empty in odd meters** — Holdsworth patterns assumed 4 quarter beats, leaving 1.5+ beats silent in 11/8 (5.5 beats). Now detects actual measure length from `chord.duration` and scales note positions/durations proportionally when measure exceeds 4 beats
+
 ## [1.2.1] - 2026-07-13
 
 ### Fixed
