@@ -4,6 +4,23 @@ All notable changes to `@jmove/generator` will be documented in this file.
 
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [1.2.4] - 2026-07-14
+
+### Added
+
+- **Ride/HH rotation extended to 7 styles** — ride variant + hihat variant rotation (every 4-8 bars) ported from Holdsworth to metheny, fusion, neoSoul, contemporaryJazz, hardBop, coolJazz, swing:
+  - **metheny**: 3 rides (flat/brush/Sanchez bell), 3 HH (pedal/open splash/sparse), fill prob 0.70/0.50
+  - **fusion**: 4 timekeeping variants (3 HH patterns + ride bell) rotate as rideVariants. HH-B (Weckl broken), HH-C (Gadd 8th-note pocket)
+  - **neoSoul**: 3 broken HH variants rotate (Dilla/Questlove/heavy-open). New HH-C with Questlove pocket feel
+  - **contemporaryJazz**: 3 rides (8ths/Kendrick Scott bell/sparse quarters), 3 HH (pedal/open splash/sparse)
+  - **hardBop**: 3 rides (standard/Blakey bell/crash), 2 HH (2&4/all-beats driving)
+  - **coolJazz**: 2 rides (quarters/gentle 8ths), 2 HH (brush sweep/pedal only)
+  - **swing**: 2 rides (standard/bell accent), 2 HH (2&4/Philly Joe all-beats). Ghost pulse integrated into HH variants
+- **Stochastic table upgrades** — accent snares, cross-stick, wider velocity for 3 styles:
+  - **metheny**: 12 positions (was 8), accent snare vel 85-88, cross-stick prob 0.12-0.15, minHits 2/maxHits 5 (was 1/3)
+  - **contemporaryJazz**: 14 positions (was 11), accent snare vel 80-85, ghost cascades, maxHits 6 (was 5)
+  - **hardBop**: accent snare at beats 1 and 2.5 (vel 85-88), ghost cascades, maxHits 6 (was 5)
+
 ## [1.2.3] - 2026-07-14
 
 ### Added

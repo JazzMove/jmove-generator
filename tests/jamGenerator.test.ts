@@ -1527,23 +1527,22 @@ describe("Jam Generator", () => {
       expect(noteCounts.size).toBeGreaterThanOrEqual(1);
     });
 
-    it("drums generate conversational Bob Moses patterns", () => {
+    it("drums generate conversational Moses/Sanchez patterns", () => {
       const drums = generateDrumPattern({
         style: "metheny", tempo: 95, measures: 4, humanize: false,
       });
       expect(drums.length).toBeGreaterThan(0);
-      // Ride should be present (flat ride quarter notes)
+      // Ride should be present (flat ride, brush, or bell variant)
       const rideHits = drums.filter(h => h.pitch === 51 || h.pitch === 53);
       expect(rideHits.length).toBeGreaterThan(4);
-      // Kick should be sparse (Bob Moses conversational)
+      // Kick should be present
       const kickHits = drums.filter(h => h.pitch === 36);
       const snareHits = drums.filter(h => h.pitch === 38 || h.pitch === 37);
       expect(kickHits.length).toBeGreaterThan(0);
-      // Bob Moses: snare is intentionally sparse (ghost notes at 8-15% probability)
       expect(snareHits.length).toBeGreaterThanOrEqual(0);
-      // Bob Moses: low velocity overall (lighter than swing)
+      // Ride variants range up to 82 (Sanchez bell accents), lighter than hardBop
       for (const hit of rideHits) {
-        expect(hit.velocity).toBeLessThanOrEqual(80);
+        expect(hit.velocity).toBeLessThanOrEqual(85);
       }
     });
 

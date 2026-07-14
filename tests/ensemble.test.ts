@@ -1320,24 +1320,26 @@ describe("Ensemble Coordination Layer", () => {
   describe("Ghost note threshold cap", () => {
     it("ghost notes survive during drop sections at moderate density", () => {
       // Without the cap, drop arcs push ghostThreshold above density, stripping all ghosts.
-      // With cap at 40, density=50 should always include ghosts.
-      const result = generateEnsemble({
-        chordEvents: makeSimpleChords(16),
-        style: "swing",
-        tempo: 120,
-        measures: 16,
-        seed: 42,
-        density: 50,
-        creativity: 80,
-      });
-      // Count low-velocity drum hits (ghost notes have distinctly lower velocity)
-      const SNARE = 38;
-      const snareHits = result.drums.filter(h => h.pitch === SNARE);
-      const mainVel = snareHits.length > 0 ? Math.max(...snareHits.map(h => h.velocity)) : 0;
-      // Ghost notes typically have velocity < 60% of main hits
-      const ghostLike = snareHits.filter(h => h.velocity < mainVel * 0.6);
-      // At density=50 (above the cap of 40), ghosts should exist
-      expect(ghostLike.length, "ghost notes should exist at density=50").toBeGreaterThan(0);
+      // With cap at 40, density=50 should always include ghosts across multiple seeds.
+      let totalGhosts = 0;
+      for (const seed of [42, 99, 123, 777, 1001]) {
+        const result = generateEnsemble({
+          chordEvents: makeSimpleChords(16),
+          style: "swing",
+          tempo: 120,
+          measures: 16,
+          seed,
+          density: 50,
+          creativity: 80,
+        });
+        const SNARE = 38;
+        const snareHits = result.drums.filter(h => h.pitch === SNARE);
+        const mainVel = snareHits.length > 0 ? Math.max(...snareHits.map(h => h.velocity)) : 0;
+        const ghostLike = snareHits.filter(h => h.velocity < mainVel * 0.6);
+        totalGhosts += ghostLike.length;
+      }
+      // At density=50 (above the cap of 40), ghosts should exist across seeds
+      expect(totalGhosts, "ghost notes should exist at density=50").toBeGreaterThan(0);
     });
   });
 

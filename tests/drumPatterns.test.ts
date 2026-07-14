@@ -97,10 +97,11 @@ describe("Drum Patterns — swing", () => {
     expect(rides.length).toBeGreaterThanOrEqual(4);
   });
 
-  it("has hi-hat on beats 2 and 4", () => {
+  it("has hi-hat pedal", () => {
     const hits = generateDrumPattern({ style: "swing", measures: 1, humanize: false });
     const hats = hitsOf(hits, GM_DRUMS.HI_HAT_PEDAL);
-    expect(hats.length).toBe(2);
+    // Variant A: 2 pedals (2&4), Variant B: 4 pedals (all beats)
+    expect(hats.length).toBeGreaterThanOrEqual(2);
   });
 
   it("swing ride has skip-note feel (triplet placement)", () => {
@@ -300,10 +301,9 @@ describe("Drum Patterns — funk", () => {
 describe("Drum Patterns — humanization", () => {
   it("humanize=false produces exact grid timing", () => {
     const hits = generateDrumPattern({ style: "swing", measures: 1, humanize: false });
-    const beatDur = 60 / 120;
-    // First ride should be exactly at 0
-    const firstRide = hitsOf(hits, GM_DRUMS.RIDE)[0];
-    expect(firstRide.time).toBe(0);
+    // First cymbal hit (ride or bell) should be exactly at 0
+    const cymbals = hits.filter(h => h.pitch === GM_DRUMS.RIDE || h.pitch === GM_DRUMS.RIDE_BELL);
+    expect(cymbals[0].time).toBe(0);
   });
 
   it("humanize=true adds small timing jitter", () => {
@@ -352,19 +352,15 @@ describe("Drum Patterns — time signatures", () => {
 // ── Phase D: Hard Bop Ride + Ghost Density Threshold ──
 
 describe("Drum Patterns — hard bop ride", () => {
-  it("skip notes have velocity >= 70", () => {
+  it("ride has strong downbeats", () => {
     const hits = generateDrumPattern({ style: "hardBop", measures: 4, humanize: false });
     const rides = hitsOf(hits, GM_DRUMS.RIDE);
-    // Skip notes are at fractional beat positions (0.67)
-    const beatDur = 60 / 120;
-    const skipNotes = rides.filter((r) => {
-      const beatPos = (r.time / beatDur) % 1;
-      return Math.abs(beatPos - 0.67) < 0.05;
-    });
-    expect(skipNotes.length).toBeGreaterThan(0);
-    for (const s of skipNotes) {
-      expect(s.velocity).toBeGreaterThanOrEqual(70);
-    }
+    const bells = hitsOf(hits, GM_DRUMS.RIDE_BELL);
+    // All variants have loud downbeats (vel >= 90)
+    const cymbals = [...rides, ...bells];
+    expect(cymbals.length).toBeGreaterThanOrEqual(16); // at least 4 per measure
+    const loudest = Math.max(...cymbals.map(c => c.velocity));
+    expect(loudest).toBeGreaterThanOrEqual(90);
   });
 });
 
@@ -417,13 +413,12 @@ describe("Drum Patterns — form markers (crash)", () => {
 // ── Phase J: Swing Hi-Hat Pulse ──
 
 describe("Drum Patterns — swing hi-hat pulse", () => {
-  it("swing pattern includes closed + open hi-hat hits from pulse", () => {
+  it("swing pattern includes closed hi-hat ghost pulse", () => {
     const hits = generateDrumPattern({ style: "swing", measures: 2, humanize: false, density: 50 });
     const closedHihats = hitsOf(hits, GM_DRUMS.HI_HAT_CLOSED);
     const openHihats = hitsOf(hits, GM_DRUMS.HI_HAT_OPEN);
-    // 8 per measure × 2 = 16 total pulse hats; some convert to open via kick interlocking
-    expect(closedHihats.length).toBeGreaterThanOrEqual(8);
-    expect(closedHihats.length + openHihats.length).toBeGreaterThanOrEqual(16);
+    // Ghost pulse integrated into HH variants: 4-6 ghost hats per measure
+    expect(closedHihats.length + openHihats.length).toBeGreaterThanOrEqual(8);
   });
 
   it("pulse hi-hat notes are very soft (pocket feel)", () => {
@@ -656,10 +651,11 @@ describe("Drum Patterns — micro-variation", () => {
     // Micro-variation adds hits but never removes timekeeping
     const hits = generateDrumPattern({ style: "swing", measures: 4, humanize: false, density: 50 });
     const rides = hitsOf(hits, GM_DRUMS.RIDE);
+    const bells = hitsOf(hits, GM_DRUMS.RIDE_BELL);
     const hihatPedals = hitsOf(hits, GM_DRUMS.HI_HAT_PEDAL);
-    // Ride: ~8 per measure (quarters + skip notes), hi-hat pedal: 2 per measure
-    expect(rides.length).toBeGreaterThanOrEqual(4 * 4); // at least 4 rides/measure
-    expect(hihatPedals.length).toBe(4 * 2); // exactly 2 pedals/measure
+    // Ride: variants have 4-8 per measure; pedal: 2-4 per measure depending on variant
+    expect(rides.length + bells.length).toBeGreaterThanOrEqual(4 * 4);
+    expect(hihatPedals.length).toBeGreaterThanOrEqual(4 * 2); // at least 2 pedals/measure
   });
 });
 
@@ -677,11 +673,11 @@ describe("Drum Patterns — kick-hihat interlocking", () => {
     expect(conversions).toBeGreaterThan(0);
   });
 
-  it("hi-hat pedal on 2&4 unaffected", () => {
+  it("hi-hat pedal unaffected by interlocking", () => {
     const hits = generateDrumPattern({ style: "swing", measures: 4, humanize: false, density: 50 });
     const hihatPedals = hitsOf(hits, GM_DRUMS.HI_HAT_PEDAL);
-    // HI_HAT_PEDAL (44) is separate GM pitch from HI_HAT_CLOSED (42)
-    expect(hihatPedals.length).toBe(4 * 2);
+    // HH variants: 2 or 4 pedals per measure
+    expect(hihatPedals.length).toBeGreaterThanOrEqual(4 * 2);
   });
 
   it("interlocking suppressed for bossa and latin", () => {
@@ -865,27 +861,34 @@ describe("Drum Patterns — neoSoul", () => {
 });
 
 describe("Drum Patterns — contemporaryJazz", () => {
-  it("uses ride 8ths (busier than ECM)", () => {
+  it("uses ride cymbal consistently", () => {
     const hits = generateDrumPattern({ style: "contemporaryJazz", measures: 4, humanize: false });
     const rides = hitsOf(hits, GM_DRUMS.RIDE);
-    // 8th-note ride = 8 per measure × 4 = 32
-    expect(rides.length).toBeGreaterThanOrEqual(28);
+    const bells = hitsOf(hits, GM_DRUMS.RIDE_BELL);
+    // Ride variants: 8ths (8/bar), bell+body (8/bar), or quarters (4/bar)
+    expect(rides.length + bells.length).toBeGreaterThanOrEqual(16);
   });
 
-  it("uses cross-stick instead of full snare", () => {
-    const hits = generateDrumPattern({ style: "contemporaryJazz", measures: 8, humanize: false, density: 50 });
-    const crossSticks = hitsOf(hits, GM_DRUMS.CROSS_STICK);
-    const fullSnares = hitsOf(hits, GM_DRUMS.SNARE);
-    // Contemporary jazz uses cross-stick, not full snare in base patterns
-    expect(crossSticks.length).toBeGreaterThan(0);
-    // Micro-variation may add ghost snares, but cross-sticks should dominate
-    expect(crossSticks.length).toBeGreaterThanOrEqual(fullSnares.length);
+  it("uses cross-stick and accent snare", () => {
+    // Kendrick Scott uses both cross-stick interjections and accent snares
+    let foundCross = false;
+    let foundSnare = false;
+    for (let i = 0; i < 50; i++) {
+      const hits = generateDrumPattern({ style: "contemporaryJazz", measures: 16, humanize: false, density: 50 });
+      if (hitsOf(hits, GM_DRUMS.CROSS_STICK).length > 0) foundCross = true;
+      if (hitsOf(hits, GM_DRUMS.SNARE).length > 0) foundSnare = true;
+      if (foundCross && foundSnare) break;
+    }
+    expect(foundCross).toBe(true);
+    expect(foundSnare).toBe(true);
   });
 
-  it("hi-hat pedal present", () => {
+  it("hi-hat present", () => {
     const hits = generateDrumPattern({ style: "contemporaryJazz", measures: 4, humanize: false });
     const pedals = hitsOf(hits, GM_DRUMS.HI_HAT_PEDAL);
-    expect(pedals.length).toBeGreaterThanOrEqual(4); // 2 per measure × 4
+    const openHats = hitsOf(hits, GM_DRUMS.HI_HAT_OPEN);
+    // HH variants: pedal on 2&4, pedal+open, or sparse pedal on 4 only
+    expect(pedals.length + openHats.length).toBeGreaterThanOrEqual(4);
   });
 
   it("all velocities in 25-127 range", () => {
@@ -1079,10 +1082,11 @@ describe("Drum Patterns — stochastic jazz comping", () => {
   it("ride/hihat timekeeping unaffected by stochastic comping", () => {
     const hits = generateDrumPattern({ style: "swing", measures: 4, humanize: false, density: 50 });
     const rides = hitsOf(hits, GM_DRUMS.RIDE);
+    const bells = hitsOf(hits, GM_DRUMS.RIDE_BELL);
     const pedals = hitsOf(hits, GM_DRUMS.HI_HAT_PEDAL);
-    // Ride: 8 per measure (quarters + skip), pedal: 2 per measure
-    expect(rides.length).toBeGreaterThanOrEqual(4 * 4);
-    expect(pedals.length).toBe(4 * 2);
+    // Ride variants: 4-8 per measure; pedal: 2-4 per measure
+    expect(rides.length + bells.length).toBeGreaterThanOrEqual(4 * 4);
+    expect(pedals.length).toBeGreaterThanOrEqual(4 * 2);
   });
 
   it("non-stochastic styles (bossa, funk) have consistent kick counts", () => {
@@ -1673,5 +1677,97 @@ describe("Drum Patterns — Holdsworth Wackerman", () => {
     }
     // With 0.75 section prob and multiple markers, fills should appear in most runs
     expect(holdsWithToms / runs).toBeGreaterThan(0.3);
+  });
+});
+
+// ── v1.2.4: Multi-style ride/HH rotation + stochastic upgrades ──
+
+describe("Drum Patterns — v1.2.4 multi-style rotation", () => {
+  it("metheny ride bell appears (Sanchez bell variant)", () => {
+    let foundBell = false;
+    for (let i = 0; i < 50; i++) {
+      const hits = generateDrumPattern({ style: "metheny", tempo: 120, measures: 8, humanize: false });
+      if (hits.some(h => h.pitch === GM_DRUMS.RIDE_BELL)) { foundBell = true; break; }
+    }
+    expect(foundBell).toBe(true);
+  });
+
+  it("metheny accent snare velocity reaches 85+", () => {
+    let maxVel = 0;
+    for (let i = 0; i < 100; i++) {
+      const hits = generateDrumPattern({ style: "metheny", tempo: 120, measures: 16, humanize: false, density: 60 });
+      for (const h of hits) {
+        if (h.pitch === GM_DRUMS.SNARE && h.velocity > maxVel) maxVel = h.velocity;
+      }
+      if (maxVel >= 85) break;
+    }
+    expect(maxVel).toBeGreaterThanOrEqual(85);
+  });
+
+  it("metheny cross-stick present", () => {
+    let found = false;
+    for (let i = 0; i < 50; i++) {
+      const hits = generateDrumPattern({ style: "metheny", tempo: 120, measures: 16, humanize: false, density: 50 });
+      if (hits.some(h => h.pitch === GM_DRUMS.CROSS_STICK)) { found = true; break; }
+    }
+    expect(found).toBe(true);
+  });
+
+  it("coolJazz ride varies across runs (2 ride variants)", () => {
+    const rideCounts = new Set<number>();
+    for (let i = 0; i < 30; i++) {
+      const hits = generateDrumPattern({ style: "coolJazz", tempo: 120, measures: 4, humanize: false });
+      rideCounts.add(hitsOf(hits, GM_DRUMS.RIDE).length);
+    }
+    // Ride A: 4/bar (16 total), Ride B: 6/bar (24 total) — should see both
+    expect(rideCounts.size).toBeGreaterThanOrEqual(2);
+  });
+
+  it("hardBop accent snare reaches 85+", () => {
+    let maxVel = 0;
+    for (let i = 0; i < 100; i++) {
+      const hits = generateDrumPattern({ style: "hardBop", tempo: 140, measures: 16, humanize: false, density: 60 });
+      for (const h of hits) {
+        if (h.pitch === GM_DRUMS.SNARE && h.velocity > maxVel) maxVel = h.velocity;
+      }
+      if (maxVel >= 85) break;
+    }
+    expect(maxVel).toBeGreaterThanOrEqual(85);
+  });
+
+  it("fusion timekeeping rotates (different pattern counts across sections)", () => {
+    const patterns = new Set<string>();
+    for (let i = 0; i < 20; i++) {
+      const hits = generateDrumPattern({ style: "fusion", tempo: 120, measures: 32, humanize: false });
+      const beatDur = 0.5;
+      // Fingerprint first 4 bars by HH/ride pitch counts
+      const first4 = hits.filter(h => h.time < 4 * 4 * beatDur);
+      const closed = first4.filter(h => h.pitch === GM_DRUMS.HI_HAT_CLOSED).length;
+      const bell = first4.filter(h => h.pitch === GM_DRUMS.RIDE_BELL).length;
+      patterns.add(`${closed}-${bell}`);
+    }
+    // 4 timekeeping variants should produce multiple fingerprints
+    expect(patterns.size).toBeGreaterThanOrEqual(2);
+  });
+
+  it("neoSoul HH pattern varies across runs", () => {
+    const hhCounts = new Set<number>();
+    for (let i = 0; i < 30; i++) {
+      const hits = generateDrumPattern({ style: "neoSoul", tempo: 90, measures: 4, humanize: false });
+      const open = hitsOf(hits, GM_DRUMS.HI_HAT_OPEN).length;
+      const closed = hitsOf(hits, GM_DRUMS.HI_HAT_CLOSED).length;
+      hhCounts.add(open * 100 + closed);
+    }
+    // 3 HH variants with different open/closed counts
+    expect(hhCounts.size).toBeGreaterThanOrEqual(2);
+  });
+
+  it("swing ride bell appears in some runs", () => {
+    let foundBell = false;
+    for (let i = 0; i < 50; i++) {
+      const hits = generateDrumPattern({ style: "swing", tempo: 120, measures: 8, humanize: false });
+      if (hits.some(h => h.pitch === GM_DRUMS.RIDE_BELL)) { foundBell = true; break; }
+    }
+    expect(foundBell).toBe(true);
   });
 });

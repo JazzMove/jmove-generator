@@ -59,8 +59,8 @@ type Pattern = PatternHit[];
 
 // ── SWING ──
 
-const SWING_RIDE: Pattern = [
-  // Ride: quarter notes + skip-note at ~65% of main beat (audible swing pulse)
+// Ride A: standard swing ride with skip-note
+const SWING_RIDE_A: Pattern = [
   { drum: GM_DRUMS.RIDE, beat: 0, velocity: 90 },
   { drum: GM_DRUMS.RIDE, beat: 0.67, velocity: 65 },
   { drum: GM_DRUMS.RIDE, beat: 1, velocity: 80 },
@@ -71,23 +71,46 @@ const SWING_RIDE: Pattern = [
   { drum: GM_DRUMS.RIDE, beat: 3.67, velocity: 60 },
 ];
 
-const SWING_HIHAT: Pattern = [
-  // Hi-hat pedal on 2 and 4 (felt, not prominent)
-  { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 1, velocity: 55 },
-  { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 3, velocity: 55 },
+// Ride B: bell accent on 1 and 3, body between — energy lift
+const SWING_RIDE_B: Pattern = [
+  { drum: GM_DRUMS.RIDE_BELL, beat: 0, velocity: 92 },
+  { drum: GM_DRUMS.RIDE, beat: 0.67, velocity: 62 },
+  { drum: GM_DRUMS.RIDE, beat: 1, velocity: 78 },
+  { drum: GM_DRUMS.RIDE, beat: 1.67, velocity: 58 },
+  { drum: GM_DRUMS.RIDE_BELL, beat: 2, velocity: 90 },
+  { drum: GM_DRUMS.RIDE, beat: 2.67, velocity: 62 },
+  { drum: GM_DRUMS.RIDE, beat: 3, velocity: 78 },
+  { drum: GM_DRUMS.RIDE, beat: 3.67, velocity: 58 },
 ];
 
-// Soft closed hi-hat 8th-note pulse (felt, not heard) — adds pocket feel underneath ride
-const SWING_HIHAT_PULSE: Pattern = [
+const SWING_RIDES = [SWING_RIDE_A, SWING_RIDE_B];
+
+// HH A: pedal on 2 and 4 + ghost pulse (felt, not prominent)
+const SWING_HIHAT_A: Pattern = [
+  { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 1, velocity: 55 },
+  { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 3, velocity: 55 },
+  // Ghost pulse woven in (stays through rotation)
   { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 0, velocity: 30, ghost: true },
   { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 0.5, velocity: 25, ghost: true },
-  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 1, velocity: 30, ghost: true },
   { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 1.5, velocity: 25, ghost: true },
   { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 2, velocity: 30, ghost: true },
   { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 2.5, velocity: 25, ghost: true },
-  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 3, velocity: 30, ghost: true },
   { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 3.5, velocity: 25, ghost: true },
 ];
+
+// HH B: pedal on all beats + ghost pulse — Philly Joe Jones driving feel
+const SWING_HIHAT_B: Pattern = [
+  { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 0, velocity: 42 },
+  { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 1, velocity: 55 },
+  { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 2, velocity: 42 },
+  { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 3, velocity: 55 },
+  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 0.5, velocity: 25, ghost: true },
+  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 1.5, velocity: 25, ghost: true },
+  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 2.5, velocity: 25, ghost: true },
+  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 3.5, velocity: 25, ghost: true },
+];
+
+const SWING_HIHATS = [SWING_HIHAT_A, SWING_HIHAT_B];
 
 const SWING_KICK_SNARE: Pattern[] = [
   // Jazz kick/snare = very sparse, mostly felt. Drummer "feathers" the kick.
@@ -256,8 +279,8 @@ const FUNK_KICK_SNARE: Pattern[] = [
 
 // ── FUSION ──
 
-const FUSION_HIHAT: Pattern = [
-  // 16th hats with open hat accents on upbeats
+// HH A: 16th hats with open hat accents on upbeats (standard fusion)
+const FUSION_HIHAT_A: Pattern = [
   { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 0, velocity: 80 },
   { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 0.25, velocity: 50 },
   { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 0.5, velocity: 65 },
@@ -274,6 +297,38 @@ const FUSION_HIHAT: Pattern = [
   { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 3.25, velocity: 50 },
   { drum: GM_DRUMS.HI_HAT_OPEN, beat: 3.5, velocity: 75 },
   { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 3.75, velocity: 50 },
+];
+
+// HH B: open hat on beat 1 "and" and beat 3 — Weckl broken feel
+const FUSION_HIHAT_B: Pattern = [
+  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 0, velocity: 78 },
+  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 0.25, velocity: 48 },
+  { drum: GM_DRUMS.HI_HAT_OPEN, beat: 0.5, velocity: 70 },
+  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 0.75, velocity: 48 },
+  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 1, velocity: 75 },
+  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 1.25, velocity: 48 },
+  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 1.5, velocity: 65 },
+  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 1.75, velocity: 48 },
+  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 2, velocity: 78 },
+  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 2.25, velocity: 48 },
+  { drum: GM_DRUMS.HI_HAT_OPEN, beat: 2.5, velocity: 70 },
+  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 2.75, velocity: 48 },
+  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 3, velocity: 75 },
+  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 3.25, velocity: 48 },
+  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 3.5, velocity: 65 },
+  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 3.75, velocity: 48 },
+];
+
+// HH C: sparser 8th-note hats with open accents — Gadd pocket
+const FUSION_HIHAT_C: Pattern = [
+  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 0, velocity: 80 },
+  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 0.5, velocity: 65 },
+  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 1, velocity: 75 },
+  { drum: GM_DRUMS.HI_HAT_OPEN, beat: 1.5, velocity: 72 },
+  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 2, velocity: 80 },
+  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 2.5, velocity: 65 },
+  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 3, velocity: 75 },
+  { drum: GM_DRUMS.HI_HAT_OPEN, beat: 3.5, velocity: 72 },
 ];
 
 const FUSION_KICK_SNARE: Pattern[] = [
@@ -354,6 +409,9 @@ const FUSION_RIDE_BELL: Pattern = [
   { drum: GM_DRUMS.RIDE_BELL, beat: 3, velocity: 80 },
   { drum: GM_DRUMS.RIDE, beat: 3.5, velocity: 55 },
 ];
+
+// In fusion, hihat and ride bell are alternative timekeeping — rideVariants holds all options
+const FUSION_TIMEKEEPING = [FUSION_HIHAT_A, FUSION_HIHAT_B, FUSION_HIHAT_C, FUSION_RIDE_BELL];
 
 // Linear drumming (Weckl/Gadd): no two limbs simultaneously
 // These patterns encode the full kit — base should be empty
@@ -885,32 +943,59 @@ const ALFA_MIST_KICK_SNARE: Pattern[] = [
   ],
 ];
 
-// ── PAT METHENY (Bob Moses) ──
-// Conversational, brush-like touch, flat ride, reactive, ECM-adjacent.
-// Not groove-locked — responds to melody. Light, wide cymbal spacing.
-// Research: Bright Size Life, Bob Moses "dependent drumming" philosophy.
+// ── PAT METHENY (Antonio Sanchez / Bob Moses) ──
+// Sanchez: melodic bell work, precise kicks, accent snares, dynamic fills, wide velocity.
+// Moses: conversational, brush-like touch, flat ride, reactive, ECM-adjacent.
+// Research: Way Up, Bright Size Life, Sanchez "Migration", Moses "dependent drumming".
 
-const METHENY_RIDE: Pattern = [
-  // Flat ride — quarter notes, very light touch (Bob Moses lighter than swing)
-  { drum: GM_DRUMS.RIDE, beat: 0, velocity: 60 },
-  { drum: GM_DRUMS.RIDE, beat: 1, velocity: 55 },
-  { drum: GM_DRUMS.RIDE, beat: 2, velocity: 60 },
-  { drum: GM_DRUMS.RIDE, beat: 3, velocity: 55 },
+// Ride A: flat ride — quarter notes, light touch (Moses/early Metheny)
+const METHENY_RIDE_A: Pattern = [
+  { drum: GM_DRUMS.RIDE, beat: 0, velocity: 65 },
+  { drum: GM_DRUMS.RIDE, beat: 1, velocity: 58 },
+  { drum: GM_DRUMS.RIDE, beat: 2, velocity: 65 },
+  { drum: GM_DRUMS.RIDE, beat: 3, velocity: 58 },
 ];
 
-const METHENY_RIDE_BRUSHES: Pattern = [
-  // Brush-like pattern — softer, with swish quality on 2 and 4
-  { drum: GM_DRUMS.RIDE, beat: 0, velocity: 50 },
-  { drum: GM_DRUMS.RIDE, beat: 1, velocity: 58 },   // slight accent (brush sweep)
-  { drum: GM_DRUMS.RIDE, beat: 2, velocity: 50 },
-  { drum: GM_DRUMS.RIDE, beat: 3, velocity: 58 },   // brush sweep
+// Ride B: brush-like — softer, swish quality on 2 and 4
+const METHENY_RIDE_B: Pattern = [
+  { drum: GM_DRUMS.RIDE, beat: 0, velocity: 52 },
+  { drum: GM_DRUMS.RIDE, beat: 1, velocity: 60 },
+  { drum: GM_DRUMS.RIDE, beat: 2, velocity: 52 },
+  { drum: GM_DRUMS.RIDE, beat: 3, velocity: 60 },
 ];
 
-const METHENY_HIHAT: Pattern = [
-  // Minimal — soft pedal hi-hat on 2 and 4 only (Bob Moses: less is more)
+// Ride C: bell accents — Sanchez melodic bell work on 1 and 3, ride body between
+const METHENY_RIDE_C: Pattern = [
+  { drum: GM_DRUMS.RIDE_BELL, beat: 0, velocity: 82 },
+  { drum: GM_DRUMS.RIDE, beat: 0.5, velocity: 55 },
+  { drum: GM_DRUMS.RIDE, beat: 1, velocity: 62 },
+  { drum: GM_DRUMS.RIDE, beat: 1.5, velocity: 52 },
+  { drum: GM_DRUMS.RIDE_BELL, beat: 2, velocity: 80 },
+  { drum: GM_DRUMS.RIDE, beat: 2.5, velocity: 55 },
+  { drum: GM_DRUMS.RIDE, beat: 3, velocity: 62 },
+  { drum: GM_DRUMS.RIDE, beat: 3.5, velocity: 52 },
+];
+
+const METHENY_RIDES = [METHENY_RIDE_A, METHENY_RIDE_B, METHENY_RIDE_C];
+
+// HH A: minimal pedal on 2 and 4 (Moses: less is more)
+const METHENY_HIHAT_A: Pattern = [
+  { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 1, velocity: 42 },
+  { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 3, velocity: 42 },
+];
+
+// HH B: open hat splash on 3 (Sanchez conversational hat)
+const METHENY_HIHAT_B: Pattern = [
   { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 1, velocity: 40 },
-  { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 3, velocity: 40 },
+  { drum: GM_DRUMS.HI_HAT_OPEN, beat: 3, velocity: 38 },
 ];
+
+// HH C: sparse — just pedal on 4 (maximum space)
+const METHENY_HIHAT_C: Pattern = [
+  { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 3, velocity: 38 },
+];
+
+const METHENY_HIHATS = [METHENY_HIHAT_A, METHENY_HIHAT_B, METHENY_HIHAT_C];
 
 const METHENY_KICK_SNARE: Pattern[] = [
   // V1: conversational — sparse, breath-filled, reacting to melody
@@ -946,8 +1031,8 @@ const METHENY_KICK_SNARE: Pattern[] = [
 
 // ── NEO-SOUL ──
 
-// Broken hi-hat: deliberate gaps create J Dilla "broken" feel
-const NEO_SOUL_HIHAT: Pattern = [
+// HH A: Broken hi-hat — deliberate gaps create J Dilla "broken" feel
+const NEO_SOUL_HIHAT_A: Pattern = [
   { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 0, velocity: 75 },
   // gap at 0.25
   { drum: GM_DRUMS.HI_HAT_OPEN, beat: 0.5, velocity: 65 },
@@ -966,8 +1051,8 @@ const NEO_SOUL_HIHAT: Pattern = [
   { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 3.75, velocity: 45 },
 ];
 
+// HH B: alternate broken pattern — different gap placement
 const NEO_SOUL_HIHAT_B: Pattern = [
-  // Alternate broken pattern — different gap placement
   { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 0, velocity: 70 },
   { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 0.25, velocity: 50 },
   // gap at 0.5
@@ -984,6 +1069,27 @@ const NEO_SOUL_HIHAT_B: Pattern = [
   // gap at 3.5
   { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 3.75, velocity: 45 },
 ];
+
+// HH C: heavy open hat — Questlove/Pino Palladino pocket feel
+const NEO_SOUL_HIHAT_C: Pattern = [
+  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 0, velocity: 72 },
+  // gap at 0.25
+  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 0.5, velocity: 58 },
+  { drum: GM_DRUMS.HI_HAT_OPEN, beat: 0.75, velocity: 62 },
+  // gap at 1
+  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 1.25, velocity: 48 },
+  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 1.5, velocity: 55 },
+  // gap at 1.75
+  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 2, velocity: 72 },
+  { drum: GM_DRUMS.HI_HAT_OPEN, beat: 2.5, velocity: 60 },
+  // gap at 2.75
+  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 3, velocity: 68 },
+  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 3.25, velocity: 45 },
+  { drum: GM_DRUMS.HI_HAT_OPEN, beat: 3.5, velocity: 58 },
+  // gap at 3.75
+];
+
+const NEO_SOUL_HIHATS = [NEO_SOUL_HIHAT_A, NEO_SOUL_HIHAT_B, NEO_SOUL_HIHAT_C];
 
 const NEO_SOUL_KICK_SNARE: Pattern[] = [
   // V1: classic Dilla pocket
@@ -1049,21 +1155,59 @@ const NEO_SOUL_KICK_SNARE: Pattern[] = [
 // ── CONTEMPORARY JAZZ ──
 
 // 8th-note ride: busier than ECM, lighter than hardBop (brush-like)
-const CONTEMP_RIDE: Pattern = [
-  { drum: GM_DRUMS.RIDE, beat: 0, velocity: 65 },
-  { drum: GM_DRUMS.RIDE, beat: 0.5, velocity: 50 },
-  { drum: GM_DRUMS.RIDE, beat: 1, velocity: 60 },
-  { drum: GM_DRUMS.RIDE, beat: 1.5, velocity: 45 },
-  { drum: GM_DRUMS.RIDE, beat: 2, velocity: 65 },
-  { drum: GM_DRUMS.RIDE, beat: 2.5, velocity: 50 },
-  { drum: GM_DRUMS.RIDE, beat: 3, velocity: 60 },
-  { drum: GM_DRUMS.RIDE, beat: 3.5, velocity: 45 },
+// Ride A: 8th-note ride — Kendrick Scott light touch
+const CONTEMP_RIDE_A: Pattern = [
+  { drum: GM_DRUMS.RIDE, beat: 0, velocity: 68 },
+  { drum: GM_DRUMS.RIDE, beat: 0.5, velocity: 52 },
+  { drum: GM_DRUMS.RIDE, beat: 1, velocity: 62 },
+  { drum: GM_DRUMS.RIDE, beat: 1.5, velocity: 48 },
+  { drum: GM_DRUMS.RIDE, beat: 2, velocity: 68 },
+  { drum: GM_DRUMS.RIDE, beat: 2.5, velocity: 52 },
+  { drum: GM_DRUMS.RIDE, beat: 3, velocity: 62 },
+  { drum: GM_DRUMS.RIDE, beat: 3.5, velocity: 48 },
 ];
 
-const CONTEMP_HIHAT: Pattern = [
+// Ride B: bell accents on 1 and 3 — Kendrick Scott explosive moments
+const CONTEMP_RIDE_B: Pattern = [
+  { drum: GM_DRUMS.RIDE_BELL, beat: 0, velocity: 78 },
+  { drum: GM_DRUMS.RIDE, beat: 0.5, velocity: 50 },
+  { drum: GM_DRUMS.RIDE, beat: 1, velocity: 58 },
+  { drum: GM_DRUMS.RIDE, beat: 1.5, velocity: 48 },
+  { drum: GM_DRUMS.RIDE_BELL, beat: 2, velocity: 75 },
+  { drum: GM_DRUMS.RIDE, beat: 2.5, velocity: 50 },
+  { drum: GM_DRUMS.RIDE, beat: 3, velocity: 58 },
+  { drum: GM_DRUMS.RIDE, beat: 3.5, velocity: 48 },
+];
+
+// Ride C: sparse quarter-note ride — space for texture
+const CONTEMP_RIDE_C: Pattern = [
+  { drum: GM_DRUMS.RIDE, beat: 0, velocity: 62 },
+  { drum: GM_DRUMS.RIDE, beat: 1, velocity: 55 },
+  { drum: GM_DRUMS.RIDE, beat: 2, velocity: 62 },
+  { drum: GM_DRUMS.RIDE, beat: 3, velocity: 55 },
+];
+
+const CONTEMP_RIDES = [CONTEMP_RIDE_A, CONTEMP_RIDE_B, CONTEMP_RIDE_C];
+
+// HH A: pedal on 2 and 4
+const CONTEMP_HIHAT_A: Pattern = [
   { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 1, velocity: 45 },
   { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 3, velocity: 45 },
 ];
+
+// HH B: open hat splash on "and" of 2 — Kendrick Scott texture
+const CONTEMP_HIHAT_B: Pattern = [
+  { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 1, velocity: 42 },
+  { drum: GM_DRUMS.HI_HAT_OPEN, beat: 1.5, velocity: 38 },
+  { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 3, velocity: 42 },
+];
+
+// HH C: sparse — just pedal on 4
+const CONTEMP_HIHAT_C: Pattern = [
+  { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 3, velocity: 40 },
+];
+
+const CONTEMP_HIHATS = [CONTEMP_HIHAT_A, CONTEMP_HIHAT_B, CONTEMP_HIHAT_C];
 
 const CONTEMP_KICK_SNARE: Pattern[] = [
   // V1: cross-stick on 2, kick on 1
@@ -1287,8 +1431,8 @@ const ECM_SNARE: Pattern[] = [
 
 // ── HARD BOP ──
 
-const HARD_BOP_RIDE: Pattern = [
-  // Loud, driving ride with prominent skip-note
+// Ride A: loud, driving ride with prominent skip-note (Blakey standard)
+const HARD_BOP_RIDE_A: Pattern = [
   { drum: GM_DRUMS.RIDE, beat: 0, velocity: 100 },
   { drum: GM_DRUMS.RIDE, beat: 0.67, velocity: 70 },
   { drum: GM_DRUMS.RIDE, beat: 1, velocity: 95 },
@@ -1299,10 +1443,43 @@ const HARD_BOP_RIDE: Pattern = [
   { drum: GM_DRUMS.RIDE, beat: 3.67, velocity: 70 },
 ];
 
-const HARD_BOP_HIHAT: Pattern = [
+// Ride B: bell-heavy — Blakey explosive sections, bell on every downbeat
+const HARD_BOP_RIDE_B: Pattern = [
+  { drum: GM_DRUMS.RIDE_BELL, beat: 0, velocity: 105 },
+  { drum: GM_DRUMS.RIDE, beat: 0.67, velocity: 72 },
+  { drum: GM_DRUMS.RIDE_BELL, beat: 1, velocity: 98 },
+  { drum: GM_DRUMS.RIDE, beat: 1.67, velocity: 72 },
+  { drum: GM_DRUMS.RIDE_BELL, beat: 2, velocity: 105 },
+  { drum: GM_DRUMS.RIDE, beat: 2.67, velocity: 72 },
+  { drum: GM_DRUMS.RIDE_BELL, beat: 3, velocity: 98 },
+  { drum: GM_DRUMS.RIDE, beat: 3.67, velocity: 72 },
+];
+
+// Ride C: crash ride — wider cymbal, less skip (momentum builder)
+const HARD_BOP_RIDE_C: Pattern = [
+  { drum: GM_DRUMS.RIDE, beat: 0, velocity: 95 },
+  { drum: GM_DRUMS.RIDE, beat: 1, velocity: 90 },
+  { drum: GM_DRUMS.RIDE, beat: 2, velocity: 95 },
+  { drum: GM_DRUMS.RIDE, beat: 3, velocity: 90 },
+];
+
+const HARD_BOP_RIDES = [HARD_BOP_RIDE_A, HARD_BOP_RIDE_B, HARD_BOP_RIDE_C];
+
+// HH A: heavy pedal on 2 and 4
+const HARD_BOP_HIHAT_A: Pattern = [
   { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 1, velocity: 70 },
   { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 3, velocity: 70 },
 ];
+
+// HH B: pedal on all beats — Blakey driving feel
+const HARD_BOP_HIHAT_B: Pattern = [
+  { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 0, velocity: 55 },
+  { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 1, velocity: 68 },
+  { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 2, velocity: 55 },
+  { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 3, velocity: 68 },
+];
+
+const HARD_BOP_HIHATS = [HARD_BOP_HIHAT_A, HARD_BOP_HIHAT_B];
 
 const HARD_BOP_KICK_SNARE: Pattern[] = [
   [
@@ -1319,21 +1496,41 @@ const HARD_BOP_KICK_SNARE: Pattern[] = [
 
 // ── COOL JAZZ ──
 
-const COOL_RIDE: Pattern = [
-  // Soft ride quarters, no skip-note (brush feel)
+// Ride A: soft quarters, no skip-note (brush feel)
+const COOL_RIDE_A: Pattern = [
   { drum: GM_DRUMS.RIDE, beat: 0, velocity: 60 },
   { drum: GM_DRUMS.RIDE, beat: 1, velocity: 55 },
   { drum: GM_DRUMS.RIDE, beat: 2, velocity: 60 },
   { drum: GM_DRUMS.RIDE, beat: 3, velocity: 55 },
 ];
 
-const COOL_HIHAT: Pattern = [
-  // Light brush sweeps (closed hat as proxy)
+// Ride B: gentle 8ths — Motian spacious
+const COOL_RIDE_B: Pattern = [
+  { drum: GM_DRUMS.RIDE, beat: 0, velocity: 58 },
+  { drum: GM_DRUMS.RIDE, beat: 0.5, velocity: 42 },
+  { drum: GM_DRUMS.RIDE, beat: 1, velocity: 52 },
+  { drum: GM_DRUMS.RIDE, beat: 2, velocity: 58 },
+  { drum: GM_DRUMS.RIDE, beat: 2.5, velocity: 42 },
+  { drum: GM_DRUMS.RIDE, beat: 3, velocity: 52 },
+];
+
+const COOL_RIDES = [COOL_RIDE_A, COOL_RIDE_B];
+
+// HH A: light brush sweeps (closed hat as proxy)
+const COOL_HIHAT_A: Pattern = [
   { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 0, velocity: 50 },
   { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 1, velocity: 50 },
   { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 2, velocity: 50 },
   { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 3, velocity: 50 },
 ];
+
+// HH B: pedal only on 2 and 4 — more space
+const COOL_HIHAT_B: Pattern = [
+  { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 1, velocity: 42 },
+  { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 3, velocity: 42 },
+];
+
+const COOL_HIHATS = [COOL_HIHAT_A, COOL_HIHAT_B];
 
 const COOL_KICK_SNARE: Pattern[] = [
   // Var 1: kick on 1, side-stick on 3
@@ -1841,21 +2038,24 @@ const SWING_STOCHASTIC: StochasticTable = {
   maxHits: 4,
 };
 
+// Blakey: bomb drops, accent snare, driving kick, ghost cascades
 const HARD_BOP_STOCHASTIC: StochasticTable = {
   slots: {
-    "0":    [{ drum: GM_DRUMS.KICK, probability: 0.90, velocity: 75 }],
-    "0.67": [{ drum: GM_DRUMS.SNARE, probability: 0.10, velocity: 40, ghost: true }],
-    "1":    [{ drum: GM_DRUMS.KICK, probability: 0.15, velocity: 65 }],
-    "1.67": [{ drum: GM_DRUMS.SNARE, probability: 0.15, velocity: 40, ghost: true }],
-    "2":    [{ drum: GM_DRUMS.KICK, probability: 0.55, velocity: 70 }],
-    "2.5":  [{ drum: GM_DRUMS.KICK, probability: 0.15, velocity: 55 }],
-    "2.67": [{ drum: GM_DRUMS.SNARE, probability: 0.18, velocity: 50 }],
-    "3":    [{ drum: GM_DRUMS.KICK, probability: 0.25, velocity: 60 }],
-    "3.5":  [{ drum: GM_DRUMS.KICK, probability: 0.20, velocity: 60 }],
-    "3.67": [{ drum: GM_DRUMS.SNARE, probability: 0.25, velocity: 60 }],
+    "0":    [{ drum: GM_DRUMS.KICK, probability: 0.90, velocity: 82 }],
+    "0.67": [{ drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 35, ghost: true }],
+    "1":    [{ drum: GM_DRUMS.KICK, probability: 0.18, velocity: 68 },
+             { drum: GM_DRUMS.SNARE, probability: 0.20, velocity: 88 }],
+    "1.67": [{ drum: GM_DRUMS.SNARE, probability: 0.15, velocity: 35, ghost: true }],
+    "2":    [{ drum: GM_DRUMS.KICK, probability: 0.55, velocity: 75 }],
+    "2.5":  [{ drum: GM_DRUMS.KICK, probability: 0.18, velocity: 60 },
+             { drum: GM_DRUMS.SNARE, probability: 0.15, velocity: 85 }],
+    "2.67": [{ drum: GM_DRUMS.SNARE, probability: 0.18, velocity: 38, ghost: true }],
+    "3":    [{ drum: GM_DRUMS.KICK, probability: 0.25, velocity: 65 }],
+    "3.5":  [{ drum: GM_DRUMS.KICK, probability: 0.20, velocity: 62 }],
+    "3.67": [{ drum: GM_DRUMS.SNARE, probability: 0.25, velocity: 68 }],
   },
   minHits: 2,
-  maxHits: 5,
+  maxHits: 6,
 };
 
 const COOL_JAZZ_STOCHASTIC: StochasticTable = {
@@ -1894,22 +2094,30 @@ const BALLAD_STOCHASTIC: StochasticTable = {
 };
 
 // Contemporary jazz: active, Kendrick Scott-style — syncopated kicks + ghost cross-sticks
+// Kendrick Scott: accent snares, cross-stick interjections, ghost cascades, wide dynamics
 const CONTEMPORARY_JAZZ_STOCHASTIC: StochasticTable = {
   slots: {
-    "0":    [{ drum: GM_DRUMS.KICK, probability: 0.80, velocity: 60 }],
-    "0.5":  [{ drum: GM_DRUMS.KICK, probability: 0.12, velocity: 50 }],
-    "0.67": [{ drum: GM_DRUMS.CROSS_STICK, probability: 0.12, velocity: 35, ghost: true }],
-    "1":    [{ drum: GM_DRUMS.KICK, probability: 0.20, velocity: 55 }],
-    "1.67": [{ drum: GM_DRUMS.CROSS_STICK, probability: 0.15, velocity: 35, ghost: true }],
-    "2":    [{ drum: GM_DRUMS.KICK, probability: 0.40, velocity: 55 }],
-    "2.5":  [{ drum: GM_DRUMS.KICK, probability: 0.18, velocity: 50 }],
-    "2.67": [{ drum: GM_DRUMS.CROSS_STICK, probability: 0.20, velocity: 40, ghost: true }],
-    "3":    [{ drum: GM_DRUMS.KICK, probability: 0.20, velocity: 50 }],
-    "3.5":  [{ drum: GM_DRUMS.KICK, probability: 0.15, velocity: 45 }],
-    "3.67": [{ drum: GM_DRUMS.CROSS_STICK, probability: 0.22, velocity: 40, ghost: true }],
+    "0":    [{ drum: GM_DRUMS.KICK, probability: 0.80, velocity: 68 }],
+    "0.25": [{ drum: GM_DRUMS.SNARE, probability: 0.10, velocity: 28, ghost: true }],
+    "0.5":  [{ drum: GM_DRUMS.KICK, probability: 0.15, velocity: 55 }],
+    "0.75": [{ drum: GM_DRUMS.CROSS_STICK, probability: 0.12, velocity: 45 }],
+    "1":    [{ drum: GM_DRUMS.SNARE, probability: 0.22, velocity: 82 },
+             { drum: GM_DRUMS.CROSS_STICK, probability: 0.15, velocity: 50 }],
+    "1.25": [{ drum: GM_DRUMS.SNARE, probability: 0.10, velocity: 28, ghost: true }],
+    "1.5":  [{ drum: GM_DRUMS.KICK, probability: 0.18, velocity: 55 }],
+    "2":    [{ drum: GM_DRUMS.KICK, probability: 0.40, velocity: 62 },
+             { drum: GM_DRUMS.CROSS_STICK, probability: 0.15, velocity: 48 }],
+    "2.5":  [{ drum: GM_DRUMS.SNARE, probability: 0.20, velocity: 85 },
+             { drum: GM_DRUMS.KICK, probability: 0.15, velocity: 52 }],
+    "2.75": [{ drum: GM_DRUMS.SNARE, probability: 0.10, velocity: 28, ghost: true }],
+    "3":    [{ drum: GM_DRUMS.KICK, probability: 0.20, velocity: 58 },
+             { drum: GM_DRUMS.CROSS_STICK, probability: 0.15, velocity: 48 }],
+    "3.5":  [{ drum: GM_DRUMS.KICK, probability: 0.15, velocity: 50 },
+             { drum: GM_DRUMS.SNARE, probability: 0.18, velocity: 80 }],
+    "3.75": [{ drum: GM_DRUMS.SNARE, probability: 0.10, velocity: 25, ghost: true }],
   },
   minHits: 2,
-  maxHits: 5,
+  maxHits: 6,
 };
 
 // ECM: very sparse, Jon Christensen-inspired — kick feathered, occasional cross-stick
@@ -1923,20 +2131,30 @@ const ECM_STOCHASTIC: StochasticTable = {
   maxHits: 2,
 };
 
-// Metheny: Antonio Sanchez-style — precise kicks, conversational snare accents
+// Metheny: Antonio Sanchez — precise kicks, conversational snare accents, cross-stick,
+// ghost cascades, wide velocity (25-90). Sanchez plays melodically, not groove-locked.
 const METHENY_STOCHASTIC: StochasticTable = {
   slots: {
-    "0":    [{ drum: GM_DRUMS.KICK, probability: 0.70, velocity: 50 }],
-    "0.67": [{ drum: GM_DRUMS.SNARE, probability: 0.10, velocity: 30, ghost: true }],
-    "1":    [{ drum: GM_DRUMS.KICK, probability: 0.10, velocity: 40 }],
-    "2":    [{ drum: GM_DRUMS.KICK, probability: 0.25, velocity: 45 }],
-    "2.67": [{ drum: GM_DRUMS.SNARE, probability: 0.15, velocity: 35, ghost: true }],
-    "3":    [{ drum: GM_DRUMS.KICK, probability: 0.12, velocity: 40 }],
-    "3.5":  [{ drum: GM_DRUMS.SNARE, probability: 0.08, velocity: 30, ghost: true }],
-    "3.67": [{ drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 35, ghost: true }],
+    "0":    [{ drum: GM_DRUMS.KICK, probability: 0.70, velocity: 78 }],
+    "0.25": [{ drum: GM_DRUMS.SNARE, probability: 0.10, velocity: 28, ghost: true }],
+    "0.5":  [{ drum: GM_DRUMS.KICK, probability: 0.18, velocity: 65 }],
+    "0.75": [{ drum: GM_DRUMS.SNARE, probability: 0.10, velocity: 28, ghost: true }],
+    "1":    [{ drum: GM_DRUMS.SNARE, probability: 0.22, velocity: 85 },
+             { drum: GM_DRUMS.CROSS_STICK, probability: 0.15, velocity: 55 }],
+    "1.5":  [{ drum: GM_DRUMS.KICK, probability: 0.20, velocity: 62 },
+             { drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 30, ghost: true }],
+    "2":    [{ drum: GM_DRUMS.KICK, probability: 0.30, velocity: 70 },
+             { drum: GM_DRUMS.CROSS_STICK, probability: 0.12, velocity: 52 }],
+    "2.5":  [{ drum: GM_DRUMS.SNARE, probability: 0.20, velocity: 88 }],
+    "2.75": [{ drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 30, ghost: true }],
+    "3":    [{ drum: GM_DRUMS.KICK, probability: 0.15, velocity: 60 },
+             { drum: GM_DRUMS.CROSS_STICK, probability: 0.12, velocity: 52 }],
+    "3.5":  [{ drum: GM_DRUMS.KICK, probability: 0.15, velocity: 58 },
+             { drum: GM_DRUMS.SNARE, probability: 0.18, velocity: 85 }],
+    "3.75": [{ drum: GM_DRUMS.SNARE, probability: 0.10, velocity: 25, ghost: true }],
   },
-  minHits: 1,
-  maxHits: 3,
+  minHits: 2,
+  maxHits: 5,
 };
 
 // Holdsworth: Chad Wackerman — displaced kicks, ghost-to-accent dynamics,
@@ -2210,8 +2428,15 @@ export interface StylePatternSet {
   hihatVariants?: Pattern[];  // optional hihat rotation (rotates with ride for variety)
 }
 
-function getSwingPatternSet(): StylePatternSet {
-  return { base: [...SWING_RIDE, ...SWING_HIHAT, ...SWING_HIHAT_PULSE], variations: SWING_KICK_SNARE };
+function getSwingPatternSet(rng: () => number = Math.random): StylePatternSet {
+  const rideIdx = Math.floor(rng() * SWING_RIDES.length);
+  const hhIdx = Math.floor(rng() * SWING_HIHATS.length);
+  return {
+    base: [...SWING_RIDES[rideIdx], ...SWING_HIHATS[hhIdx]],
+    variations: SWING_KICK_SNARE,
+    rideVariants: SWING_RIDES,
+    hihatVariants: SWING_HIHATS,
+  };
 }
 
 function getBossaPatternSet(): StylePatternSet {
@@ -2235,9 +2460,13 @@ function getFusionPatternSet(rng: () => number = Math.random): StylePatternSet {
   if (rng() < 0.3) {
     return { base: [], variations: [FUSION_LINEAR_A, FUSION_LINEAR_B] };
   }
-  // 35% ride bell timekeeping instead of hi-hat
-  const base = rng() < 0.35 ? [...FUSION_RIDE_BELL] : [...FUSION_HIHAT];
-  return { base, variations: FUSION_KICK_SNARE };
+  // Timekeeping rotates between hihat variants and ride bell via rideVariants
+  const tkIdx = Math.floor(rng() * FUSION_TIMEKEEPING.length);
+  return {
+    base: [...FUSION_TIMEKEEPING[tkIdx]],
+    variations: FUSION_KICK_SNARE,
+    rideVariants: FUSION_TIMEKEEPING,
+  };
 }
 
 function getAlfaMistPatternSet(rng: () => number = Math.random): StylePatternSet {
@@ -2247,9 +2476,15 @@ function getAlfaMistPatternSet(rng: () => number = Math.random): StylePatternSet
 }
 
 function getMethenyPatternSet(rng: () => number = Math.random): StylePatternSet {
-  // 40% brush-like ride for timbral variety (Bob Moses)
-  const ride = rng() < 0.4 ? [...METHENY_RIDE_BRUSHES] : [...METHENY_RIDE];
-  return { base: [...ride, ...METHENY_HIHAT], variations: METHENY_KICK_SNARE };
+  // Initial ride+HH chosen randomly; rideVariants/hihatVariants enable rotation every 4-8 bars
+  const rideIdx = Math.floor(rng() * METHENY_RIDES.length);
+  const hhIdx = Math.floor(rng() * METHENY_HIHATS.length);
+  return {
+    base: [...METHENY_RIDES[rideIdx], ...METHENY_HIHATS[hhIdx]],
+    variations: METHENY_KICK_SNARE,
+    rideVariants: METHENY_RIDES,
+    hihatVariants: METHENY_HIHATS,
+  };
 }
 
 function getHoldsworthPatternSet(rng: () => number = Math.random): StylePatternSet {
@@ -2283,12 +2518,24 @@ function getHoldsworth11_8PatternSet(rng: () => number = Math.random): StylePatt
 }
 
 function getNeoSoulPatternSet(rng: () => number = Math.random): StylePatternSet {
-  const base = rng() < 0.5 ? [...NEO_SOUL_HIHAT] : [...NEO_SOUL_HIHAT_B];
-  return { base, variations: NEO_SOUL_KICK_SNARE };
+  // Broken hihat rotation — Dilla/Questlove feel shifts every 4-8 bars
+  const hhIdx = Math.floor(rng() * NEO_SOUL_HIHATS.length);
+  return {
+    base: [...NEO_SOUL_HIHATS[hhIdx]],
+    variations: NEO_SOUL_KICK_SNARE,
+    rideVariants: NEO_SOUL_HIHATS,
+  };
 }
 
-function getContemporaryJazzPatternSet(): StylePatternSet {
-  return { base: [...CONTEMP_RIDE, ...CONTEMP_HIHAT], variations: CONTEMP_KICK_SNARE };
+function getContemporaryJazzPatternSet(rng: () => number = Math.random): StylePatternSet {
+  const rideIdx = Math.floor(rng() * CONTEMP_RIDES.length);
+  const hhIdx = Math.floor(rng() * CONTEMP_HIHATS.length);
+  return {
+    base: [...CONTEMP_RIDES[rideIdx], ...CONTEMP_HIHATS[hhIdx]],
+    variations: CONTEMP_KICK_SNARE,
+    rideVariants: CONTEMP_RIDES,
+    hihatVariants: CONTEMP_HIHATS,
+  };
 }
 
 function getMathRockPatternSet(rng: () => number = Math.random): StylePatternSet {
@@ -2306,12 +2553,26 @@ function getEcmPatternSet(): StylePatternSet {
   return { base: [...ECM_RIDE, ...ECM_KICK, ...ECM_HIHAT], variations: ECM_SNARE };
 }
 
-function getHardBopPatternSet(): StylePatternSet {
-  return { base: [...HARD_BOP_RIDE, ...HARD_BOP_HIHAT], variations: HARD_BOP_KICK_SNARE };
+function getHardBopPatternSet(rng: () => number = Math.random): StylePatternSet {
+  const rideIdx = Math.floor(rng() * HARD_BOP_RIDES.length);
+  const hhIdx = Math.floor(rng() * HARD_BOP_HIHATS.length);
+  return {
+    base: [...HARD_BOP_RIDES[rideIdx], ...HARD_BOP_HIHATS[hhIdx]],
+    variations: HARD_BOP_KICK_SNARE,
+    rideVariants: HARD_BOP_RIDES,
+    hihatVariants: HARD_BOP_HIHATS,
+  };
 }
 
-function getCoolJazzPatternSet(): StylePatternSet {
-  return { base: [...COOL_RIDE, ...COOL_HIHAT], variations: COOL_KICK_SNARE };
+function getCoolJazzPatternSet(rng: () => number = Math.random): StylePatternSet {
+  const rideIdx = Math.floor(rng() * COOL_RIDES.length);
+  const hhIdx = Math.floor(rng() * COOL_HIHATS.length);
+  return {
+    base: [...COOL_RIDES[rideIdx], ...COOL_HIHATS[hhIdx]],
+    variations: COOL_KICK_SNARE,
+    rideVariants: COOL_RIDES,
+    hihatVariants: COOL_HIHATS,
+  };
 }
 
 function getModalPatternSet(): StylePatternSet {
@@ -2370,28 +2631,28 @@ function getShuffleBluesPatternSet(): StylePatternSet {
 }
 
 /** Get the style-specific pattern set (timekeeping base + comping variations) */
-export function getStylePatternSet(style: string): StylePatternSet {
+export function getStylePatternSet(style: string, rng: () => number = Math.random): StylePatternSet {
   switch (style) {
     case "bossa": return getBossaPatternSet();
     case "latin": return getLatinPatternSet();
     case "ballad": return getBalladPatternSet();
     case "funk": return getFunkPatternSet();
-    case "fusion": return getFusionPatternSet();
+    case "fusion": return getFusionPatternSet(rng);
     case "ecm": return getEcmPatternSet();
-    case "hardBop": return getHardBopPatternSet();
-    case "coolJazz": return getCoolJazzPatternSet();
+    case "hardBop": return getHardBopPatternSet(rng);
+    case "coolJazz": return getCoolJazzPatternSet(rng);
     case "modal": return getModalPatternSet();
     case "jazzWaltz": return getJazzWaltzPatternSet();
     case "shuffleBlues": return getShuffleBluesPatternSet();
-    case "neoSoul": return getNeoSoulPatternSet();
-    case "contemporaryJazz": return getContemporaryJazzPatternSet();
-    case "mathRock": return getMathRockPatternSet();
-    case "idm": return getIdmPatternSet();
-    case "holdsworth": return getHoldsworthPatternSet();
-    case "alfaMist": return getAlfaMistPatternSet();
-    case "metheny": return getMethenyPatternSet();
+    case "neoSoul": return getNeoSoulPatternSet(rng);
+    case "contemporaryJazz": return getContemporaryJazzPatternSet(rng);
+    case "mathRock": return getMathRockPatternSet(rng);
+    case "idm": return getIdmPatternSet(rng);
+    case "holdsworth": return getHoldsworthPatternSet(rng);
+    case "alfaMist": return getAlfaMistPatternSet(rng);
+    case "metheny": return getMethenyPatternSet(rng);
     case "swing":
-    default: return getSwingPatternSet();
+    default: return getSwingPatternSet(rng);
   }
 }
 
@@ -2442,20 +2703,20 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
       case "funk": patternSet = getFunkPatternSet(); break;
       case "fusion": patternSet = getFusionPatternSet(rng); break;
       case "ecm": patternSet = getEcmPatternSet(); break;
-      case "hardBop": patternSet = getHardBopPatternSet(); break;
-      case "coolJazz": patternSet = getCoolJazzPatternSet(); break;
+      case "hardBop": patternSet = getHardBopPatternSet(rng); break;
+      case "coolJazz": patternSet = getCoolJazzPatternSet(rng); break;
       case "modal": patternSet = getModalPatternSet(); break;
       case "jazzWaltz": patternSet = getJazzWaltzPatternSet(); break;
       case "shuffleBlues": patternSet = getShuffleBluesPatternSet(); break;
       case "neoSoul": patternSet = getNeoSoulPatternSet(rng); break;
-      case "contemporaryJazz": patternSet = getContemporaryJazzPatternSet(); break;
+      case "contemporaryJazz": patternSet = getContemporaryJazzPatternSet(rng); break;
       case "mathRock": patternSet = getMathRockPatternSet(rng); break;
       case "idm": patternSet = getIdmPatternSet(rng); break;
       case "holdsworth": patternSet = (timeSig[0] === 11 && timeSig[1] === 8) ? getHoldsworth11_8PatternSet(rng) : getHoldsworthPatternSet(rng); break;
       case "alfaMist": patternSet = getAlfaMistPatternSet(rng); break;
       case "metheny": patternSet = getMethenyPatternSet(rng); break;
       case "swing":
-      default: patternSet = getSwingPatternSet(); break;
+      default: patternSet = getSwingPatternSet(rng); break;
     }
   }
 
@@ -2630,8 +2891,8 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
 
       // Style-specific fill frequency: Wackerman fills frequently and dramatically,
       // Alfa Mist is sparse and broken-beat, others are standard jazz.
-      const sectionProb = (style === "alfaMist" ? 0.35 : style === "holdsworth" ? 0.75 : 0.6) * energyFillMult;
-      const phraseProb = (style === "alfaMist" ? 0.20 : style === "holdsworth" ? 0.55 : 0.4) * energyFillMult;
+      const sectionProb = (style === "alfaMist" ? 0.35 : style === "holdsworth" ? 0.75 : style === "metheny" ? 0.70 : 0.6) * energyFillMult;
+      const phraseProb = (style === "alfaMist" ? 0.20 : style === "holdsworth" ? 0.55 : style === "metheny" ? 0.50 : 0.4) * energyFillMult;
 
       if (isBeforeSectionMarker && rng() < sectionProb) {
         // Big fill before major section boundary
