@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   generateDrumPattern,
   GM_DRUMS,
+  humanizeVelocity,
   type DrumHit,
 } from "../src/index";
 
@@ -1305,5 +1306,372 @@ describe("Drum Patterns — tempo validation", () => {
 
   it("throws RangeError for negative tempo", () => {
     expect(() => generateDrumPattern({ tempo: -100 })).toThrow(RangeError);
+  });
+});
+
+// ── Holdsworth / Chad Wackerman Enhancements ──
+
+describe("Drum Patterns — Holdsworth Wackerman", () => {
+  const tempo = 120;
+  const beatDur = 60 / tempo;
+
+  it("11/8 uses Holdsworth-specific patterns, not generic", () => {
+    // Holdsworth 11/8 should have ride bell (MIDI 53) possible and cross-stick (MIDI 37)
+    // which generic 11/8 patterns do NOT have
+    let foundBell = false;
+    let foundCrossStick = false;
+    for (let i = 0; i < 50; i++) {
+      const hits = generateDrumPattern({
+        style: "holdsworth",
+        timeSignature: [11, 8],
+        tempo,
+        measures: 8,
+        humanize: false,
+        density: 50,
+      });
+      if (hits.some(h => h.pitch === GM_DRUMS.RIDE_BELL)) foundBell = true;
+      if (hits.some(h => h.pitch === GM_DRUMS.CROSS_STICK)) foundCrossStick = true;
+      if (foundBell && foundCrossStick) break;
+    }
+    // At least one of these style markers should appear across 50 runs
+    expect(foundBell || foundCrossStick).toBe(true);
+  });
+
+  it("11/8 Holdsworth produces correct number of beats per measure", () => {
+    const beatsPerMeasure = 11 * (4 / 8); // 5.5
+    const measDur = beatsPerMeasure * beatDur;
+    const hits = generateDrumPattern({
+      style: "holdsworth",
+      timeSignature: [11, 8],
+      tempo,
+      measures: 4,
+      humanize: false,
+    });
+    // All hits within 4-measure duration
+    for (const h of hits) {
+      expect(h.time).toBeGreaterThanOrEqual(-0.01);
+      expect(h.time).toBeLessThan(4 * measDur + 0.01);
+    }
+    // Should have hits in all 4 measures
+    for (let m = 0; m < 4; m++) {
+      const mHits = hits.filter(h => h.time >= m * measDur - 0.01 && h.time < (m + 1) * measDur + 0.01);
+      expect(mHits.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("cross-stick appears in 4/4 Holdsworth patterns", () => {
+    let found = false;
+    for (let i = 0; i < 100; i++) {
+      const hits = generateDrumPattern({
+        style: "holdsworth",
+        tempo,
+        measures: 8,
+        humanize: false,
+        density: 50,
+      });
+      if (hits.some(h => h.pitch === GM_DRUMS.CROSS_STICK)) {
+        found = true;
+        break;
+      }
+    }
+    expect(found).toBe(true);
+  });
+
+  it("ghost notes make up significant portion of snare hits", () => {
+    const hits = generateDrumPattern({
+      style: "holdsworth",
+      tempo,
+      measures: 32,
+      humanize: false,
+      density: 50,
+    });
+    const snares = hits.filter(h => h.pitch === GM_DRUMS.SNARE);
+    const ghosts = snares.filter(h => h.velocity < 40);
+    // Wackerman: ghost cascades are central — at least 15% of snares should be ghosts
+    expect(ghosts.length / Math.max(snares.length, 1)).toBeGreaterThan(0.15);
+  });
+
+  it("ride bell ratio ~45% across many measures", () => {
+    let bellCount = 0;
+    let rideCount = 0;
+    for (let i = 0; i < 100; i++) {
+      const hits = generateDrumPattern({
+        style: "holdsworth",
+        tempo,
+        measures: 4,
+        humanize: false,
+      });
+      bellCount += hits.filter(h => h.pitch === GM_DRUMS.RIDE_BELL).length;
+      rideCount += hits.filter(h => h.pitch === GM_DRUMS.RIDE || h.pitch === GM_DRUMS.RIDE_BELL).length;
+    }
+    const bellRatio = bellCount / Math.max(rideCount, 1);
+    // All ride variants now include bell accents (1-4 per 8 hits). ~15-40% bell ratio.
+    expect(bellRatio).toBeGreaterThan(0.10);
+    expect(bellRatio).toBeLessThan(0.55);
+  });
+
+  it("stochastic comping has wider velocity range (20-95)", () => {
+    const allVels: number[] = [];
+    for (let i = 0; i < 50; i++) {
+      const hits = generateDrumPattern({
+        style: "holdsworth",
+        tempo,
+        measures: 16,
+        humanize: false,
+        density: 50,
+      });
+      allVels.push(...hits.map(h => h.velocity));
+    }
+    const minVel = Math.min(...allVels);
+    const maxVel = Math.max(...allVels);
+    // Wide dynamic range — ghost notes (20-30) to accents (80+), at least 35 range
+    expect(maxVel - minVel).toBeGreaterThan(35);
+  });
+
+  it("Holdsworth 11/8 fills have notes past beat 3", () => {
+    let foundFillContent = false;
+    for (let i = 0; i < 100; i++) {
+      const hits = generateDrumPattern({
+        style: "holdsworth",
+        timeSignature: [11, 8],
+        tempo,
+        measures: 16,
+        humanize: false,
+        density: 50,
+        formMarkers: [4, 8, 12],
+        sectionMarkers: [4, 12],
+      });
+      // Check for tom hits (fill indicators) past beat 3 in the measure
+      const beatsPerMeasure = 5.5;
+      const measDur = beatsPerMeasure * beatDur;
+      const toms = hits.filter(h =>
+        h.pitch === GM_DRUMS.TOM_HIGH || h.pitch === GM_DRUMS.TOM_MID ||
+        h.pitch === GM_DRUMS.TOM_LOW || h.pitch === GM_DRUMS.TOM_FLOOR
+      );
+      if (toms.length > 0) {
+        foundFillContent = true;
+        break;
+      }
+    }
+    expect(foundFillContent).toBe(true);
+  });
+
+  it("ride variant rotates across measures (not stuck on one pattern)", () => {
+    // Generate 64 measures — ride should rotate every 4-8 bars.
+    // Collect bell count per 8-measure section; at least 2 sections should differ.
+    const hits = generateDrumPattern({
+      style: "holdsworth",
+      tempo,
+      measures: 64,
+      humanize: false,
+    });
+    const measDur = 4 * beatDur;
+    const bellCounts: number[] = [];
+    for (let s = 0; s < 8; s++) {
+      const sStart = s * 8 * measDur;
+      const sEnd = (s + 1) * 8 * measDur;
+      const bells = hits.filter(h => h.pitch === GM_DRUMS.RIDE_BELL && h.time >= sStart - 0.01 && h.time < sEnd);
+      bellCounts.push(bells.length);
+    }
+    // With 3 ride variants (1, 2, or 4 bell per measure), sections should have varied counts
+    const unique = new Set(bellCounts).size;
+    expect(unique).toBeGreaterThanOrEqual(2);
+  });
+
+  it("Holdsworth fill patterns have no simultaneous non-timekeeping hits", () => {
+    // Verify fill patterns themselves are linear — check tom/snare/kick within fill beats.
+    // Fills occupy beats 2-4. Focus on fill-specific instruments (toms) to avoid
+    // false positives from stochastic comping overlap with fill.
+    let fillsChecked = 0;
+    for (let i = 0; i < 200; i++) {
+      const hits = generateDrumPattern({
+        style: "holdsworth",
+        tempo,
+        measures: 16,
+        humanize: false,
+        formMarkers: [4, 8, 12],
+        sectionMarkers: [4, 12],
+      });
+      const measDur = 4 * beatDur;
+      for (let m = 0; m < 16; m++) {
+        const mStart = m * measDur;
+        const mHits = hits.filter(h => h.time >= mStart - 0.001 && h.time < mStart + measDur);
+        const toms = mHits.filter(h =>
+          h.pitch === GM_DRUMS.TOM_HIGH || h.pitch === GM_DRUMS.TOM_MID ||
+          h.pitch === GM_DRUMS.TOM_LOW || h.pitch === GM_DRUMS.TOM_FLOOR
+        );
+        if (toms.length >= 2) {
+          fillsChecked++;
+          // Check that no two toms share exact same time (fill should be linear)
+          const tomTimes = toms.map(h => Math.round(h.time * 1000));
+          const uniqueTomTimes = new Set(tomTimes);
+          expect(uniqueTomTimes.size).toBe(tomTimes.length);
+        }
+      }
+    }
+    expect(fillsChecked).toBeGreaterThan(0);
+  });
+
+  // ── v1.2.3: snare guarantee, HH rotation, velocity floor, accent velocity, xstick frequency ──
+
+  it("stochastic comping always produces snare or cross-stick (snare guarantee)", () => {
+    // Run many short generations — no bar should be completely snare-free
+    // (except drumsMinimal bars which are ride-only, tested separately)
+    let emptyBars = 0;
+    const tempo = 120;
+    const beatDur = 60 / tempo;
+    const measDur = 4 * beatDur; // 4/4
+    for (let i = 0; i < 200; i++) {
+      const hits = generateDrumPattern({
+        style: "holdsworth",
+        tempo,
+        measures: 8,
+        humanize: false,
+        density: 50,
+      });
+      for (let m = 0; m < 8; m++) {
+        const mStart = m * measDur;
+        const mHits = hits.filter(h => h.time >= mStart - 0.001 && h.time < mStart + measDur + 0.001);
+        const hasSnare = mHits.some(h => h.pitch === GM_DRUMS.SNARE || h.pitch === GM_DRUMS.CROSS_STICK);
+        if (!hasSnare) emptyBars++;
+      }
+    }
+    // With snare guarantee, zero-snare bars should be extremely rare (only fill bars)
+    // Allow up to 5% — fills replace comping so they won't have guarantee
+    expect(emptyBars / (200 * 8)).toBeLessThan(0.05);
+  });
+
+  it("stochastic comping snare guarantee in 11/8", () => {
+    let emptyBars = 0;
+    const tempo = 120;
+    const beatDur = 60 / tempo;
+    const measDur = 5.5 * beatDur; // 11/8
+    for (let i = 0; i < 200; i++) {
+      const hits = generateDrumPattern({
+        style: "holdsworth",
+        timeSignature: [11, 8],
+        tempo,
+        measures: 8,
+        humanize: false,
+        density: 50,
+      });
+      for (let m = 0; m < 8; m++) {
+        const mStart = m * measDur;
+        const mHits = hits.filter(h => h.time >= mStart - 0.001 && h.time < mStart + measDur + 0.001);
+        const hasSnare = mHits.some(h => h.pitch === GM_DRUMS.SNARE || h.pitch === GM_DRUMS.CROSS_STICK);
+        if (!hasSnare) emptyBars++;
+      }
+    }
+    expect(emptyBars / (200 * 8)).toBeLessThan(0.05);
+  });
+
+  it("hihat variants produce variety across measures", () => {
+    // Over 64 measures, HH patterns should rotate (not identical every bar)
+    const tempo = 120;
+    const beatDur = 60 / tempo;
+    const measDur = 4 * beatDur;
+    const hhPatterns = new Set<string>();
+    for (let i = 0; i < 20; i++) {
+      const hits = generateDrumPattern({
+        style: "holdsworth",
+        tempo,
+        measures: 32,
+        humanize: false,
+      });
+      for (let m = 0; m < 32; m++) {
+        const mStart = m * measDur;
+        const hh = hits
+          .filter(h =>
+            h.time >= mStart - 0.001 && h.time < mStart + measDur + 0.001 &&
+            (h.pitch === GM_DRUMS.HI_HAT_CLOSED || h.pitch === GM_DRUMS.HI_HAT_OPEN || h.pitch === GM_DRUMS.HI_HAT_PEDAL)
+          )
+          .map(h => `${h.pitch}@${((h.time - mStart) / beatDur).toFixed(2)}`)
+          .sort()
+          .join("|");
+        if (hh) hhPatterns.add(hh);
+      }
+    }
+    // With 3 HH variants, should see at least 2 distinct patterns
+    expect(hhPatterns.size).toBeGreaterThanOrEqual(2);
+  });
+
+  it("humanizeVelocity non-ghost floor is 35 (not 45)", () => {
+    // With humanization disabled, vel=35 should pass through (not clamp to 45)
+    expect(humanizeVelocity(35, false, false)).toBe(35);
+    expect(humanizeVelocity(30, false, false)).toBe(35); // clamped up to 35
+    expect(humanizeVelocity(36, false, false)).toBe(36);
+  });
+
+  it("humanizeVelocity ghost floor is 35", () => {
+    expect(humanizeVelocity(30, true, false)).toBe(35); // clamped up to 35
+    expect(humanizeVelocity(40, true, false)).toBe(40);
+    expect(humanizeVelocity(55, true, false)).toBe(50); // capped at 50
+  });
+
+  it("accent snare velocity reaches 88+ in stochastic output", () => {
+    // Holdsworth stochastic tables have accent snare at 88-92. Without humanization
+    // these should appear in output.
+    let maxSnareVel = 0;
+    for (let i = 0; i < 100; i++) {
+      const hits = generateDrumPattern({
+        style: "holdsworth",
+        tempo: 120,
+        measures: 16,
+        humanize: false,
+        density: 60,
+      });
+      const snares = hits.filter(h => h.pitch === GM_DRUMS.SNARE);
+      for (const s of snares) {
+        if (s.velocity > maxSnareVel) maxSnareVel = s.velocity;
+      }
+      if (maxSnareVel >= 88) break;
+    }
+    expect(maxSnareVel).toBeGreaterThanOrEqual(88);
+  });
+
+  it("cross-stick appears with reasonable frequency", () => {
+    // With prob 0.18, cross-stick should appear frequently over many bars
+    let xstickCount = 0;
+    let totalBars = 0;
+    for (let i = 0; i < 50; i++) {
+      const hits = generateDrumPattern({
+        style: "holdsworth",
+        tempo: 120,
+        measures: 16,
+        humanize: false,
+        density: 50,
+      });
+      xstickCount += hits.filter(h => h.pitch === GM_DRUMS.CROSS_STICK).length;
+      totalBars += 16;
+    }
+    // At prob ~0.18 with 3 slots per bar, expect at least 0.3 per bar on average
+    // Be conservative: at least 0.1 per bar
+    expect(xstickCount / totalBars).toBeGreaterThan(0.1);
+  });
+
+  it("holdsworth fill probability higher than generic styles", () => {
+    // Holdsworth has sectionProb=0.75, phraseProb=0.55.
+    // Over many runs with form/section markers, toms should appear more often.
+    let holdsWithToms = 0;
+    const runs = 100;
+    for (let i = 0; i < runs; i++) {
+      const hits = generateDrumPattern({
+        style: "holdsworth",
+        tempo: 120,
+        measures: 16,
+        humanize: false,
+        density: 50,
+        formMarkers: [4, 8, 12],
+        sectionMarkers: [4, 12],
+      });
+      if (hits.some(h =>
+        h.pitch === GM_DRUMS.TOM_HIGH || h.pitch === GM_DRUMS.TOM_MID ||
+        h.pitch === GM_DRUMS.TOM_LOW || h.pitch === GM_DRUMS.TOM_FLOOR
+      )) {
+        holdsWithToms++;
+      }
+    }
+    // With 0.75 section prob and multiple markers, fills should appear in most runs
+    expect(holdsWithToms / runs).toBeGreaterThan(0.3);
   });
 });

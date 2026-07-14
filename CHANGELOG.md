@@ -4,6 +4,31 @@ All notable changes to `@jmove/generator` will be documented in this file.
 
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [1.2.3] - 2026-07-14
+
+### Added
+
+- **Chad Wackerman drums for Holdsworth preset** — Complete drum overhaul inspired by Wackerman's playing with Allan Holdsworth:
+  - **Holdsworth-specific 11/8 patterns** — ride, kick/snare, hi-hat, and fills designed for 5.5-beat measures with 3+3+3+2 asymmetric grouping accents. Holdsworth in 11/8 no longer falls back to generic patterns
+  - **Cross-stick variations** — 2 new kick/snare patterns (V5, V6) using cross-stick (MIDI 37) for quiet intensity and ghost cascade punctuation
+  - **Ghost cascade density** — expanded stochastic table with 16th-note ghost positions (0.25, 0.75, 1.25, etc.) for cascading snare melody between accents
+  - **Cross-stick in stochastic comping** — 3 cross-stick slots at beats 1, 2, 3 with 6-8% probability for conversational interjections
+  - **Linear fills** — 4 new fills: linear snare-kick cascade (no simultaneous hits), dynamic arc (pp→ff ghost build), cross-stick→snare transition, metric modulation triplets
+  - **Ride bell increased to 45%** — up from 30%, matching Wackerman's aggressive bell usage
+  - **11/8 stochastic table** — dedicated `HOLDSWORTH_11_8_STOCHASTIC` with accents following 3+3+3+2 grouping boundaries
+  - **11/8 fills** — 3 fill patterns adapted for odd-meter: ghost cascade into tom melody, linear cascade, triplet grouping metric modulation
+  - **Fixed simultaneous hit in fill 2** — crash moved from beat 3.5 (simultaneous with snare) to 3.75 for linear drumming integrity
+  - **Ride bell always present** — replaced all-or-nothing bell selection (45% chance of zero bell for entire piece) with 3 ride variants that ALL include bell accents: A (2 bell on downbeats), B (1 bell, conversational), C (4 bell, high energy). Ride variant rotates every 4-8 bars for timbral arc across sections
+  - **11/8 ride bell always present** — 2 ride variants (A: 4 bell on group boundaries, B: 2 bell sparser), both with guaranteed bell
+  - **Stochastic accent probabilities raised** — snare accent slots from 0.10-0.12 to 0.20-0.30 in both 4/4 and 11/8 tables. Kick secondary positions boosted. minHits raised to 2, maxHits to 6-7. Eliminates nearly-empty comping measures
+  - **Hi-hat rotation** — 3 variants per meter (pedal+open, shifted emphasis, sparse) rotate alongside ride every 4-8 bars via `hihatVariants` on `StylePatternSet`. Breaks monotony of single static hi-hat pattern
+  - **Fill probability boosted** — Holdsworth section fill 0.60→0.75, phrase fill 0.40→0.55. Wackerman fills frequently and dramatically
+  - **Snare guarantee in stochastic comping** — if stochastic roll produces zero snare/cross-stick, inject ghost snare at random accent position. No drummer leaves snare completely silent in a non-minimal bar
+  - **Ride pattern velocities raised** — off-beats 48-55→58-68, bells 72-80→85-92 across all Holdsworth ride variants (4/4 and 11/8). Ride drives the beat instead of whispering
+  - **Accent snare velocities raised** — stochastic table accent snare from 75-82→88-95. After multiplier stacking and MIDI scaling, accents land at 60-75 instead of 45-55
+  - **Cross-stick probability raised** — 0.08-0.12→0.18-0.22. Wackerman uses cross-stick as conversational interjection, should appear regularly
+  - **`humanizeVelocity` non-ghost floor lowered** — 45→35. Old floor compressed quiet ride/kick into same velocity band as accents, collapsing dynamics
+
 ## [1.2.2] - 2026-07-13
 
 ### Fixed

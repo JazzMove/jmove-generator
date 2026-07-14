@@ -31,7 +31,7 @@ Deep technical articles about how JMove and the generator work:
 - **Jam Session Generator** — random chord progressions across 17 jazz forms (blues, rhythm changes, AABA, modal, Coltrane matrix, and more)
 - **Walking Bass** — rule-based walking lines with dissonance filtering, chromatic approaches, pattern variety, 19 styles (swing, bossa, Latin tumbao, neo-soul, math rock, IDM), proper odd-meter groupings (11/8, 7/8, 5/4)
 - **Piano Comping** — Bill Evans rootless voicings (Type A/B), quartal, shell, cluster — all quality-aware (diatonic intervals per chord type), voice-led with rhythmic templates per style
-- **Drum Patterns** — 19 styles with humanization, ghost notes, groove templates based on GrooVAE research
+- **Drum Patterns** — 19 styles with humanization, ghost notes, groove templates based on GrooVAE research. Holdsworth preset features Chad Wackerman-inspired drumming: cross-stick interjections, ghost cascades, linear fills, 11/8-specific patterns with asymmetric grouping accents
 - **23 Style Presets** — Classic Swing to IDM, with per-instrument style overrides and tuned musicality parameters
 - **Auto-Detect** — analyze a score to recommend the best preset
 - **Full Song Form** — multi-section arrangements with dynamic shaping
@@ -394,7 +394,7 @@ ALL_TIME_SIGNATURES   // all supported time signatures
 | `shuffleBlues` | Triplet shuffle | Shuffle bass | Blues comping | Shuffle groove |
 | `neoSoul` | Broken feel | Erykah-style | Glasper voicings | J Dilla pocket |
 | `contemporaryJazz` | Moderate | Nordic clarity | Avishai Cohen trio | Brushes/sticks mix |
-| `holdsworth` | Straight | Melodic minor | Wide voicings | Linear fusion |
+| `holdsworth` | Straight | Melodic minor | Wide voicings | Wackerman: bell ride, cross-stick, ghost cascades, 11/8-aware |
 | `alfaMist` | Broken beat | Lo-fi chromatic | Rhodes, chromatic | Broken beat |
 | `metheny` | Light swing | Jaco melodic | Lydian shimmer | Bob Moses brushes |
 | `mathRock` | Straight | Angular | Staccato | Odd groupings |

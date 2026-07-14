@@ -451,14 +451,14 @@ const HOLDSWORTH_FILLS: Pattern[] = [
     { drum: GM_DRUMS.TOM_MID, beat: 3.33, velocity: 75 },
     { drum: GM_DRUMS.KICK, beat: 3.67, velocity: 80 },
   ],
-  // Dotted-8th displacement — Wackerman metric modulation feel
+  // Dotted-8th displacement — Wackerman metric modulation feel (linear: no simultaneous hits)
   [
     { drum: GM_DRUMS.KICK, beat: 2, velocity: 90 },
     { drum: GM_DRUMS.SNARE, beat: 2.375, velocity: 80 },
     { drum: GM_DRUMS.TOM_HIGH, beat: 2.75, velocity: 75 },
     { drum: GM_DRUMS.KICK, beat: 3.125, velocity: 85 },
     { drum: GM_DRUMS.SNARE, beat: 3.5, velocity: 90 },
-    { drum: GM_DRUMS.CRASH, beat: 3.5, velocity: 60 },
+    { drum: GM_DRUMS.CRASH, beat: 3.75, velocity: 58 },
   ],
   // Ghost cascade into accent — conversational build
   [
@@ -471,14 +471,45 @@ const HOLDSWORTH_FILLS: Pattern[] = [
     { drum: GM_DRUMS.TOM_MID, beat: 3.5, velocity: 75 },
     { drum: GM_DRUMS.TOM_LOW, beat: 3.75, velocity: 85 },
   ],
-  // Wide-interval tom melody — Husband melodic drumming
+  // Wide-interval tom melody — Husband melodic drumming (linear: no simultaneous hits)
   [
     { drum: GM_DRUMS.TOM_HIGH, beat: 2, velocity: 80 },
     { drum: GM_DRUMS.TOM_FLOOR, beat: 2.5, velocity: 75 },
     { drum: GM_DRUMS.TOM_HIGH, beat: 3, velocity: 85 },
     { drum: GM_DRUMS.KICK, beat: 3.25, velocity: 80 },
     { drum: GM_DRUMS.SNARE, beat: 3.5, velocity: 90 },
-    { drum: GM_DRUMS.CRASH, beat: 3.5, velocity: 55 },
+    { drum: GM_DRUMS.CRASH, beat: 3.75, velocity: 55 },
+  ],
+  // Linear fill — strictly no simultaneous hits (Wackerman precision)
+  [
+    { drum: GM_DRUMS.SNARE, beat: 2, velocity: 75 },
+    { drum: GM_DRUMS.KICK, beat: 2.25, velocity: 80 },
+    { drum: GM_DRUMS.TOM_HIGH, beat: 2.5, velocity: 72 },
+    { drum: GM_DRUMS.SNARE, beat: 2.75, velocity: 78 },
+    { drum: GM_DRUMS.KICK, beat: 3, velocity: 82 },
+    { drum: GM_DRUMS.TOM_MID, beat: 3.25, velocity: 75 },
+    { drum: GM_DRUMS.TOM_LOW, beat: 3.5, velocity: 80 },
+    { drum: GM_DRUMS.KICK, beat: 3.75, velocity: 85 },
+  ],
+  // Dynamic arc — pp ghost build to ff accent (Wackerman storytelling)
+  [
+    { drum: GM_DRUMS.SNARE, beat: 2, velocity: 20, ghost: true },
+    { drum: GM_DRUMS.SNARE, beat: 2.25, velocity: 25, ghost: true },
+    { drum: GM_DRUMS.SNARE, beat: 2.5, velocity: 35, ghost: true },
+    { drum: GM_DRUMS.SNARE, beat: 2.75, velocity: 50 },
+    { drum: GM_DRUMS.SNARE, beat: 3, velocity: 65 },
+    { drum: GM_DRUMS.TOM_HIGH, beat: 3.25, velocity: 78 },
+    { drum: GM_DRUMS.TOM_MID, beat: 3.5, velocity: 85 },
+    { drum: GM_DRUMS.KICK, beat: 3.75, velocity: 92 },
+  ],
+  // Cross-stick to snare transition — subtle color change
+  [
+    { drum: GM_DRUMS.CROSS_STICK, beat: 2, velocity: 50 },
+    { drum: GM_DRUMS.CROSS_STICK, beat: 2.5, velocity: 55 },
+    { drum: GM_DRUMS.SNARE, beat: 3, velocity: 70 },
+    { drum: GM_DRUMS.TOM_HIGH, beat: 3.25, velocity: 75 },
+    { drum: GM_DRUMS.KICK, beat: 3.5, velocity: 80 },
+    { drum: GM_DRUMS.SNARE, beat: 3.75, velocity: 85 },
   ],
 ];
 
@@ -486,36 +517,62 @@ const HOLDSWORTH_FILLS: Pattern[] = [
 // Gary Husband / Chad Wackerman: conversational, displaced, evolving.
 // 8th-note ride, displaced kick/snare, ghost-heavy, open hi-hat accents.
 
-const HOLDSWORTH_RIDE: Pattern = [
-  // 8th-note ride — Husband/Wackerman drive harder than quarter notes
-  { drum: GM_DRUMS.RIDE, beat: 0, velocity: 72 },
-  { drum: GM_DRUMS.RIDE, beat: 0.5, velocity: 55 },
+// Ride A: bell accents on beat 0 & 2 — always some bell color (Wackerman signature)
+const HOLDSWORTH_RIDE_A: Pattern = [
+  { drum: GM_DRUMS.RIDE_BELL, beat: 0, velocity: 90 },
+  { drum: GM_DRUMS.RIDE, beat: 0.5, velocity: 62 },
+  { drum: GM_DRUMS.RIDE, beat: 1, velocity: 72 },
+  { drum: GM_DRUMS.RIDE, beat: 1.5, velocity: 60 },
+  { drum: GM_DRUMS.RIDE_BELL, beat: 2, velocity: 88 },
+  { drum: GM_DRUMS.RIDE, beat: 2.5, velocity: 62 },
+  { drum: GM_DRUMS.RIDE, beat: 3, velocity: 72 },
+  { drum: GM_DRUMS.RIDE, beat: 3.5, velocity: 60 },
+];
+
+// Ride B: bell on beat 0 only — subtler, more conversational
+const HOLDSWORTH_RIDE_B: Pattern = [
+  { drum: GM_DRUMS.RIDE_BELL, beat: 0, velocity: 88 },
+  { drum: GM_DRUMS.RIDE, beat: 0.5, velocity: 58 },
   { drum: GM_DRUMS.RIDE, beat: 1, velocity: 68 },
-  { drum: GM_DRUMS.RIDE, beat: 1.5, velocity: 55 },
+  { drum: GM_DRUMS.RIDE, beat: 1.5, velocity: 58 },
   { drum: GM_DRUMS.RIDE, beat: 2, velocity: 72 },
-  { drum: GM_DRUMS.RIDE, beat: 2.5, velocity: 55 },
+  { drum: GM_DRUMS.RIDE, beat: 2.5, velocity: 58 },
   { drum: GM_DRUMS.RIDE, beat: 3, velocity: 68 },
-  { drum: GM_DRUMS.RIDE, beat: 3.5, velocity: 55 },
+  { drum: GM_DRUMS.RIDE, beat: 3.5, velocity: 58 },
 ];
 
-const HOLDSWORTH_RIDE_BELL: Pattern = [
-  // Bell accents on downbeats + ride 8ths — Wackerman intensity
-  { drum: GM_DRUMS.RIDE_BELL, beat: 0, velocity: 78 },
-  { drum: GM_DRUMS.RIDE, beat: 0.5, velocity: 50 },
-  { drum: GM_DRUMS.RIDE, beat: 1, velocity: 60 },
-  { drum: GM_DRUMS.RIDE, beat: 1.5, velocity: 50 },
-  { drum: GM_DRUMS.RIDE_BELL, beat: 2, velocity: 75 },
-  { drum: GM_DRUMS.RIDE, beat: 2.5, velocity: 50 },
-  { drum: GM_DRUMS.RIDE, beat: 3, velocity: 60 },
-  { drum: GM_DRUMS.RIDE, beat: 3.5, velocity: 50 },
+// Ride C: dense bell — beats 0, 1, 2, 3 all bell (high energy sections)
+const HOLDSWORTH_RIDE_C: Pattern = [
+  { drum: GM_DRUMS.RIDE_BELL, beat: 0, velocity: 92 },
+  { drum: GM_DRUMS.RIDE, beat: 0.5, velocity: 60 },
+  { drum: GM_DRUMS.RIDE_BELL, beat: 1, velocity: 85 },
+  { drum: GM_DRUMS.RIDE, beat: 1.5, velocity: 60 },
+  { drum: GM_DRUMS.RIDE_BELL, beat: 2, velocity: 90 },
+  { drum: GM_DRUMS.RIDE, beat: 2.5, velocity: 60 },
+  { drum: GM_DRUMS.RIDE_BELL, beat: 3, velocity: 85 },
+  { drum: GM_DRUMS.RIDE, beat: 3.5, velocity: 60 },
 ];
 
-const HOLDSWORTH_HIHAT: Pattern = [
-  // Conversational hi-hat — pedal on 2&4 + open hi-hat accents
+// 4/4 Hi-hat variants — rotate with ride for variety
+const HOLDSWORTH_HIHAT_A: Pattern = [
+  // Pedal on 2&4 + open hat accent on "and" of 2
   { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 1, velocity: 50 },
   { drum: GM_DRUMS.HI_HAT_OPEN, beat: 2.5, velocity: 45 },
   { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 3, velocity: 50 },
 ];
+const HOLDSWORTH_HIHAT_B: Pattern = [
+  // Open hat on "and" of 1, pedal on 3 — shifted emphasis
+  { drum: GM_DRUMS.HI_HAT_OPEN, beat: 1.5, velocity: 42 },
+  { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 3, velocity: 48 },
+];
+const HOLDSWORTH_HIHAT_C: Pattern = [
+  // Two open hats — brighter, more conversational
+  { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 1, velocity: 45 },
+  { drum: GM_DRUMS.HI_HAT_OPEN, beat: 2, velocity: 40 },
+  { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 3, velocity: 45 },
+  { drum: GM_DRUMS.HI_HAT_OPEN, beat: 3.5, velocity: 38 },
+];
+const HOLDSWORTH_HIHATS = [HOLDSWORTH_HIHAT_A, HOLDSWORTH_HIHAT_B, HOLDSWORTH_HIHAT_C];
 
 const HOLDSWORTH_KICK_SNARE: Pattern[] = [
   // V1: displaced — kick on "and" of 1, snare on "and" of 2 (Husband signature)
@@ -553,6 +610,164 @@ const HOLDSWORTH_KICK_SNARE: Pattern[] = [
     { drum: GM_DRUMS.SNARE, beat: 2, velocity: 85 },
     { drum: GM_DRUMS.KICK, beat: 3, velocity: 75 },
     { drum: GM_DRUMS.SNARE, beat: 3.5, velocity: 30, ghost: true },
+  ],
+  // V5: cross-stick conversational — Wackerman quiet intensity
+  [
+    { drum: GM_DRUMS.KICK, beat: 0, velocity: 78 },
+    { drum: GM_DRUMS.CROSS_STICK, beat: 1, velocity: 52 },
+    { drum: GM_DRUMS.SNARE, beat: 1.5, velocity: 28, ghost: true },
+    { drum: GM_DRUMS.KICK, beat: 2.5, velocity: 72 },
+    { drum: GM_DRUMS.CROSS_STICK, beat: 3, velocity: 48 },
+    { drum: GM_DRUMS.SNARE, beat: 3.75, velocity: 28, ghost: true },
+  ],
+  // V6: ghost cascade with cross-stick punctuation
+  [
+    { drum: GM_DRUMS.KICK, beat: 0, velocity: 80 },
+    { drum: GM_DRUMS.SNARE, beat: 0.25, velocity: 22, ghost: true },
+    { drum: GM_DRUMS.SNARE, beat: 0.5, velocity: 25, ghost: true },
+    { drum: GM_DRUMS.CROSS_STICK, beat: 0.75, velocity: 50 },
+    { drum: GM_DRUMS.SNARE, beat: 1.25, velocity: 28, ghost: true },
+    { drum: GM_DRUMS.SNARE, beat: 1.5, velocity: 78 },
+    { drum: GM_DRUMS.KICK, beat: 2, velocity: 75 },
+    { drum: GM_DRUMS.SNARE, beat: 2.75, velocity: 25, ghost: true },
+    { drum: GM_DRUMS.CROSS_STICK, beat: 3.25, velocity: 48 },
+    { drum: GM_DRUMS.SNARE, beat: 3.5, velocity: 28, ghost: true },
+  ],
+];
+
+// ── HOLDSWORTH 11/8 ──
+// Chad Wackerman's 11/8 mastery: asymmetric groupings (3+3+3+2 or 2+3+3+3),
+// displaced accents that float across bar lines, ghost cascades between accents,
+// cross-stick interjections, and ride bell grouping markers.
+// beatsPerMeasure = 11 * (4/8) = 5.5 quarter-note beats
+
+// 11/8 Ride A: bell on group boundaries (0, 1.5, 3, 4.5) — Wackerman clarity
+const HOLDSWORTH_11_8_RIDE_A: Pattern = [
+  { drum: GM_DRUMS.RIDE_BELL, beat: 0, velocity: 90 },
+  { drum: GM_DRUMS.RIDE, beat: 0.5, velocity: 60 },
+  { drum: GM_DRUMS.RIDE, beat: 1, velocity: 65 },
+  { drum: GM_DRUMS.RIDE_BELL, beat: 1.5, velocity: 88 },
+  { drum: GM_DRUMS.RIDE, beat: 2, velocity: 60 },
+  { drum: GM_DRUMS.RIDE, beat: 2.5, velocity: 65 },
+  { drum: GM_DRUMS.RIDE_BELL, beat: 3, velocity: 88 },
+  { drum: GM_DRUMS.RIDE, beat: 3.5, velocity: 60 },
+  { drum: GM_DRUMS.RIDE, beat: 4, velocity: 65 },
+  { drum: GM_DRUMS.RIDE_BELL, beat: 4.5, velocity: 85 },
+  { drum: GM_DRUMS.RIDE, beat: 5, velocity: 60 },
+];
+
+// 11/8 Ride B: bell only on beat 0 and 3 — sparser bell, more conversational
+const HOLDSWORTH_11_8_RIDE_B: Pattern = [
+  { drum: GM_DRUMS.RIDE_BELL, beat: 0, velocity: 88 },
+  { drum: GM_DRUMS.RIDE, beat: 0.5, velocity: 58 },
+  { drum: GM_DRUMS.RIDE, beat: 1, velocity: 65 },
+  { drum: GM_DRUMS.RIDE, beat: 1.5, velocity: 72 },
+  { drum: GM_DRUMS.RIDE, beat: 2, velocity: 58 },
+  { drum: GM_DRUMS.RIDE, beat: 2.5, velocity: 65 },
+  { drum: GM_DRUMS.RIDE_BELL, beat: 3, velocity: 88 },
+  { drum: GM_DRUMS.RIDE, beat: 3.5, velocity: 58 },
+  { drum: GM_DRUMS.RIDE, beat: 4, velocity: 65 },
+  { drum: GM_DRUMS.RIDE, beat: 4.5, velocity: 72 },
+  { drum: GM_DRUMS.RIDE, beat: 5, velocity: 58 },
+];
+
+// 11/8 Hi-hat variants — rotate to break monotony (Wackerman uses hat as conversation)
+const HOLDSWORTH_11_8_HIHAT_A: Pattern = [
+  // Pedal on group boundaries + open hat accent
+  { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 1.5, velocity: 45 },
+  { drum: GM_DRUMS.HI_HAT_OPEN, beat: 3, velocity: 42 },
+  { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 4.5, velocity: 45 },
+];
+const HOLDSWORTH_11_8_HIHAT_B: Pattern = [
+  // Open hat on group 2, pedal on 3 — shifted emphasis
+  { drum: GM_DRUMS.HI_HAT_OPEN, beat: 1.5, velocity: 44 },
+  { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 3, velocity: 42 },
+  { drum: GM_DRUMS.HI_HAT_OPEN, beat: 4, velocity: 38 },
+  { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 5, velocity: 40 },
+];
+const HOLDSWORTH_11_8_HIHAT_C: Pattern = [
+  // Sparse — only two pedal hits, maximum air
+  { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 1.5, velocity: 40 },
+  { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 4.5, velocity: 40 },
+];
+const HOLDSWORTH_11_8_HIHATS = [HOLDSWORTH_11_8_HIHAT_A, HOLDSWORTH_11_8_HIHAT_B, HOLDSWORTH_11_8_HIHAT_C];
+
+const HOLDSWORTH_11_8_KICK_SNARE: Pattern[] = [
+  // V1: displaced — kick on group starts, snare between groups (Wackerman float)
+  [
+    { drum: GM_DRUMS.KICK, beat: 0, velocity: 80 },
+    { drum: GM_DRUMS.SNARE, beat: 1, velocity: 30, ghost: true },
+    { drum: GM_DRUMS.KICK, beat: 1.5, velocity: 75 },
+    { drum: GM_DRUMS.SNARE, beat: 2.5, velocity: 78 },
+    { drum: GM_DRUMS.KICK, beat: 3, velocity: 72 },
+    { drum: GM_DRUMS.SNARE, beat: 4, velocity: 30, ghost: true },
+    { drum: GM_DRUMS.KICK, beat: 4.5, velocity: 75 },
+  ],
+  // V2: ghost cascade — ghosted snare melody weaving through accents
+  [
+    { drum: GM_DRUMS.KICK, beat: 0, velocity: 82 },
+    { drum: GM_DRUMS.SNARE, beat: 0.5, velocity: 28, ghost: true },
+    { drum: GM_DRUMS.SNARE, beat: 0.75, velocity: 30, ghost: true },
+    { drum: GM_DRUMS.SNARE, beat: 1, velocity: 32, ghost: true },
+    { drum: GM_DRUMS.SNARE, beat: 1.5, velocity: 80 },
+    { drum: GM_DRUMS.KICK, beat: 2.5, velocity: 70 },
+    { drum: GM_DRUMS.SNARE, beat: 3.25, velocity: 30, ghost: true },
+    { drum: GM_DRUMS.SNARE, beat: 3.5, velocity: 75 },
+    { drum: GM_DRUMS.KICK, beat: 4.5, velocity: 72 },
+    { drum: GM_DRUMS.SNARE, beat: 5, velocity: 30, ghost: true },
+  ],
+  // V3: cross-stick conversational — sparse, breathes (Husband)
+  [
+    { drum: GM_DRUMS.KICK, beat: 0, velocity: 78 },
+    { drum: GM_DRUMS.CROSS_STICK, beat: 1, velocity: 55 },
+    { drum: GM_DRUMS.KICK, beat: 1.5, velocity: 70 },
+    { drum: GM_DRUMS.SNARE, beat: 2.5, velocity: 30, ghost: true },
+    { drum: GM_DRUMS.CROSS_STICK, beat: 3, velocity: 50 },
+    { drum: GM_DRUMS.KICK, beat: 4, velocity: 72 },
+    { drum: GM_DRUMS.SNARE, beat: 5, velocity: 30, ghost: true },
+  ],
+  // V4: polyrhythmic — dotted-quarter kick superimposed on 11/8
+  [
+    { drum: GM_DRUMS.KICK, beat: 0, velocity: 82 },
+    { drum: GM_DRUMS.SNARE, beat: 0.75, velocity: 30, ghost: true },
+    { drum: GM_DRUMS.KICK, beat: 1.5, velocity: 75 },
+    { drum: GM_DRUMS.SNARE, beat: 2, velocity: 80 },
+    { drum: GM_DRUMS.KICK, beat: 3, velocity: 72 },
+    { drum: GM_DRUMS.SNARE, beat: 3.5, velocity: 30, ghost: true },
+    { drum: GM_DRUMS.KICK, beat: 4.5, velocity: 78 },
+    { drum: GM_DRUMS.SNARE, beat: 5, velocity: 75 },
+  ],
+];
+
+// Holdsworth 11/8 fills — Wackerman navigates odd meters with musical phrase fills
+const HOLDSWORTH_11_8_FILLS: Pattern[] = [
+  // Ghost cascade into tom melody — builds tension across full bar
+  [
+    { drum: GM_DRUMS.SNARE, beat: 3, velocity: 28, ghost: true },
+    { drum: GM_DRUMS.SNARE, beat: 3.25, velocity: 32, ghost: true },
+    { drum: GM_DRUMS.SNARE, beat: 3.5, velocity: 38, ghost: true },
+    { drum: GM_DRUMS.TOM_HIGH, beat: 3.75, velocity: 75 },
+    { drum: GM_DRUMS.TOM_MID, beat: 4, velocity: 70 },
+    { drum: GM_DRUMS.TOM_LOW, beat: 4.5, velocity: 80 },
+    { drum: GM_DRUMS.KICK, beat: 5, velocity: 85 },
+  ],
+  // Linear snare-kick cascade — no simultaneous hits
+  [
+    { drum: GM_DRUMS.SNARE, beat: 3.5, velocity: 75 },
+    { drum: GM_DRUMS.KICK, beat: 4, velocity: 78 },
+    { drum: GM_DRUMS.SNARE, beat: 4.25, velocity: 72 },
+    { drum: GM_DRUMS.TOM_HIGH, beat: 4.5, velocity: 80 },
+    { drum: GM_DRUMS.KICK, beat: 5, velocity: 85 },
+  ],
+  // Triplet grouping over 11/8 — metric modulation feel
+  [
+    { drum: GM_DRUMS.SNARE, beat: 3, velocity: 78 },
+    { drum: GM_DRUMS.TOM_HIGH, beat: 3.33, velocity: 70 },
+    { drum: GM_DRUMS.KICK, beat: 3.67, velocity: 75 },
+    { drum: GM_DRUMS.SNARE, beat: 4, velocity: 80 },
+    { drum: GM_DRUMS.TOM_MID, beat: 4.33, velocity: 72 },
+    { drum: GM_DRUMS.KICK, beat: 4.67, velocity: 78 },
+    { drum: GM_DRUMS.TOM_FLOOR, beat: 5, velocity: 85 },
   ],
 ];
 
@@ -1724,25 +1939,65 @@ const METHENY_STOCHASTIC: StochasticTable = {
   maxHits: 3,
 };
 
-// Holdsworth: Gary Husband/Chad Wackerman — displaced kicks, ghost-to-accent dynamics,
-// conversational snare, open hi-hat interactions
+// Holdsworth: Chad Wackerman — displaced kicks, ghost-to-accent dynamics,
+// conversational snare, cross-stick interjections, open hi-hat interactions,
+// 16th-note ghost positions for cascading snare melody, wide velocity range (20-95)
 const HOLDSWORTH_STOCHASTIC: StochasticTable = {
   slots: {
-    "0":    [{ drum: GM_DRUMS.KICK, probability: 0.70, velocity: 70 }],
-    "0.5":  [{ drum: GM_DRUMS.KICK, probability: 0.18, velocity: 60 },
-             { drum: GM_DRUMS.HI_HAT_OPEN, probability: 0.12, velocity: 40 }],
-    "1":    [{ drum: GM_DRUMS.SNARE, probability: 0.10, velocity: 30, ghost: true }],
-    "1.5":  [{ drum: GM_DRUMS.KICK, probability: 0.15, velocity: 55 },
-             { drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 75 }],
-    "2":    [{ drum: GM_DRUMS.KICK, probability: 0.35, velocity: 65 }],
-    "2.5":  [{ drum: GM_DRUMS.SNARE, probability: 0.15, velocity: 40, ghost: true },
-             { drum: GM_DRUMS.HI_HAT_OPEN, probability: 0.10, velocity: 35 }],
-    "3":    [{ drum: GM_DRUMS.KICK, probability: 0.20, velocity: 55 }],
-    "3.5":  [{ drum: GM_DRUMS.KICK, probability: 0.15, velocity: 55 },
-             { drum: GM_DRUMS.SNARE, probability: 0.18, velocity: 35, ghost: true }],
+    "0":    [{ drum: GM_DRUMS.KICK, probability: 0.75, velocity: 85 }],
+    "0.25": [{ drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 28, ghost: true }],
+    "0.5":  [{ drum: GM_DRUMS.KICK, probability: 0.22, velocity: 70 },
+             { drum: GM_DRUMS.HI_HAT_OPEN, probability: 0.15, velocity: 48 }],
+    "0.75": [{ drum: GM_DRUMS.SNARE, probability: 0.14, velocity: 30, ghost: true }],
+    "1":    [{ drum: GM_DRUMS.SNARE, probability: 0.28, velocity: 90 },
+             { drum: GM_DRUMS.CROSS_STICK, probability: 0.18, velocity: 58 }],
+    "1.25": [{ drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 28, ghost: true }],
+    "1.5":  [{ drum: GM_DRUMS.KICK, probability: 0.25, velocity: 70 },
+             { drum: GM_DRUMS.SNARE, probability: 0.28, velocity: 92 }],
+    "1.75": [{ drum: GM_DRUMS.SNARE, probability: 0.14, velocity: 30, ghost: true }],
+    "2":    [{ drum: GM_DRUMS.KICK, probability: 0.40, velocity: 78 },
+             { drum: GM_DRUMS.CROSS_STICK, probability: 0.18, velocity: 55 }],
+    "2.25": [{ drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 28, ghost: true }],
+    "2.5":  [{ drum: GM_DRUMS.SNARE, probability: 0.25, velocity: 88 },
+             { drum: GM_DRUMS.HI_HAT_OPEN, probability: 0.15, velocity: 45 }],
+    "2.75": [{ drum: GM_DRUMS.SNARE, probability: 0.14, velocity: 30, ghost: true }],
+    "3":    [{ drum: GM_DRUMS.KICK, probability: 0.30, velocity: 70 },
+             { drum: GM_DRUMS.CROSS_STICK, probability: 0.18, velocity: 55 }],
+    "3.25": [{ drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 28, ghost: true }],
+    "3.5":  [{ drum: GM_DRUMS.KICK, probability: 0.20, velocity: 65 },
+             { drum: GM_DRUMS.SNARE, probability: 0.25, velocity: 88 }],
+    "3.75": [{ drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 25, ghost: true }],
   },
-  minHits: 1,
-  maxHits: 5,
+  minHits: 2,
+  maxHits: 7,
+};
+
+// Holdsworth 11/8 stochastic: Wackerman in odd meter — accents follow 3+3+3+2 grouping,
+// cross-stick on group boundaries, ghost cascades between, wider position grid
+const HOLDSWORTH_11_8_STOCHASTIC: StochasticTable = {
+  slots: {
+    "0":    [{ drum: GM_DRUMS.KICK, probability: 0.75, velocity: 85 }],
+    "0.25": [{ drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 28, ghost: true }],
+    "0.5":  [{ drum: GM_DRUMS.SNARE, probability: 0.15, velocity: 30, ghost: true }],
+    "0.75": [{ drum: GM_DRUMS.CROSS_STICK, probability: 0.20, velocity: 58 }],
+    "1":    [{ drum: GM_DRUMS.SNARE, probability: 0.30, velocity: 90 },
+             { drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 28, ghost: true }],
+    "1.5":  [{ drum: GM_DRUMS.KICK, probability: 0.60, velocity: 80 }],   // group 2 start
+    "1.75": [{ drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 28, ghost: true }],
+    "2":    [{ drum: GM_DRUMS.SNARE, probability: 0.32, velocity: 92 },
+             { drum: GM_DRUMS.HI_HAT_OPEN, probability: 0.15, velocity: 48 }],
+    "2.5":  [{ drum: GM_DRUMS.SNARE, probability: 0.15, velocity: 32, ghost: true }],
+    "3":    [{ drum: GM_DRUMS.KICK, probability: 0.55, velocity: 78 }],   // group 3 start
+    "3.25": [{ drum: GM_DRUMS.CROSS_STICK, probability: 0.20, velocity: 55 }],
+    "3.5":  [{ drum: GM_DRUMS.SNARE, probability: 0.28, velocity: 90 },
+             { drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 30, ghost: true }],
+    "4":    [{ drum: GM_DRUMS.SNARE, probability: 0.15, velocity: 30, ghost: true }],
+    "4.5":  [{ drum: GM_DRUMS.KICK, probability: 0.50, velocity: 75 }],   // group 4 start
+    "5":    [{ drum: GM_DRUMS.SNARE, probability: 0.18, velocity: 32, ghost: true },
+             { drum: GM_DRUMS.KICK, probability: 0.18, velocity: 62 }],
+  },
+  minHits: 2,
+  maxHits: 7,
 };
 
 // Alfa Mist / Jas Kayser: broken-beat displacement, flam accents, Afrobeat-jazz hybrid.
@@ -1848,6 +2103,18 @@ function generateStochasticComping(
     hits.shift();
   }
 
+  // Snare guarantee: no drummer leaves snare silent for an entire bar (unless drumsMinimal).
+  // Runs AFTER maxHits pruning so it can't be removed by the limiter.
+  if (!hits.some(h => h.drum === GM_DRUMS.SNARE || h.drum === GM_DRUMS.CROSS_STICK)) {
+    const snareBeats = Object.entries(table.slots)
+      .filter(([, s]) => s.some(x => x.drum === GM_DRUMS.SNARE))
+      .map(([b]) => parseFloat(b));
+    if (snareBeats.length > 0) {
+      const beat = snareBeats[Math.floor(rng() * snareBeats.length)];
+      hits.push({ drum: GM_DRUMS.SNARE, beat, velocity: 30, ghost: true });
+    }
+  }
+
   return hits;
 }
 
@@ -1864,8 +2131,8 @@ export function humanizeTime(time: number, enabled: boolean, style?: string, dru
 export function humanizeVelocity(vel: number, ghost: boolean, enabled: boolean, random?: () => number): number {
   const rng = random ?? Math.random;
   if (ghost) return Math.max(35, Math.min(50, vel + (enabled ? Math.floor((rng() - 0.5) * 10) : 0)));
-  if (!enabled) return Math.max(45, Math.min(127, vel));
-  return Math.max(45, Math.min(127, vel + Math.floor((rng() - 0.5) * 12)));
+  if (!enabled) return Math.max(35, Math.min(127, vel));
+  return Math.max(35, Math.min(127, vel + Math.floor((rng() - 0.5) * 12)));
 }
 
 // ── Beat-to-Beat Micro-Variation ──
@@ -1938,6 +2205,9 @@ export function applyMicroVariation(
 export interface StylePatternSet {
   base: Pattern;         // fixed timekeeping (ride, hihat)
   variations: Pattern[]; // kick/snare comping options (held 2-4 bars for continuity)
+  rideVariants?: Pattern[]; // optional ride rotation (e.g., Holdsworth bell variants)
+  hihat?: Pattern;          // hihat pattern appended when ride rotates
+  hihatVariants?: Pattern[];  // optional hihat rotation (rotates with ride for variety)
 }
 
 function getSwingPatternSet(): StylePatternSet {
@@ -1983,9 +2253,33 @@ function getMethenyPatternSet(rng: () => number = Math.random): StylePatternSet 
 }
 
 function getHoldsworthPatternSet(rng: () => number = Math.random): StylePatternSet {
-  // 30% bell ride for timbral variation (Wackerman)
-  const ride = rng() < 0.3 ? [...HOLDSWORTH_RIDE_BELL] : [...HOLDSWORTH_RIDE];
-  return { base: [...ride, ...HOLDSWORTH_HIHAT], variations: HOLDSWORTH_KICK_SNARE };
+  // All ride variants have bell — Wackerman always uses bell.
+  // Ride rotates every 4-8 bars via rideVariants for timbral arc.
+  // HH variants also rotate for variety (Wackerman uses hat conversationally).
+  const rideVariants = [HOLDSWORTH_RIDE_A, HOLDSWORTH_RIDE_B, HOLDSWORTH_RIDE_C];
+  const initialIdx = Math.floor(rng() * rideVariants.length);
+  const hhIdx = Math.floor(rng() * HOLDSWORTH_HIHATS.length);
+  return {
+    base: [...rideVariants[initialIdx], ...HOLDSWORTH_HIHATS[hhIdx]],
+    variations: HOLDSWORTH_KICK_SNARE,
+    rideVariants: rideVariants,
+    hihat: HOLDSWORTH_HIHATS[hhIdx],
+    hihatVariants: HOLDSWORTH_HIHATS,
+  };
+}
+
+function getHoldsworth11_8PatternSet(rng: () => number = Math.random): StylePatternSet {
+  // Both ride variants have bell — rotate for timbral variety
+  const rideVariants = [HOLDSWORTH_11_8_RIDE_A, HOLDSWORTH_11_8_RIDE_B];
+  const initialIdx = Math.floor(rng() * rideVariants.length);
+  const hhIdx = Math.floor(rng() * HOLDSWORTH_11_8_HIHATS.length);
+  return {
+    base: [...rideVariants[initialIdx], ...HOLDSWORTH_11_8_HIHATS[hhIdx]],
+    variations: HOLDSWORTH_11_8_KICK_SNARE,
+    rideVariants: rideVariants,
+    hihat: HOLDSWORTH_11_8_HIHATS[hhIdx],
+    hihatVariants: HOLDSWORTH_11_8_HIHATS,
+  };
 }
 
 function getNeoSoulPatternSet(rng: () => number = Math.random): StylePatternSet {
@@ -2131,8 +2425,11 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
 
   // Select pattern set: meter-specific patterns override style when in odd meters
   // (e.g., 5/4 or 7/8 need specific grouping patterns regardless of style)
+  // Exception: styles with their own odd-meter patterns (e.g., Holdsworth 11/8)
+  // use style-specific patterns to preserve musical character.
   const meterPatternSet = getMeterPatternSet(timeSig, rng);
-  const isOddMeter = meterPatternSet !== null && !(timeSig[0] === 4 && timeSig[1] === 4) && !(timeSig[0] === 3 && timeSig[1] === 4 && style === "jazzWaltz");
+  const hasStyleOddMeter = style === "holdsworth" && timeSig[0] === 11 && timeSig[1] === 8;
+  const isOddMeter = !hasStyleOddMeter && meterPatternSet !== null && !(timeSig[0] === 4 && timeSig[1] === 4) && !(timeSig[0] === 3 && timeSig[1] === 4 && style === "jazzWaltz");
 
   let patternSet: StylePatternSet;
   if (isOddMeter) {
@@ -2154,7 +2451,7 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
       case "contemporaryJazz": patternSet = getContemporaryJazzPatternSet(); break;
       case "mathRock": patternSet = getMathRockPatternSet(rng); break;
       case "idm": patternSet = getIdmPatternSet(rng); break;
-      case "holdsworth": patternSet = getHoldsworthPatternSet(rng); break;
+      case "holdsworth": patternSet = (timeSig[0] === 11 && timeSig[1] === 8) ? getHoldsworth11_8PatternSet(rng) : getHoldsworthPatternSet(rng); break;
       case "alfaMist": patternSet = getAlfaMistPatternSet(rng); break;
       case "metheny": patternSet = getMethenyPatternSet(rng); break;
       case "swing":
@@ -2167,7 +2464,12 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
   // In streaming (measures=1), state is restored from options.drumState to maintain
   // continuity across calls.
   const isStochastic = STOCHASTIC_STYLES.has(style);
-  const stochasticTable = isStochastic ? STOCHASTIC_TABLES[style] : null;
+  // Holdsworth in 11/8 uses its own stochastic table adapted for odd-meter groupings
+  const stochasticTable = isStochastic
+    ? (style === "holdsworth" && timeSig[0] === 11 && timeSig[1] === 8
+       ? HOLDSWORTH_11_8_STOCHASTIC
+       : STOCHASTIC_TABLES[style])
+    : null;
   const ds = options.drumState;
   // When drumState is provided with sentinel values (variationIdx < 0, tendency null),
   // initialize them using rng so PRNG consumption matches the batch (no drumState) path.
@@ -2182,6 +2484,14 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
   let patternHoldBars = (ds && ds.patternHoldBars >= 0)
     ? ds.patternHoldBars
     : 2 + Math.floor(rng() * 3);
+
+  // Ride + hihat rotation: when rideVariants present, swap timbre every 4-8 bars
+  const rideVariants = patternSet.rideVariants;
+  const hhVariants = patternSet.hihatVariants;
+  let rideIdx = rideVariants ? Math.floor(rng() * rideVariants.length) : -1;
+  let hhIdx = hhVariants ? Math.floor(rng() * hhVariants.length) : -1;
+  let barsOnRide = 0;
+  let rideHoldBars = rideVariants ? (4 + Math.floor(rng() * 5)) : Infinity;
 
   const hits: DrumHit[] = [];
 
@@ -2205,6 +2515,24 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
       }
       patternHoldBars = 2 + Math.floor(rng() * 3);
       barsOnPattern = 0;
+    }
+
+    // Ride + hihat rotation: swap ride bell density every 4-8 bars for timbral arc
+    if (rideVariants && barsOnRide >= rideHoldBars) {
+      const rideCandidates = Array.from({ length: rideVariants.length }, (_, i) => i)
+        .filter((i) => i !== rideIdx);
+      rideIdx = rideCandidates[Math.floor(rng() * rideCandidates.length)];
+      // Also rotate hihat — filter current to guarantee change
+      if (hhVariants && hhVariants.length > 1) {
+        const hhCandidates = Array.from({ length: hhVariants.length }, (_, i) => i)
+          .filter((i) => i !== hhIdx);
+        hhIdx = hhCandidates[Math.floor(rng() * hhCandidates.length)];
+      }
+      const hh = hhVariants ? hhVariants[hhIdx] : (patternSet.hihat ?? []);
+      patternSet.base = [...rideVariants[rideIdx], ...hh];
+      patternSet.hihat = hh;
+      rideHoldBars = 4 + Math.floor(rng() * 5);
+      barsOnRide = 0;
     }
 
     const measureStart = startTime + m * measureDuration;
@@ -2300,19 +2628,20 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
       // Energy multiplier: at energy 0.3 fills are 40% as likely, at 1.0 fully likely
       const energyFillMult = 0.2 + energy * 0.8;
 
-      // Alfa Mist: fills are rarer and subtler (broken-beat, not flashy jazz)
-      const sectionProb = (style === "alfaMist" ? 0.35 : 0.6) * energyFillMult;
-      const phraseProb = (style === "alfaMist" ? 0.20 : 0.4) * energyFillMult;
+      // Style-specific fill frequency: Wackerman fills frequently and dramatically,
+      // Alfa Mist is sparse and broken-beat, others are standard jazz.
+      const sectionProb = (style === "alfaMist" ? 0.35 : style === "holdsworth" ? 0.75 : 0.6) * energyFillMult;
+      const phraseProb = (style === "alfaMist" ? 0.20 : style === "holdsworth" ? 0.55 : 0.4) * energyFillMult;
 
       if (isBeforeSectionMarker && rng() < sectionProb) {
         // Big fill before major section boundary
-        const pool = style === "holdsworth" ? HOLDSWORTH_FILLS
+        const pool = style === "holdsworth" ? (hasStyleOddMeter ? HOLDSWORTH_11_8_FILLS : HOLDSWORTH_FILLS)
           : style === "alfaMist" ? ALFA_MIST_FILLS
           : style === "fusion" ? FUSION_FILLS : JAZZ_FILLS_BIG;
         fillPattern = pool[Math.floor(rng() * pool.length)];
       } else if (isBeforeFormMarker && rng() < phraseProb) {
         // Medium or small fill before phrase boundary
-        const pool = style === "holdsworth" ? HOLDSWORTH_FILLS
+        const pool = style === "holdsworth" ? (hasStyleOddMeter ? HOLDSWORTH_11_8_FILLS : HOLDSWORTH_FILLS)
           : style === "alfaMist" ? ALFA_MIST_FILLS
           : style === "fusion" ? FUSION_FILLS : JAZZ_FILLS;
         fillPattern = pool[Math.floor(rng() * pool.length)];
@@ -2379,6 +2708,7 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
     applyMicroVariation(hits, measureStart, beatDuration, beatsPerMeasure, style, density, humanize, rng);
 
     barsOnPattern++;
+    barsOnRide++;
   }
 
   // Persist state for streaming continuity across 1-measure calls
