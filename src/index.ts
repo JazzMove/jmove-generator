@@ -120,7 +120,7 @@ export { autoDetectPreset } from "./autoDetectPreset";
 export { getGrooveTemplate, applyGroove, drumPitchToElement } from "./grooveTemplates";
 
 // ── Swing Utilities ──
-export { tempoSwingMultiplier, instrumentSwingFactor, dynamicMultiplier } from "./swingUtils";
+export { tempoSwingMultiplier, instrumentSwingFactor, dynamicMultiplier, compressDynamicLevel } from "./swingUtils";
 
 // ── Style Mapping ──
 export { irealStyleToPracticeStyle } from "./styleMapping";
@@ -135,4 +135,4 @@ export { resolveDrumGranular, resolvePianoGranular, resolveBassGranular } from "
 export { createPRNG, randomSeed, deriveStream, STREAM_DRUMS, STREAM_BASS, STREAM_PIANO } from "./prng";
 
 // ── Version ──
-export const GENERATOR_VERSION = "1.2.6";
+export const GENERATOR_VERSION = "1.2.7";

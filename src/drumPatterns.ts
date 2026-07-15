@@ -638,6 +638,14 @@ const HOLDSWORTH_RIDE_C: Pattern = [
   { drum: GM_DRUMS.RIDE, beat: 3.5, velocity: 60 },
 ];
 
+// Ride D: sparse quarter-notes — breathing room, conversational (Husband whisper)
+const HOLDSWORTH_RIDE_D: Pattern = [
+  { drum: GM_DRUMS.RIDE_BELL, beat: 0, velocity: 82 },
+  { drum: GM_DRUMS.RIDE, beat: 1, velocity: 62 },
+  { drum: GM_DRUMS.RIDE_BELL, beat: 2, velocity: 78 },
+  { drum: GM_DRUMS.RIDE, beat: 3, velocity: 60 },
+];
+
 // 4/4 Hi-hat variants — rotate with ride for variety
 const HOLDSWORTH_HIHAT_A: Pattern = [
   // Pedal on 2&4 + open hat accent on "and" of 2
@@ -657,7 +665,9 @@ const HOLDSWORTH_HIHAT_C: Pattern = [
   { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 3, velocity: 45 },
   { drum: GM_DRUMS.HI_HAT_OPEN, beat: 3.5, velocity: 38 },
 ];
-const HOLDSWORTH_HIHATS = [HOLDSWORTH_HIHAT_A, HOLDSWORTH_HIHAT_B, HOLDSWORTH_HIHAT_C];
+// Ride-only: no hihat — lets ride breathe without cymbal overlap (Wackerman often drops hat)
+const HOLDSWORTH_HIHAT_NONE: Pattern = [];
+const HOLDSWORTH_HIHATS = [HOLDSWORTH_HIHAT_A, HOLDSWORTH_HIHAT_B, HOLDSWORTH_HIHAT_C, HOLDSWORTH_HIHAT_NONE];
 
 const HOLDSWORTH_KICK_SNARE: Pattern[] = [
   // V1: displaced — kick on "and" of 1, snare on "and" of 2 (Husband signature)
@@ -756,6 +766,17 @@ const HOLDSWORTH_11_8_RIDE_B: Pattern = [
   { drum: GM_DRUMS.RIDE, beat: 5, velocity: 58 },
 ];
 
+// 11/8 Ride C: sparse — bell on group starts only (3+3+3+2), maximum space
+const HOLDSWORTH_11_8_RIDE_C: Pattern = [
+  { drum: GM_DRUMS.RIDE_BELL, beat: 0, velocity: 82 },
+  { drum: GM_DRUMS.RIDE, beat: 1, velocity: 58 },
+  { drum: GM_DRUMS.RIDE_BELL, beat: 1.5, velocity: 78 },
+  { drum: GM_DRUMS.RIDE, beat: 2.5, velocity: 55 },
+  { drum: GM_DRUMS.RIDE_BELL, beat: 3, velocity: 78 },
+  { drum: GM_DRUMS.RIDE, beat: 4, velocity: 55 },
+  { drum: GM_DRUMS.RIDE_BELL, beat: 4.5, velocity: 75 },
+];
+
 // 11/8 Hi-hat variants — rotate to break monotony (Wackerman uses hat as conversation)
 const HOLDSWORTH_11_8_HIHAT_A: Pattern = [
   // Pedal on group boundaries + open hat accent
@@ -775,7 +796,9 @@ const HOLDSWORTH_11_8_HIHAT_C: Pattern = [
   { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 1.5, velocity: 40 },
   { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 4.5, velocity: 40 },
 ];
-const HOLDSWORTH_11_8_HIHATS = [HOLDSWORTH_11_8_HIHAT_A, HOLDSWORTH_11_8_HIHAT_B, HOLDSWORTH_11_8_HIHAT_C];
+// Ride-only: no hihat — lets ride breathe without cymbal overlap
+const HOLDSWORTH_11_8_HIHAT_NONE: Pattern = [];
+const HOLDSWORTH_11_8_HIHATS = [HOLDSWORTH_11_8_HIHAT_A, HOLDSWORTH_11_8_HIHAT_B, HOLDSWORTH_11_8_HIHAT_C, HOLDSWORTH_11_8_HIHAT_NONE];
 
 const HOLDSWORTH_11_8_KICK_SNARE: Pattern[] = [
   // V1: displaced — kick on group starts, snare between groups (Wackerman float)
@@ -2227,37 +2250,35 @@ const METHENY_STOCHASTIC: StochasticTable = {
 const HOLDSWORTH_STOCHASTIC: StochasticTable = {
   slots: {
     "0":    [{ drum: GM_DRUMS.KICK, probability: 0.75, velocity: 85 }],
-    "0.25": [{ drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 28, ghost: true },
-             { drum: GM_DRUMS.TOM_HIGH, probability: 0.08, velocity: 38, ghost: true }],
-    "0.5":  [{ drum: GM_DRUMS.KICK, probability: 0.22, velocity: 70 },
-             { drum: GM_DRUMS.HI_HAT_OPEN, probability: 0.15, velocity: 48 }],
-    "0.75": [{ drum: GM_DRUMS.SNARE, probability: 0.14, velocity: 30, ghost: true }],
+    "0.25": [{ drum: GM_DRUMS.SNARE, probability: 0.08, velocity: 28, ghost: true },
+             { drum: GM_DRUMS.TOM_HIGH, probability: 0.04, velocity: 38, ghost: true }],
+    "0.5":  [{ drum: GM_DRUMS.KICK, probability: 0.22, velocity: 70 }],
+    "0.75": [{ drum: GM_DRUMS.SNARE, probability: 0.09, velocity: 30, ghost: true }],
     "1":    [{ drum: GM_DRUMS.SNARE, probability: 0.28, velocity: 90 },
              { drum: GM_DRUMS.CROSS_STICK, probability: 0.18, velocity: 58 }],
-    "1.25": [{ drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 28, ghost: true },
-             { drum: GM_DRUMS.TOM_MID, probability: 0.10, velocity: 42, ghost: true }],
+    "1.25": [{ drum: GM_DRUMS.SNARE, probability: 0.08, velocity: 28, ghost: true },
+             { drum: GM_DRUMS.TOM_MID, probability: 0.05, velocity: 42, ghost: true }],
     "1.5":  [{ drum: GM_DRUMS.KICK, probability: 0.25, velocity: 70 },
              { drum: GM_DRUMS.SNARE, probability: 0.28, velocity: 92 }],
-    "1.75": [{ drum: GM_DRUMS.SNARE, probability: 0.14, velocity: 30, ghost: true },
-             { drum: GM_DRUMS.TOM_FLOOR, probability: 0.08, velocity: 45, ghost: true }],
+    "1.75": [{ drum: GM_DRUMS.SNARE, probability: 0.09, velocity: 30, ghost: true },
+             { drum: GM_DRUMS.TOM_FLOOR, probability: 0.04, velocity: 45, ghost: true }],
     "2":    [{ drum: GM_DRUMS.KICK, probability: 0.40, velocity: 78 },
              { drum: GM_DRUMS.CROSS_STICK, probability: 0.18, velocity: 55 }],
-    "2.25": [{ drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 28, ghost: true }],
-    "2.5":  [{ drum: GM_DRUMS.SNARE, probability: 0.25, velocity: 88 },
-             { drum: GM_DRUMS.HI_HAT_OPEN, probability: 0.15, velocity: 45 }],
-    "2.75": [{ drum: GM_DRUMS.SNARE, probability: 0.14, velocity: 30, ghost: true },
-             { drum: GM_DRUMS.TOM_HIGH, probability: 0.10, velocity: 50 }],
+    "2.25": [{ drum: GM_DRUMS.SNARE, probability: 0.08, velocity: 28, ghost: true }],
+    "2.5":  [{ drum: GM_DRUMS.SNARE, probability: 0.25, velocity: 88 }],
+    "2.75": [{ drum: GM_DRUMS.SNARE, probability: 0.09, velocity: 30, ghost: true },
+             { drum: GM_DRUMS.TOM_HIGH, probability: 0.05, velocity: 50 }],
     "3":    [{ drum: GM_DRUMS.KICK, probability: 0.30, velocity: 70 },
              { drum: GM_DRUMS.CROSS_STICK, probability: 0.18, velocity: 55 }],
-    "3.25": [{ drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 28, ghost: true },
-             { drum: GM_DRUMS.TOM_MID, probability: 0.08, velocity: 40, ghost: true }],
+    "3.25": [{ drum: GM_DRUMS.SNARE, probability: 0.08, velocity: 28, ghost: true },
+             { drum: GM_DRUMS.TOM_MID, probability: 0.04, velocity: 40, ghost: true }],
     "3.5":  [{ drum: GM_DRUMS.KICK, probability: 0.20, velocity: 65 },
              { drum: GM_DRUMS.SNARE, probability: 0.25, velocity: 88 }],
-    "3.75": [{ drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 25, ghost: true },
-             { drum: GM_DRUMS.TOM_FLOOR, probability: 0.10, velocity: 48 }],
+    "3.75": [{ drum: GM_DRUMS.SNARE, probability: 0.08, velocity: 25, ghost: true },
+             { drum: GM_DRUMS.TOM_FLOOR, probability: 0.05, velocity: 48 }],
   },
   minHits: 2,
-  maxHits: 8,
+  maxHits: 6,
 };
 
 // Holdsworth 11/8 stochastic: Wackerman in odd meter — accents follow 3+3+3+2 grouping,
@@ -2265,31 +2286,30 @@ const HOLDSWORTH_STOCHASTIC: StochasticTable = {
 const HOLDSWORTH_11_8_STOCHASTIC: StochasticTable = {
   slots: {
     "0":    [{ drum: GM_DRUMS.KICK, probability: 0.75, velocity: 85 }],
-    "0.25": [{ drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 28, ghost: true }],
-    "0.5":  [{ drum: GM_DRUMS.SNARE, probability: 0.15, velocity: 30, ghost: true }],
+    "0.25": [{ drum: GM_DRUMS.SNARE, probability: 0.08, velocity: 28, ghost: true }],
+    "0.5":  [{ drum: GM_DRUMS.SNARE, probability: 0.10, velocity: 30, ghost: true }],
     "0.75": [{ drum: GM_DRUMS.CROSS_STICK, probability: 0.20, velocity: 58 },
-             { drum: GM_DRUMS.TOM_HIGH, probability: 0.08, velocity: 45, ghost: true }],
+             { drum: GM_DRUMS.TOM_HIGH, probability: 0.04, velocity: 45, ghost: true }],
     "1":    [{ drum: GM_DRUMS.SNARE, probability: 0.30, velocity: 90 },
-             { drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 28, ghost: true }],
+             { drum: GM_DRUMS.SNARE, probability: 0.08, velocity: 28, ghost: true }],
     "1.5":  [{ drum: GM_DRUMS.KICK, probability: 0.60, velocity: 80 }],   // group 2 start
-    "1.75": [{ drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 28, ghost: true },
-             { drum: GM_DRUMS.TOM_MID, probability: 0.09, velocity: 48, ghost: true }],
-    "2":    [{ drum: GM_DRUMS.SNARE, probability: 0.32, velocity: 92 },
-             { drum: GM_DRUMS.HI_HAT_OPEN, probability: 0.15, velocity: 48 }],
-    "2.5":  [{ drum: GM_DRUMS.SNARE, probability: 0.15, velocity: 32, ghost: true }],
+    "1.75": [{ drum: GM_DRUMS.SNARE, probability: 0.08, velocity: 28, ghost: true },
+             { drum: GM_DRUMS.TOM_MID, probability: 0.05, velocity: 48, ghost: true }],
+    "2":    [{ drum: GM_DRUMS.SNARE, probability: 0.32, velocity: 92 }],
+    "2.5":  [{ drum: GM_DRUMS.SNARE, probability: 0.10, velocity: 32, ghost: true }],
     "3":    [{ drum: GM_DRUMS.KICK, probability: 0.55, velocity: 78 }],   // group 3 start
     "3.25": [{ drum: GM_DRUMS.CROSS_STICK, probability: 0.20, velocity: 55 },
-             { drum: GM_DRUMS.TOM_FLOOR, probability: 0.10, velocity: 55 }],
+             { drum: GM_DRUMS.TOM_FLOOR, probability: 0.05, velocity: 55 }],
     "3.5":  [{ drum: GM_DRUMS.SNARE, probability: 0.28, velocity: 90 },
-             { drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 30, ghost: true }],
-    "4":    [{ drum: GM_DRUMS.SNARE, probability: 0.15, velocity: 30, ghost: true },
-             { drum: GM_DRUMS.TOM_MID, probability: 0.08, velocity: 42, ghost: true }],
+             { drum: GM_DRUMS.SNARE, probability: 0.08, velocity: 30, ghost: true }],
+    "4":    [{ drum: GM_DRUMS.SNARE, probability: 0.10, velocity: 30, ghost: true },
+             { drum: GM_DRUMS.TOM_MID, probability: 0.04, velocity: 42, ghost: true }],
     "4.5":  [{ drum: GM_DRUMS.KICK, probability: 0.50, velocity: 75 }],   // group 4 start
-    "5":    [{ drum: GM_DRUMS.SNARE, probability: 0.18, velocity: 32, ghost: true },
+    "5":    [{ drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 32, ghost: true },
              { drum: GM_DRUMS.KICK, probability: 0.18, velocity: 62 }],
   },
   minHits: 2,
-  maxHits: 8,
+  maxHits: 6,
 };
 
 // Alfa Mist / Jas Kayser: broken-beat displacement, flam accents, Afrobeat-jazz hybrid.
@@ -2435,9 +2455,11 @@ export function humanizeVelocity(vel: number, ghost: boolean, enabled: boolean, 
 
 // alfaMist excluded: hand-crafted patterns already have dense ghost work
 // (sextuplet ghosts, flams, ghost cascades). Extra random ghosts = chaotic layering.
+// holdsworth excluded: stochastic table already embeds rich ghost/tom comping —
+// micro-variation doubles ghosting and causes density overload.
 const MICRO_VARIATION_STYLES = new Set([
   "swing", "hardBop", "coolJazz", "modal", "jazzWaltz",
-  "fusion", "neoSoul", "contemporaryJazz", "holdsworth", "metheny",
+  "fusion", "neoSoul", "contemporaryJazz", "metheny",
 ]);
 
 export function applyMicroVariation(
@@ -2594,7 +2616,8 @@ function getHoldsworthPatternSet(rng: () => number = Math.random): StylePatternS
   // All ride variants have bell — Wackerman always uses bell.
   // Ride rotates every 4-8 bars via rideVariants for timbral arc.
   // HH variants also rotate for variety (Wackerman uses hat conversationally).
-  const rideVariants = [HOLDSWORTH_RIDE_A, HOLDSWORTH_RIDE_B, HOLDSWORTH_RIDE_C];
+  // Ride D (sparse quarters) at index 0 for rideWash bias: low wash → sparse, high → dense
+  const rideVariants = [HOLDSWORTH_RIDE_D, HOLDSWORTH_RIDE_B, HOLDSWORTH_RIDE_A, HOLDSWORTH_RIDE_C];
   const initialIdx = Math.floor(rng() * rideVariants.length);
   const hhIdx = Math.floor(rng() * HOLDSWORTH_HIHATS.length);
   return {
@@ -2608,7 +2631,8 @@ function getHoldsworthPatternSet(rng: () => number = Math.random): StylePatternS
 
 function getHoldsworth11_8PatternSet(rng: () => number = Math.random): StylePatternSet {
   // Both ride variants have bell — rotate for timbral variety
-  const rideVariants = [HOLDSWORTH_11_8_RIDE_A, HOLDSWORTH_11_8_RIDE_B];
+  // Ride C (sparse) at index 0 for rideWash bias: low wash → sparse, high → dense
+  const rideVariants = [HOLDSWORTH_11_8_RIDE_C, HOLDSWORTH_11_8_RIDE_B, HOLDSWORTH_11_8_RIDE_A];
   const initialIdx = Math.floor(rng() * rideVariants.length);
   const hhIdx = Math.floor(rng() * HOLDSWORTH_11_8_HIHATS.length);
   return {
@@ -3005,8 +3029,8 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
       // Style-specific fill frequency: Wackerman fills frequently and dramatically,
       // Alfa Mist is sparse and broken-beat, others are standard jazz.
       const fillScale = options.granular ? options.granular.fillIntensity / 50 : 1;
-      const sectionProb = (style === "alfaMist" ? 0.35 : style === "holdsworth" ? 0.75 : style === "metheny" ? 0.70 : 0.6) * energyFillMult * fillScale;
-      const phraseProb = (style === "alfaMist" ? 0.20 : style === "holdsworth" ? 0.55 : style === "metheny" ? 0.50 : 0.4) * energyFillMult * fillScale;
+      const sectionProb = (style === "alfaMist" ? 0.35 : style === "holdsworth" ? 0.55 : style === "metheny" ? 0.70 : 0.6) * energyFillMult * fillScale;
+      const phraseProb = (style === "alfaMist" ? 0.20 : style === "holdsworth" ? 0.30 : style === "metheny" ? 0.50 : 0.4) * energyFillMult * fillScale;
 
       if (isBeforeSectionMarker && rng() < sectionProb) {
         // Big fill before major section boundary

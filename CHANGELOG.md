@@ -4,6 +4,28 @@ All notable changes to `@jmove/generator` will be documented in this file.
 
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [1.2.7] - 2026-07-15
+
+### Fixed
+
+- **Dynamic level compression** — section dynamicLevel was applied as raw multiplier (intro at 0.55 × micro 0.60 = 0.33, near-silent). Compressed to `0.7 + 0.3 × dynamicLevel`, mapping [0.3, 1.0] → [0.79, 1.0]. Max velocity ratio across sections now < 1.5x
+- **Section boundary crossfade** — instant velocity jumps at section transitions replaced with 2-measure linear blend from previous section's level to current. Short sections (< 4 measures) use proportionally shorter crossfade
+- **Holdsworth drum balance** — diagnosed via MIDI analysis (toms in 46% of measures, ride+HH overlap in 78%, erratic velocity CV=0.33). Six targeted fixes:
+  - Removed HI_HAT_OPEN from stochastic table (base pattern already provides hi-hat → no cymbal overlap)
+  - Reduced maxHits from 8 to 6 (both 4/4 and 11/8) — prevents 19-hit measures
+  - Removed holdsworth from MICRO_VARIATION_STYLES (stochastic table IS the ghost engine; micro-variation was double-dipping)
+  - Reduced fill probabilities: section 0.75→0.55, phrase 0.55→0.30 (was highest of all styles)
+  - Halved tom probabilities in stochastic table (8-10% → 4-5%)
+  - Reduced ghost snare probabilities (12-14% → 8-10%)
+  - Added empty hihat variant — ride-only rotation periods (~25% of time, no cymbal overlap)
+  - Added sparse quarter-note ride variant for 4/4 (4 hits vs 8) and sparse group-start ride for 11/8 (7 hits vs 11)
+  - Reordered ride variants: sparse at index 0 so low rideWash biases toward lighter patterns
+
+### Added
+
+- **Exported `compressDynamicLevel()`** — extracted and exported for testability and reuse
+- **20 section-aware dynamic tests** — `compressDynamicLevel` (7: floor/max/intro/head/clamping/range/monotonicity) + section dynamics (13: compression, peak, ratio cap, crossfade, convergence, single section, 3-section fullSong, multi-style, floor/max levels, gap handling, short sections, realistic form templates). Total generator tests: 1221
+
 ## [1.2.6] - 2026-07-15
 
 ### Added

@@ -32,6 +32,21 @@ export function instrumentSwingFactor(role: InstrumentRole): number {
   }
 }
 
+/** Minimum dynamic level — prevents silent output from empty/zero sections. */
+const DYNAMIC_FLOOR = 0.3;
+
+/** Measures to blend between sections at boundaries. */
+const SECTION_CROSSFADE_MEASURES = 2;
+
+/**
+ * Compress section dynamic level to a narrower velocity range.
+ * Raw multiplication (micro 0.60 × level 0.55 = 0.33) created near-silent intros.
+ * Maps [0.3, 1.0] → [0.79, 1.0] — perceptible dynamics without extremes.
+ */
+export function compressDynamicLevel(level: number): number {
+  return 0.7 + 0.3 * Math.max(DYNAMIC_FLOOR, level);
+}
+
 /**
  * Dynamic arc multiplier across a chorus.
  * Creates natural volume contour: subdued opening → build → peak → slight taper.
@@ -45,11 +60,21 @@ export function dynamicMultiplier(measureIndex: number, totalMeasures: number, s
     if (section) {
       const sectionLen = section.endMeasure - section.startMeasure;
       const localIdx = measureIndex - section.startMeasure;
-      // Micro arc: existing style curve applied within this section
       const micro = dynamicMultiplier(localIdx, sectionLen, style);
-      // Macro arc: section's energy level scales the micro curve.
-      // Floor at 0.3 matches getSectionEnergy clamping — prevents silent output.
-      return micro * Math.max(0.3, section.dynamicLevel);
+      const macroLevel = compressDynamicLevel(section.dynamicLevel);
+
+      // Crossfade at section boundaries — blend from previous section's level.
+      const crossfadeLen = Math.min(SECTION_CROSSFADE_MEASURES, Math.floor(sectionLen / 2));
+      if (crossfadeLen > 0 && localIdx < crossfadeLen && section.startMeasure > 0) {
+        const prevSection = sections.find(s => s.endMeasure === section.startMeasure);
+        if (prevSection) {
+          const prevLevel = compressDynamicLevel(prevSection.dynamicLevel);
+          const blend = localIdx / crossfadeLen;
+          return micro * (prevLevel + (macroLevel - prevLevel) * blend);
+        }
+      }
+
+      return micro * macroLevel;
     }
   }
 

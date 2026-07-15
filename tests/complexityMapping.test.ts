@@ -194,7 +194,7 @@ describe("GENERATOR_VERSION", () => {
     expect(GENERATOR_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
   });
 
-  it("is 1.2.6", () => {
-    expect(GENERATOR_VERSION).toBe("1.2.6");
+  it("is 1.2.7", () => {
+    expect(GENERATOR_VERSION).toBe("1.2.7");
   });
 });

@@ -685,8 +685,12 @@ describe("Walking Bass — drums-first kick snapping", () => {
     const notes = generateWalkingBass(chords, {
       style: "swing", tempo: 120, humanize: true, kickTimes,
     });
-    // Beat 1 notes (first of each measure) should snap to kick times
-    const beat1Notes = notes.filter((_, i) => i === 0 || i === 4); // approx indices
+    // Beat 1 notes: closest note to each measure start (beat 0 and beat 2)
+    const beatDur = 60 / 120;
+    const measureStarts = [0, 2 * beatDur]; // beats 0 and 2 in seconds
+    const beat1Notes = measureStarts.map(ms =>
+      notes.reduce((best, n) => Math.abs(n.time - ms) < Math.abs(best.time - ms) ? n : best)
+    );
     for (const n of beat1Notes) {
       const nearestKick = kickTimes.reduce((best, kt) =>
         Math.abs(kt - n.time) < Math.abs(best - n.time) ? kt : best
