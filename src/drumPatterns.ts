@@ -396,6 +396,31 @@ const FUSION_KICK_SNARE: Pattern[] = [
     { drum: GM_DRUMS.SNARE, beat: 3.25, velocity: 90 },
     { drum: GM_DRUMS.KICK, beat: 3.75, velocity: 70 },
   ],
+  // V7: Weckl linear tom-kick phrase — rack tom replaces snare ghost
+  [
+    { drum: GM_DRUMS.KICK, beat: 0, velocity: 100 },
+    { drum: GM_DRUMS.TOM_HIGH, beat: 0.25, velocity: 45, ghost: true },
+    { drum: GM_DRUMS.SNARE, beat: 1, velocity: 95 },
+    { drum: GM_DRUMS.TOM_MID, beat: 1.5, velocity: 58 },
+    { drum: GM_DRUMS.KICK, beat: 2, velocity: 85 },
+    { drum: GM_DRUMS.TOM_HIGH, beat: 2.25, velocity: 42, ghost: true },
+    { drum: GM_DRUMS.TOM_MID, beat: 2.75, velocity: 48, ghost: true },
+    { drum: GM_DRUMS.SNARE, beat: 3, velocity: 95 },
+    { drum: GM_DRUMS.TOM_LOW, beat: 3.5, velocity: 60 },
+  ],
+  // V8: Chambers power groove — floor tom + kick unison, tom cascades
+  [
+    { drum: GM_DRUMS.KICK, beat: 0, velocity: 100 },
+    { drum: GM_DRUMS.TOM_FLOOR, beat: 0, velocity: 62 },
+    { drum: GM_DRUMS.SNARE, beat: 1, velocity: 95 },
+    { drum: GM_DRUMS.KICK, beat: 1.75, velocity: 75 },
+    { drum: GM_DRUMS.KICK, beat: 2.5, velocity: 85 },
+    { drum: GM_DRUMS.TOM_FLOOR, beat: 2.5, velocity: 58 },
+    { drum: GM_DRUMS.SNARE, beat: 3, velocity: 95 },
+    { drum: GM_DRUMS.TOM_HIGH, beat: 3.25, velocity: 52 },
+    { drum: GM_DRUMS.TOM_MID, beat: 3.5, velocity: 48, ghost: true },
+    { drum: GM_DRUMS.KICK, beat: 3.75, velocity: 70 },
+  ],
 ];
 
 // Ride bell pattern for fusion (alternate timekeeping)
@@ -1149,6 +1174,30 @@ const NEO_SOUL_KICK_SNARE: Pattern[] = [
     { drum: GM_DRUMS.SNARE, beat: 3, velocity: 85 },
     { drum: GM_DRUMS.SNARE, beat: 3.5, velocity: 30, ghost: true },
     { drum: GM_DRUMS.SNARE, beat: 3.75, velocity: 30, ghost: true },
+  ],
+  // V6: ghost tom touches — muted tom replacing some snare ghosts (Questlove)
+  [
+    { drum: GM_DRUMS.KICK, beat: 0, velocity: 95 },
+    { drum: GM_DRUMS.TOM_HIGH, beat: 0.5, velocity: 32, ghost: true },
+    { drum: GM_DRUMS.SNARE, beat: 1, velocity: 90 },
+    { drum: GM_DRUMS.TOM_MID, beat: 1.5, velocity: 30, ghost: true },
+    { drum: GM_DRUMS.KICK, beat: 1.75, velocity: 75 },
+    { drum: GM_DRUMS.KICK, beat: 2.5, velocity: 80 },
+    { drum: GM_DRUMS.TOM_HIGH, beat: 2.75, velocity: 35, ghost: true },
+    { drum: GM_DRUMS.SNARE, beat: 3, velocity: 90 },
+    { drum: GM_DRUMS.TOM_MID, beat: 3.5, velocity: 30, ghost: true },
+  ],
+  // V7: floor tom pocket — floor tom as rhythmic anchor with kick
+  [
+    { drum: GM_DRUMS.KICK, beat: 0, velocity: 95 },
+    { drum: GM_DRUMS.TOM_FLOOR, beat: 0, velocity: 40, ghost: true },
+    { drum: GM_DRUMS.SNARE, beat: 0.75, velocity: 30, ghost: true },
+    { drum: GM_DRUMS.SNARE, beat: 1, velocity: 85 },
+    { drum: GM_DRUMS.KICK, beat: 2, velocity: 80 },
+    { drum: GM_DRUMS.TOM_FLOOR, beat: 2.5, velocity: 38, ghost: true },
+    { drum: GM_DRUMS.SNARE, beat: 3, velocity: 90 },
+    { drum: GM_DRUMS.TOM_HIGH, beat: 3.25, velocity: 32, ghost: true },
+    { drum: GM_DRUMS.KICK, beat: 3.5, velocity: 72 },
   ],
 ];
 
@@ -2031,11 +2080,12 @@ const SWING_STOCHASTIC: StochasticTable = {
     "2.5":  [{ drum: GM_DRUMS.KICK, probability: 0.08, velocity: 40 }],
     "2.67": [{ drum: GM_DRUMS.SNARE, probability: 0.15, velocity: 35, ghost: true }],
     "3":    [{ drum: GM_DRUMS.KICK, probability: 0.15, velocity: 45 }],
-    "3.5":  [{ drum: GM_DRUMS.KICK, probability: 0.10, velocity: 40 }],
+    "3.5":  [{ drum: GM_DRUMS.KICK, probability: 0.10, velocity: 40 },
+             { drum: GM_DRUMS.TOM_FLOOR, probability: 0.07, velocity: 42, ghost: true }],
     "3.67": [{ drum: GM_DRUMS.SNARE, probability: 0.20, velocity: 35, ghost: true }],
   },
   minHits: 1,
-  maxHits: 4,
+  maxHits: 5,
 };
 
 // Blakey: bomb drops, accent snare, driving kick, ghost cascades
@@ -2045,17 +2095,20 @@ const HARD_BOP_STOCHASTIC: StochasticTable = {
     "0.67": [{ drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 35, ghost: true }],
     "1":    [{ drum: GM_DRUMS.KICK, probability: 0.18, velocity: 68 },
              { drum: GM_DRUMS.SNARE, probability: 0.20, velocity: 88 }],
+    "1.5":  [{ drum: GM_DRUMS.TOM_MID, probability: 0.10, velocity: 58, ghost: true }],
     "1.67": [{ drum: GM_DRUMS.SNARE, probability: 0.15, velocity: 35, ghost: true }],
     "2":    [{ drum: GM_DRUMS.KICK, probability: 0.55, velocity: 75 }],
     "2.5":  [{ drum: GM_DRUMS.KICK, probability: 0.18, velocity: 60 },
              { drum: GM_DRUMS.SNARE, probability: 0.15, velocity: 85 }],
     "2.67": [{ drum: GM_DRUMS.SNARE, probability: 0.18, velocity: 38, ghost: true }],
     "3":    [{ drum: GM_DRUMS.KICK, probability: 0.25, velocity: 65 }],
-    "3.5":  [{ drum: GM_DRUMS.KICK, probability: 0.20, velocity: 62 }],
-    "3.67": [{ drum: GM_DRUMS.SNARE, probability: 0.25, velocity: 68 }],
+    "3.5":  [{ drum: GM_DRUMS.KICK, probability: 0.20, velocity: 62 },
+             { drum: GM_DRUMS.TOM_FLOOR, probability: 0.12, velocity: 65 }],
+    "3.67": [{ drum: GM_DRUMS.SNARE, probability: 0.25, velocity: 68 },
+             { drum: GM_DRUMS.TOM_MID, probability: 0.08, velocity: 55, ghost: true }],
   },
   minHits: 2,
-  maxHits: 6,
+  maxHits: 7,
 };
 
 const COOL_JAZZ_STOCHASTIC: StochasticTable = {
@@ -2064,11 +2117,12 @@ const COOL_JAZZ_STOCHASTIC: StochasticTable = {
     "1":    [{ drum: GM_DRUMS.SIDE_STICK, probability: 0.15, velocity: 45 }],
     "2":    [{ drum: GM_DRUMS.SIDE_STICK, probability: 0.25, velocity: 45 },
              { drum: GM_DRUMS.KICK, probability: 0.15, velocity: 45 }],
+    "2.5":  [{ drum: GM_DRUMS.TOM_FLOOR, probability: 0.06, velocity: 38, ghost: true }],
     "3":    [{ drum: GM_DRUMS.SIDE_STICK, probability: 0.18, velocity: 40 }],
     "3.67": [{ drum: GM_DRUMS.SIDE_STICK, probability: 0.10, velocity: 35 }],
   },
   minHits: 1,
-  maxHits: 3,
+  maxHits: 4,
 };
 
 const MODAL_STOCHASTIC: StochasticTable = {
@@ -2100,24 +2154,28 @@ const CONTEMPORARY_JAZZ_STOCHASTIC: StochasticTable = {
     "0":    [{ drum: GM_DRUMS.KICK, probability: 0.80, velocity: 68 }],
     "0.25": [{ drum: GM_DRUMS.SNARE, probability: 0.10, velocity: 28, ghost: true }],
     "0.5":  [{ drum: GM_DRUMS.KICK, probability: 0.15, velocity: 55 }],
-    "0.75": [{ drum: GM_DRUMS.CROSS_STICK, probability: 0.12, velocity: 45 }],
+    "0.75": [{ drum: GM_DRUMS.CROSS_STICK, probability: 0.12, velocity: 45 },
+             { drum: GM_DRUMS.TOM_HIGH, probability: 0.08, velocity: 45, ghost: true }],
     "1":    [{ drum: GM_DRUMS.SNARE, probability: 0.22, velocity: 82 },
              { drum: GM_DRUMS.CROSS_STICK, probability: 0.15, velocity: 50 }],
     "1.25": [{ drum: GM_DRUMS.SNARE, probability: 0.10, velocity: 28, ghost: true }],
-    "1.5":  [{ drum: GM_DRUMS.KICK, probability: 0.18, velocity: 55 }],
+    "1.5":  [{ drum: GM_DRUMS.KICK, probability: 0.18, velocity: 55 },
+             { drum: GM_DRUMS.TOM_MID, probability: 0.10, velocity: 50, ghost: true }],
     "2":    [{ drum: GM_DRUMS.KICK, probability: 0.40, velocity: 62 },
              { drum: GM_DRUMS.CROSS_STICK, probability: 0.15, velocity: 48 }],
     "2.5":  [{ drum: GM_DRUMS.SNARE, probability: 0.20, velocity: 85 },
              { drum: GM_DRUMS.KICK, probability: 0.15, velocity: 52 }],
-    "2.75": [{ drum: GM_DRUMS.SNARE, probability: 0.10, velocity: 28, ghost: true }],
+    "2.75": [{ drum: GM_DRUMS.SNARE, probability: 0.10, velocity: 28, ghost: true },
+             { drum: GM_DRUMS.TOM_HIGH, probability: 0.10, velocity: 48, ghost: true }],
     "3":    [{ drum: GM_DRUMS.KICK, probability: 0.20, velocity: 58 },
              { drum: GM_DRUMS.CROSS_STICK, probability: 0.15, velocity: 48 }],
+    "3.25": [{ drum: GM_DRUMS.TOM_MID, probability: 0.08, velocity: 42, ghost: true }],
     "3.5":  [{ drum: GM_DRUMS.KICK, probability: 0.15, velocity: 50 },
              { drum: GM_DRUMS.SNARE, probability: 0.18, velocity: 80 }],
     "3.75": [{ drum: GM_DRUMS.SNARE, probability: 0.10, velocity: 25, ghost: true }],
   },
   minHits: 2,
-  maxHits: 6,
+  maxHits: 7,
 };
 
 // ECM: very sparse, Jon Christensen-inspired — kick feathered, occasional cross-stick
@@ -2137,24 +2195,28 @@ const METHENY_STOCHASTIC: StochasticTable = {
   slots: {
     "0":    [{ drum: GM_DRUMS.KICK, probability: 0.70, velocity: 78 }],
     "0.25": [{ drum: GM_DRUMS.SNARE, probability: 0.10, velocity: 28, ghost: true }],
-    "0.5":  [{ drum: GM_DRUMS.KICK, probability: 0.18, velocity: 65 }],
+    "0.5":  [{ drum: GM_DRUMS.KICK, probability: 0.18, velocity: 65 },
+             { drum: GM_DRUMS.TOM_HIGH, probability: 0.10, velocity: 52, ghost: true }],
     "0.75": [{ drum: GM_DRUMS.SNARE, probability: 0.10, velocity: 28, ghost: true }],
     "1":    [{ drum: GM_DRUMS.SNARE, probability: 0.22, velocity: 85 },
              { drum: GM_DRUMS.CROSS_STICK, probability: 0.15, velocity: 55 }],
     "1.5":  [{ drum: GM_DRUMS.KICK, probability: 0.20, velocity: 62 },
-             { drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 30, ghost: true }],
+             { drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 30, ghost: true },
+             { drum: GM_DRUMS.TOM_MID, probability: 0.08, velocity: 48, ghost: true }],
     "2":    [{ drum: GM_DRUMS.KICK, probability: 0.30, velocity: 70 },
              { drum: GM_DRUMS.CROSS_STICK, probability: 0.12, velocity: 52 }],
     "2.5":  [{ drum: GM_DRUMS.SNARE, probability: 0.20, velocity: 88 }],
-    "2.75": [{ drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 30, ghost: true }],
+    "2.75": [{ drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 30, ghost: true },
+             { drum: GM_DRUMS.TOM_HIGH, probability: 0.10, velocity: 55 }],
     "3":    [{ drum: GM_DRUMS.KICK, probability: 0.15, velocity: 60 },
              { drum: GM_DRUMS.CROSS_STICK, probability: 0.12, velocity: 52 }],
+    "3.25": [{ drum: GM_DRUMS.TOM_MID, probability: 0.08, velocity: 45, ghost: true }],
     "3.5":  [{ drum: GM_DRUMS.KICK, probability: 0.15, velocity: 58 },
              { drum: GM_DRUMS.SNARE, probability: 0.18, velocity: 85 }],
     "3.75": [{ drum: GM_DRUMS.SNARE, probability: 0.10, velocity: 25, ghost: true }],
   },
   minHits: 2,
-  maxHits: 5,
+  maxHits: 6,
 };
 
 // Holdsworth: Chad Wackerman — displaced kicks, ghost-to-accent dynamics,
@@ -2163,31 +2225,37 @@ const METHENY_STOCHASTIC: StochasticTable = {
 const HOLDSWORTH_STOCHASTIC: StochasticTable = {
   slots: {
     "0":    [{ drum: GM_DRUMS.KICK, probability: 0.75, velocity: 85 }],
-    "0.25": [{ drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 28, ghost: true }],
+    "0.25": [{ drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 28, ghost: true },
+             { drum: GM_DRUMS.TOM_HIGH, probability: 0.08, velocity: 38, ghost: true }],
     "0.5":  [{ drum: GM_DRUMS.KICK, probability: 0.22, velocity: 70 },
              { drum: GM_DRUMS.HI_HAT_OPEN, probability: 0.15, velocity: 48 }],
     "0.75": [{ drum: GM_DRUMS.SNARE, probability: 0.14, velocity: 30, ghost: true }],
     "1":    [{ drum: GM_DRUMS.SNARE, probability: 0.28, velocity: 90 },
              { drum: GM_DRUMS.CROSS_STICK, probability: 0.18, velocity: 58 }],
-    "1.25": [{ drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 28, ghost: true }],
+    "1.25": [{ drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 28, ghost: true },
+             { drum: GM_DRUMS.TOM_MID, probability: 0.10, velocity: 42, ghost: true }],
     "1.5":  [{ drum: GM_DRUMS.KICK, probability: 0.25, velocity: 70 },
              { drum: GM_DRUMS.SNARE, probability: 0.28, velocity: 92 }],
-    "1.75": [{ drum: GM_DRUMS.SNARE, probability: 0.14, velocity: 30, ghost: true }],
+    "1.75": [{ drum: GM_DRUMS.SNARE, probability: 0.14, velocity: 30, ghost: true },
+             { drum: GM_DRUMS.TOM_FLOOR, probability: 0.08, velocity: 45, ghost: true }],
     "2":    [{ drum: GM_DRUMS.KICK, probability: 0.40, velocity: 78 },
              { drum: GM_DRUMS.CROSS_STICK, probability: 0.18, velocity: 55 }],
     "2.25": [{ drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 28, ghost: true }],
     "2.5":  [{ drum: GM_DRUMS.SNARE, probability: 0.25, velocity: 88 },
              { drum: GM_DRUMS.HI_HAT_OPEN, probability: 0.15, velocity: 45 }],
-    "2.75": [{ drum: GM_DRUMS.SNARE, probability: 0.14, velocity: 30, ghost: true }],
+    "2.75": [{ drum: GM_DRUMS.SNARE, probability: 0.14, velocity: 30, ghost: true },
+             { drum: GM_DRUMS.TOM_HIGH, probability: 0.10, velocity: 50 }],
     "3":    [{ drum: GM_DRUMS.KICK, probability: 0.30, velocity: 70 },
              { drum: GM_DRUMS.CROSS_STICK, probability: 0.18, velocity: 55 }],
-    "3.25": [{ drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 28, ghost: true }],
+    "3.25": [{ drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 28, ghost: true },
+             { drum: GM_DRUMS.TOM_MID, probability: 0.08, velocity: 40, ghost: true }],
     "3.5":  [{ drum: GM_DRUMS.KICK, probability: 0.20, velocity: 65 },
              { drum: GM_DRUMS.SNARE, probability: 0.25, velocity: 88 }],
-    "3.75": [{ drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 25, ghost: true }],
+    "3.75": [{ drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 25, ghost: true },
+             { drum: GM_DRUMS.TOM_FLOOR, probability: 0.10, velocity: 48 }],
   },
   minHits: 2,
-  maxHits: 7,
+  maxHits: 8,
 };
 
 // Holdsworth 11/8 stochastic: Wackerman in odd meter — accents follow 3+3+3+2 grouping,
@@ -2197,25 +2265,29 @@ const HOLDSWORTH_11_8_STOCHASTIC: StochasticTable = {
     "0":    [{ drum: GM_DRUMS.KICK, probability: 0.75, velocity: 85 }],
     "0.25": [{ drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 28, ghost: true }],
     "0.5":  [{ drum: GM_DRUMS.SNARE, probability: 0.15, velocity: 30, ghost: true }],
-    "0.75": [{ drum: GM_DRUMS.CROSS_STICK, probability: 0.20, velocity: 58 }],
+    "0.75": [{ drum: GM_DRUMS.CROSS_STICK, probability: 0.20, velocity: 58 },
+             { drum: GM_DRUMS.TOM_HIGH, probability: 0.08, velocity: 45, ghost: true }],
     "1":    [{ drum: GM_DRUMS.SNARE, probability: 0.30, velocity: 90 },
              { drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 28, ghost: true }],
     "1.5":  [{ drum: GM_DRUMS.KICK, probability: 0.60, velocity: 80 }],   // group 2 start
-    "1.75": [{ drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 28, ghost: true }],
+    "1.75": [{ drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 28, ghost: true },
+             { drum: GM_DRUMS.TOM_MID, probability: 0.09, velocity: 48, ghost: true }],
     "2":    [{ drum: GM_DRUMS.SNARE, probability: 0.32, velocity: 92 },
              { drum: GM_DRUMS.HI_HAT_OPEN, probability: 0.15, velocity: 48 }],
     "2.5":  [{ drum: GM_DRUMS.SNARE, probability: 0.15, velocity: 32, ghost: true }],
     "3":    [{ drum: GM_DRUMS.KICK, probability: 0.55, velocity: 78 }],   // group 3 start
-    "3.25": [{ drum: GM_DRUMS.CROSS_STICK, probability: 0.20, velocity: 55 }],
+    "3.25": [{ drum: GM_DRUMS.CROSS_STICK, probability: 0.20, velocity: 55 },
+             { drum: GM_DRUMS.TOM_FLOOR, probability: 0.10, velocity: 55 }],
     "3.5":  [{ drum: GM_DRUMS.SNARE, probability: 0.28, velocity: 90 },
              { drum: GM_DRUMS.SNARE, probability: 0.12, velocity: 30, ghost: true }],
-    "4":    [{ drum: GM_DRUMS.SNARE, probability: 0.15, velocity: 30, ghost: true }],
+    "4":    [{ drum: GM_DRUMS.SNARE, probability: 0.15, velocity: 30, ghost: true },
+             { drum: GM_DRUMS.TOM_MID, probability: 0.08, velocity: 42, ghost: true }],
     "4.5":  [{ drum: GM_DRUMS.KICK, probability: 0.50, velocity: 75 }],   // group 4 start
     "5":    [{ drum: GM_DRUMS.SNARE, probability: 0.18, velocity: 32, ghost: true },
              { drum: GM_DRUMS.KICK, probability: 0.18, velocity: 62 }],
   },
   minHits: 2,
-  maxHits: 7,
+  maxHits: 8,
 };
 
 // Alfa Mist / Jas Kayser: broken-beat displacement, flam accents, Afrobeat-jazz hybrid.
@@ -2415,6 +2487,29 @@ export function applyMicroVariation(
       duration: 0.08,
       velocity: humanizeVelocity(55, false, humanize, rng),
     });
+  }
+
+  // Tom ghost on random offbeat (~8%) — adds melodic color between kick/snare
+  // Excluded from swing/coolJazz (too sparse), modal (minimal), jazzWaltz (3/4 too tight)
+  const TOM_MICRO_EXCLUDED = ["swing", "coolJazz", "modal", "jazzWaltz"];
+  if (rng() < 0.08 && !TOM_MICRO_EXCLUDED.includes(style) && beatsPerMeasure >= 4) {
+    const tomPitches = [GM_DRUMS.TOM_HIGH, GM_DRUMS.TOM_MID];
+    const tomPitch = tomPitches[Math.floor(rng() * tomPitches.length)];
+    const beat = Math.floor(rng() * Math.min(beatsPerMeasure, 4));
+    const offset = rng() < 0.5 ? 0.25 : 0.75; // 16th-note offbeat positions
+    const time = measureStart + (beat + offset) * beatDuration;
+    const hasTom = hits.some(h =>
+      (h.pitch === GM_DRUMS.TOM_HIGH || h.pitch === GM_DRUMS.TOM_MID ||
+       h.pitch === GM_DRUMS.TOM_LOW || h.pitch === GM_DRUMS.TOM_FLOOR) &&
+      Math.abs(h.time - time) < beatDuration * 0.2);
+    if (!hasTom) {
+      hits.push({
+        pitch: tomPitch,
+        time: humanizeTime(time, humanize, undefined, undefined, rng),
+        duration: 0.08,
+        velocity: humanizeVelocity(42, true, humanize, rng),
+      });
+    }
   }
 }
 

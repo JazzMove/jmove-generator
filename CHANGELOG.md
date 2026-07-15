@@ -4,6 +4,32 @@ All notable changes to `@jmove/generator` will be documented in this file.
 
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [1.2.5] - 2026-07-14
+
+### Added
+
+- **Tom integration in regular grooves** — toms now appear in comping, not just fills:
+  - **holdsworth**: melodic tom ghosts (HIGH, MID, FLOOR) on 16th positions (8-10%), floor tom as kick substitute at 3.75
+  - **holdsworth 11/8**: tom accents on 3+3+3+2 group boundaries (HIGH at 0.75, MID at 1.75/4, FLOOR at 3.25)
+  - **metheny**: linear tom touches between kick/snare (HIGH at 0.5, MID at 1.5/3.25, HIGH accent at 2.75)
+  - **hardBop**: floor tom bombs on beat 3.5 (12%), mid tom ghost at 1.5 and 3.67 (Blakey-inspired)
+  - **contemporaryJazz**: conversational tom ghosts on offbeats (HIGH at 0.75/2.75, MID at 1.5/3.25)
+  - **swing**: sparse floor tom ghost at 3.5 (7%) — tasteful color without overpowering
+  - **coolJazz**: brushy floor tom swell at 2.5 (6%) — minimal, ghost-only
+- **Fusion tom variations** — 2 new kick/snare patterns:
+  - V7: Weckl linear tom-kick phrase (rack toms replace snare ghosts, HIGH→MID→LOW cascade)
+  - V8: Chambers power groove (floor tom + kick unison on beats 0 and 2.5, tom cascade at 3.25-3.5)
+- **NeoSoul ghost tom touches** — 2 new variations:
+  - V6: muted tom replacing snare ghosts (Questlove feel, vel 30-35)
+  - V7: floor tom pocket as rhythmic anchor with kick unison (vel 38-40)
+- **Tom micro-variation** — 8% probability ghost tom (HIGH or MID) on random 16th offbeat, excluded from swing/coolJazz
+- **11 new tests** — tom presence per style, velocity range, pitch variety, fusion/neoSoul toms, micro-variation, excluded styles
+
+### Changed
+
+- **maxHits raised** for tom accommodation: holdsworth 7→8, holdsworth 11/8 7→8, metheny 5→6, hardBop 6→7, contemporaryJazz 6→7, swing 4→5, coolJazz 3→4
+- **AI drums default OFF** — pattern drums now default; Magenta neural drums available via checkbox
+
 ## [1.2.4] - 2026-07-14
 
 ### Added

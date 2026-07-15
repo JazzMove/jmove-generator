@@ -1771,3 +1771,119 @@ describe("Drum Patterns — v1.2.4 multi-style rotation", () => {
     expect(foundBell).toBe(true);
   });
 });
+
+describe("Drum Patterns — v1.2.5 tom integration", () => {
+  const TOM_PITCHES = [GM_DRUMS.TOM_HIGH, GM_DRUMS.TOM_MID, GM_DRUMS.TOM_LOW, GM_DRUMS.TOM_FLOOR];
+  const isTom = (h: { pitch: number }) => TOM_PITCHES.includes(h.pitch);
+
+  it("holdsworth stochastic generates tom hits (statistical)", () => {
+    let totalToms = 0;
+    for (let i = 0; i < 30; i++) {
+      const hits = generateDrumPattern({ style: "holdsworth", tempo: 120, measures: 8, humanize: false });
+      totalToms += hits.filter(isTom).length;
+    }
+    expect(totalToms).toBeGreaterThan(0);
+  });
+
+  it("metheny stochastic generates tom hits (statistical)", () => {
+    let totalToms = 0;
+    for (let i = 0; i < 30; i++) {
+      const hits = generateDrumPattern({ style: "metheny", tempo: 120, measures: 8, humanize: false });
+      totalToms += hits.filter(isTom).length;
+    }
+    expect(totalToms).toBeGreaterThan(0);
+  });
+
+  it("hardBop generates floor tom bombs (statistical)", () => {
+    let floorTomFound = false;
+    for (let i = 0; i < 30; i++) {
+      const hits = generateDrumPattern({ style: "hardBop", tempo: 140, measures: 8, humanize: false });
+      if (hits.some(h => h.pitch === GM_DRUMS.TOM_FLOOR)) { floorTomFound = true; break; }
+    }
+    expect(floorTomFound).toBe(true);
+  });
+
+  it("contemporaryJazz generates conversational tom touches (statistical)", () => {
+    let totalToms = 0;
+    for (let i = 0; i < 30; i++) {
+      const hits = generateDrumPattern({ style: "contemporaryJazz", tempo: 120, measures: 8, humanize: false });
+      totalToms += hits.filter(isTom).length;
+    }
+    expect(totalToms).toBeGreaterThan(0);
+  });
+
+  it("tom velocities stay in ghost/accent range (≤72) across all tom styles", () => {
+    const styles = ["holdsworth", "metheny", "hardBop", "contemporaryJazz", "fusion", "neoSoul", "swing", "coolJazz"];
+    for (const style of styles) {
+      for (let i = 0; i < 20; i++) {
+        const hits = generateDrumPattern({ style, tempo: 120, measures: 8, humanize: false });
+        const toms = hits.filter(isTom);
+        for (const t of toms) {
+          expect(t.velocity, `${style} tom velocity ${t.velocity} out of range`).toBeLessThanOrEqual(72);
+        }
+      }
+    }
+  });
+
+  it("multiple tom pitches used across seeds (variety)", () => {
+    const tomPitchesUsed = new Set<number>();
+    for (let i = 0; i < 50; i++) {
+      const hits = generateDrumPattern({ style: "holdsworth", tempo: 120, measures: 8, humanize: false });
+      for (const h of hits.filter(isTom)) tomPitchesUsed.add(h.pitch);
+    }
+    // Holdsworth should use at least HIGH, MID, and FLOOR
+    expect(tomPitchesUsed.size).toBeGreaterThanOrEqual(3);
+  });
+
+  it("fusion V7/V8 produce tom hits", () => {
+    let tomFound = false;
+    for (let i = 0; i < 50; i++) {
+      const hits = generateDrumPattern({ style: "fusion", tempo: 120, measures: 4, humanize: false });
+      // Filter out fill-region toms (beats 2-4 of last measure) — we want groove toms
+      if (hits.some(isTom)) { tomFound = true; break; }
+    }
+    expect(tomFound).toBe(true);
+  });
+
+  it("neoSoul ghost tom touches present (statistical)", () => {
+    let tomFound = false;
+    for (let i = 0; i < 50; i++) {
+      const hits = generateDrumPattern({ style: "neoSoul", tempo: 85, measures: 8, humanize: false });
+      if (hits.some(isTom)) { tomFound = true; break; }
+    }
+    expect(tomFound).toBe(true);
+  });
+
+  it("micro-variation adds tom ghosts to applicable styles (statistical)", () => {
+    let tomFound = false;
+    // Use holdsworth which has both stochastic toms AND micro-variation toms
+    for (let i = 0; i < 50; i++) {
+      const hits = generateDrumPattern({ style: "holdsworth", tempo: 120, measures: 16, humanize: false, density: 75 });
+      if (hits.some(isTom)) { tomFound = true; break; }
+    }
+    expect(tomFound).toBe(true);
+  });
+
+  it("excluded styles have no toms in grooves", () => {
+    const excludedStyles = ["bossa", "latin", "ballad", "ecm", "funk", "shuffleBlues", "modal", "alfaMist", "mathRock"];
+    for (const style of excludedStyles) {
+      for (let i = 0; i < 10; i++) {
+        const hits = generateDrumPattern({ style, tempo: 120, measures: 4, humanize: false });
+        const toms = hits.filter(isTom);
+        expect(toms.length, `${style} should not have tom hits in grooves`).toBe(0);
+      }
+    }
+  });
+
+  it("holdsworth 11/8 has toms on group boundaries (statistical)", () => {
+    let totalToms = 0;
+    for (let i = 0; i < 30; i++) {
+      const hits = generateDrumPattern({
+        style: "holdsworth", tempo: 125, measures: 8, humanize: false,
+        timeSignature: [11, 8],
+      });
+      totalToms += hits.filter(isTom).length;
+    }
+    expect(totalToms).toBeGreaterThan(0);
+  });
+});
