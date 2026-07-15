@@ -4,6 +4,26 @@ All notable changes to `@jmove/generator` will be documented in this file.
 
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [1.2.6] - 2026-07-15
+
+### Added
+
+- **Per-instrument complexity controls** — 3 general sliders + 13 granular sub-controls:
+  - **Drums** (5 controls): tomFrequency, fillIntensity, rideWash, ghostDensity, cymbalColor
+  - **Piano** (4 controls): voicingDensity, rhythmicActivity, registerRange, anticipation
+  - **Bass** (4 controls): chromaticApproach, registerWidth, syncopation, beatVariety
+- **Complexity mapping engine** (`complexityMapping.ts`) — piecewise linear interpolation maps general complexity (0-100) to per-control values via min/default/max curves; manual overrides take precedence
+- **Cymbal color variety** — SPLASH (GM 55) and CHINA (GM 52) added to `GM_DRUMS`; cymbalColor controls substitution probability on section boundaries
+- **`GENERATOR_VERSION` export** — runtime version string for metadata stamping
+- **45 granular tests** — 14 complexity mapping (defaults, extremes, overrides, monotonicity, clamping, integer output) + 7 drum behavioral (tomFrequency, fillIntensity, rideWash, ghostDensity, cymbalColor high/low, backward compat) + 6 piano behavioral (voicingDensity, rhythmicActivity, registerRange, anticipation, backward compat) + 6 bass behavioral (chromaticApproach, registerWidth, registerWidth extremes, syncopation, beatVariety, backward compat) + 5 ensemble threading (drum/piano/bass pass-through, all-three combined, streaming) + 7 edge cases (bounds at 0/100, partial/full overrides, GENERATOR_VERSION semver)
+
+### Changed
+
+- **Drum granular wiring** — `tomFrequency` scales stochastic tom probabilities and micro-variation; `fillIntensity` scales fill probabilities; `rideWash` biases ride variant selection and rotation; `ghostDensity` adjusts ghost threshold; `cymbalColor` triggers splash/china substitution
+- **Piano granular wiring** — `voicingDensity` controls shell vs full voicing threshold; `rhythmicActivity` overrides density for rhythm pattern selection; `registerRange` scales max register drift magnitude; `anticipation` controls harmonic anticipation probability
+- **Bass granular wiring** — `chromaticApproach` biases approach tone vocabulary weights; `registerWidth` narrows/widens playable MIDI range dynamically; `syncopation` scales 8th-note enclosure probability; `beatVariety` scales chord-tone variety on beat 2
+- **Ensemble threading** — all granular params threaded through batch and streaming ensemble paths to per-instrument generators
+
 ## [1.2.5] - 2026-07-14
 
 ### Added

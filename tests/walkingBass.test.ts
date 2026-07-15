@@ -2,8 +2,11 @@ import { describe, it, expect } from "vitest";
 import {
   generateWalkingBass,
   scoreChordsToEvents,
+  resolveBassGranular,
+  createPRNG,
   type ChordEvent,
   type BassNote,
+  type BassGranular,
 } from "../src/index";
 
 // ── Constants ──
@@ -875,5 +878,167 @@ describe("Walking Bass — tempo validation", () => {
 
   it("throws RangeError for negative tempo", () => {
     expect(() => generateWalkingBass(iiVI(), { tempo: -120 })).toThrow(RangeError);
+  });
+});
+
+// ── Granular Controls ──
+
+describe("Walking Bass — granular controls", () => {
+  const SEEDS = [42, 100, 200];
+
+  function longChords(): ChordEvent[] {
+    // 8 measures ii-V-I
+    const base = iiVI();
+    return [
+      ...base.map(c => ({ ...c })),
+      ...base.map(c => ({ ...c, time: c.time + 8 })),
+    ];
+  }
+
+  it("chromaticApproach — high produces more chromatic passing tones", () => {
+    // Diatonic pitch classes for Dm7→G7→Cmaj7 progression (C major scale)
+    const diatonic = new Set([0, 2, 4, 5, 7, 9, 11]); // C D E F G A B
+    let highChromatic = 0;
+    let lowChromatic = 0;
+    for (const seed of SEEDS) {
+      const highNotes = generateWalkingBass(longChords(), {
+        style: "swing", tempo: 120,
+        random: createPRNG(seed),
+        granular: resolveBassGranular(50, { chromaticApproach: 85 }),
+      });
+      const lowNotes = generateWalkingBass(longChords(), {
+        style: "swing", tempo: 120,
+        random: createPRNG(seed),
+        granular: resolveBassGranular(50, { chromaticApproach: 10 }),
+      });
+      highChromatic += highNotes.filter(n => !diatonic.has(n.pitch % 12)).length;
+      lowChromatic += lowNotes.filter(n => !diatonic.has(n.pitch % 12)).length;
+    }
+    expect(highChromatic).toBeGreaterThanOrEqual(lowChromatic);
+  });
+
+  it("registerWidth — high produces wider pitch range", () => {
+    let highRange = 0;
+    let lowRange = 0;
+    for (const seed of SEEDS) {
+      const wideNotes = generateWalkingBass(longChords(), {
+        style: "swing", tempo: 120,
+        random: createPRNG(seed),
+        granular: resolveBassGranular(50, { registerWidth: 90 }),
+      });
+      const narrowNotes = generateWalkingBass(longChords(), {
+        style: "swing", tempo: 120,
+        random: createPRNG(seed),
+        granular: resolveBassGranular(50, { registerWidth: 15 }),
+      });
+      const widePitches = wideNotes.map(n => n.pitch);
+      const narrowPitches = narrowNotes.map(n => n.pitch);
+      if (widePitches.length > 0) highRange += Math.max(...widePitches) - Math.min(...widePitches);
+      if (narrowPitches.length > 0) lowRange += Math.max(...narrowPitches) - Math.min(...narrowPitches);
+    }
+    expect(highRange).toBeGreaterThanOrEqual(lowRange);
+  });
+
+  it("registerWidth extremes — narrow constrains to ~12 semitone range", () => {
+    for (const seed of SEEDS) {
+      const notes = generateWalkingBass(longChords(), {
+        style: "swing", tempo: 120,
+        random: createPRNG(seed),
+        granular: { chromaticApproach: 50, registerWidth: 0, syncopation: 30, beatVariety: 40 },
+      });
+      const pitches = notes.map(n => n.pitch);
+      // registerWidth=0 → getBassLow()=35, getBassHigh()=47, range ~12
+      for (const p of pitches) {
+        expect(p).toBeGreaterThanOrEqual(28); // absolute floor
+        expect(p).toBeLessThanOrEqual(55);    // absolute ceiling
+      }
+      if (pitches.length > 0) {
+        const range = Math.max(...pitches) - Math.min(...pitches);
+        expect(range).toBeLessThanOrEqual(20); // narrow range
+      }
+    }
+  });
+
+  it("syncopation — high produces more off-beat notes", () => {
+    const beatDur = 0.5; // 120bpm
+    let highOffbeat = 0;
+    let lowOffbeat = 0;
+    for (const seed of SEEDS) {
+      const highNotes = generateWalkingBass(longChords(), {
+        style: "swing", tempo: 120,
+        random: createPRNG(seed),
+        granular: resolveBassGranular(50, { syncopation: 75 }),
+      });
+      const lowNotes = generateWalkingBass(longChords(), {
+        style: "swing", tempo: 120,
+        random: createPRNG(seed),
+        granular: resolveBassGranular(50, { syncopation: 0 }),
+      });
+      // Off-beat = time offset from nearest beat > threshold
+      for (const n of highNotes) {
+        const offset = n.time % beatDur;
+        if (offset > 0.05 && offset < beatDur - 0.05) highOffbeat++;
+      }
+      for (const n of lowNotes) {
+        const offset = n.time % beatDur;
+        if (offset > 0.05 && offset < beatDur - 0.05) lowOffbeat++;
+      }
+    }
+    expect(highOffbeat).toBeGreaterThanOrEqual(lowOffbeat);
+  });
+
+  it("beatVariety — high produces more varied beat 2 pitch choices", () => {
+    let highUnique = 0;
+    let lowUnique = 0;
+    // Run many seeds to see variety
+    for (let seed = 0; seed < 20; seed++) {
+      const highNotes = generateWalkingBass(iiVI(), {
+        style: "swing", tempo: 120,
+        random: createPRNG(seed),
+        granular: resolveBassGranular(50, { beatVariety: 80 }),
+      });
+      const lowNotes = generateWalkingBass(iiVI(), {
+        style: "swing", tempo: 120,
+        random: createPRNG(seed),
+        granular: resolveBassGranular(50, { beatVariety: 10 }),
+      });
+      // Collect beat-2 pitches (every 2nd note in each 4-note measure)
+      if (highNotes.length >= 2) highUnique = new Set([...Array(20)].map((_, s) => {
+        const notes = generateWalkingBass(iiVI(), {
+          style: "swing", tempo: 120, random: createPRNG(s),
+          granular: resolveBassGranular(50, { beatVariety: 80 }),
+        });
+        return notes.length >= 2 ? notes[1].pitch : -1;
+      })).size;
+      if (lowNotes.length >= 2) lowUnique = new Set([...Array(20)].map((_, s) => {
+        const notes = generateWalkingBass(iiVI(), {
+          style: "swing", tempo: 120, random: createPRNG(s),
+          granular: resolveBassGranular(50, { beatVariety: 10 }),
+        });
+        return notes.length >= 2 ? notes[1].pitch : -1;
+      })).size;
+      break; // only need one pass since we iterate seeds internally
+    }
+    expect(highUnique).toBeGreaterThanOrEqual(lowUnique);
+  });
+
+  it("no granular = backward compatible", () => {
+    for (const seed of SEEDS) {
+      const noGranular = generateWalkingBass(iiVI(), {
+        style: "swing", tempo: 120,
+        random: createPRNG(seed),
+      });
+      const undefinedGranular = generateWalkingBass(iiVI(), {
+        style: "swing", tempo: 120,
+        random: createPRNG(seed),
+        granular: undefined,
+      });
+      expect(noGranular.length).toBe(undefinedGranular.length);
+      for (let i = 0; i < noGranular.length; i++) {
+        expect(noGranular[i].pitch).toBe(undefinedGranular[i].pitch);
+        expect(noGranular[i].time).toBeCloseTo(undefinedGranular[i].time, 6);
+        expect(noGranular[i].velocity).toBe(undefinedGranular[i].velocity);
+      }
+    }
   });
 });

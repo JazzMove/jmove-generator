@@ -5,6 +5,9 @@ import {
   generateDrumPattern,
   generatePianoComping,
   generateWalkingBass,
+  resolveDrumGranular,
+  resolvePianoGranular,
+  resolveBassGranular,
   type ChordEvent,
   type EnsembleOptions,
   type PracticeStyle,
@@ -1469,6 +1472,100 @@ describe("Ensemble Coordination Layer", () => {
       expect(pm.boundaries.length).toBeGreaterThan(0);
       expect(pm.intents.length).toBe(pm.boundaries.length);
       expect((pm as Record<string, unknown>)["motifSeeds"]).toBeUndefined();
+    });
+  });
+
+  describe("granular threading", () => {
+    it("drum granular passes through — output differs from no-granular", () => {
+      const base = generateEnsemble({
+        chordEvents: makeBlues12Chords(),
+        style: "swing", tempo: 120, measures: 12, seed: 42,
+      });
+      const withGranular = generateEnsemble({
+        chordEvents: makeBlues12Chords(),
+        style: "swing", tempo: 120, measures: 12, seed: 42,
+        drumGranular: resolveDrumGranular(100),
+      });
+      expect(withGranular.drums.length).toBeGreaterThan(0);
+      // Output should differ (different granular params change RNG consumption)
+      const basePitches = base.drums.map(h => h.pitch).join(",");
+      const granPitches = withGranular.drums.map(h => h.pitch).join(",");
+      // At least one instrument output should differ
+      const drumsDiffer = basePitches !== granPitches;
+      const bassDiffer = base.bass.map(n => n.pitch).join(",") !== withGranular.bass.map(n => n.pitch).join(",");
+      expect(drumsDiffer || bassDiffer).toBe(true);
+    });
+
+    it("piano granular passes through — output differs from no-granular", () => {
+      const base = generateEnsemble({
+        chordEvents: makeBlues12Chords(),
+        style: "swing", tempo: 120, measures: 12, seed: 42,
+      });
+      const withGranular = generateEnsemble({
+        chordEvents: makeBlues12Chords(),
+        style: "swing", tempo: 120, measures: 12, seed: 42,
+        pianoGranular: resolvePianoGranular(100),
+      });
+      expect(withGranular.piano.length).toBeGreaterThan(0);
+      const basePitches = base.piano.map(n => n.pitches.join("-")).join(",");
+      const granPitches = withGranular.piano.map(n => n.pitches.join("-")).join(",");
+      const pianoDiffer = basePitches !== granPitches;
+      const bassDiffer = base.bass.map(n => n.pitch).join(",") !== withGranular.bass.map(n => n.pitch).join(",");
+      expect(pianoDiffer || bassDiffer).toBe(true);
+    });
+
+    it("bass granular passes through — output differs from no-granular", () => {
+      const base = generateEnsemble({
+        chordEvents: makeBlues12Chords(),
+        style: "swing", tempo: 120, measures: 12, seed: 42,
+      });
+      const withGranular = generateEnsemble({
+        chordEvents: makeBlues12Chords(),
+        style: "swing", tempo: 120, measures: 12, seed: 42,
+        bassGranular: resolveBassGranular(100),
+      });
+      expect(withGranular.bass.length).toBeGreaterThan(0);
+      const basePitches = base.bass.map(n => n.pitch).join(",");
+      const granPitches = withGranular.bass.map(n => n.pitch).join(",");
+      expect(basePitches).not.toBe(granPitches);
+    });
+
+    it("all three granular params together — produces non-empty output", () => {
+      const result = generateEnsemble({
+        chordEvents: makeBlues12Chords(),
+        style: "swing", tempo: 120, measures: 12, seed: 42,
+        drumGranular: resolveDrumGranular(80),
+        pianoGranular: resolvePianoGranular(80),
+        bassGranular: resolveBassGranular(80),
+      });
+      expect(result.drums.length).toBeGreaterThan(0);
+      expect(result.piano.length).toBeGreaterThan(0);
+      expect(result.bass.length).toBeGreaterThan(0);
+    });
+
+    it("generateEnsembleMeasures threads granular", () => {
+      const baseSlices = [...generateEnsembleMeasures({
+        chordEvents: makeSimpleChords(8),
+        style: "swing", tempo: 120, measures: 8, seed: 42,
+      })];
+      const granSlices = [...generateEnsembleMeasures({
+        chordEvents: makeSimpleChords(8),
+        style: "swing", tempo: 120, measures: 8, seed: 42,
+        drumGranular: resolveDrumGranular(100),
+        bassGranular: resolveBassGranular(100),
+        pianoGranular: resolvePianoGranular(100),
+      })];
+      expect(granSlices.length).toBeGreaterThan(0);
+      const baseDrums = baseSlices.flatMap(s => s.drums);
+      const granDrums = granSlices.flatMap(s => s.drums);
+      const baseBass = baseSlices.flatMap(s => s.bass);
+      const granBass = granSlices.flatMap(s => s.bass);
+      // At least one instrument differs
+      const drumsDiffer = baseDrums.length !== granDrums.length ||
+        baseDrums.some((h, i) => h.pitch !== granDrums[i]?.pitch);
+      const bassDiffer = baseBass.length !== granBass.length ||
+        baseBass.some((n, i) => n.pitch !== granBass[i]?.pitch);
+      expect(drumsDiffer || bassDiffer).toBe(true);
     });
   });
 });

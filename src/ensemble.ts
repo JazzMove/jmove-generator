@@ -474,6 +474,7 @@ export function generateEnsemble(options: EnsembleOptions): EnsembleResult {
     measureInfo,
     random: drumRng,
     bandContext: context,
+    granular: options.drumGranular,
   });
 
   // Extract drum context for bass coordination
@@ -491,6 +492,7 @@ export function generateEnsemble(options: EnsembleOptions): EnsembleResult {
     kickTimes: context.kickTimes,
     random: bassRng,
     bandContext: context,
+    granular: options.bassGranular,
   });
 
   // Built-in alignment: snap bass to nearest kick
@@ -515,6 +517,7 @@ export function generateEnsemble(options: EnsembleOptions): EnsembleResult {
     measureInfo,
     random: pianoRng,
     bandContext: context,
+    granular: options.pianoGranular,
   });
 
   // Built-in alignment: snap piano to nearest bass note
@@ -627,6 +630,7 @@ export function* generateEnsembleMeasures(options: EnsembleOptions): Generator<M
       bandContext: context,
       fillHint,
       drumState,
+      granular: options.drumGranular,
     });
 
     // Extract drum context from this measure
@@ -653,6 +657,7 @@ export function* generateEnsembleMeasures(options: EnsembleOptions): Generator<M
           kickTimes: measureKicks,
           random: bassRng,
           bandContext: context,
+          granular: options.bassGranular,
         })
       : [];
 
@@ -682,6 +687,7 @@ export function* generateEnsembleMeasures(options: EnsembleOptions): Generator<M
           measureInfo,
           random: pianoRng,
           bandContext: context,
+          granular: options.pianoGranular,
         })
       : [];
 

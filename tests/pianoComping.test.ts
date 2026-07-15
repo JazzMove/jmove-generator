@@ -1,8 +1,11 @@
 import { describe, it, expect } from "vitest";
 import {
   generatePianoComping,
+  resolvePianoGranular,
+  createPRNG,
   type ChordEvent,
   type CompNote,
+  type PianoGranular,
 } from "../src/index";
 
 // ── Constants ──
@@ -940,4 +943,132 @@ describe("Piano Comping — odd meters", () => {
       }
     });
   }
+});
+
+// ── Granular Controls ──
+
+describe("Piano Comping — granular controls", () => {
+  const SEEDS = [42, 100, 200];
+
+  function longChords(): ChordEvent[] {
+    // 8 measures of ii-V-I repeated
+    return [
+      ...iiVI().map(c => ({ ...c })),
+      ...iiVI().map(c => ({ ...c, time: c.time + 8 })),
+    ];
+  }
+
+  it("voicingDensity — low produces fewer notes per chord (shell voicings)", () => {
+    let lowAvg = 0;
+    let highAvg = 0;
+    for (const seed of SEEDS) {
+      const lowNotes = generatePianoComping(iiVI(), {
+        style: "swing", humanize: false, strum: false,
+        random: createPRNG(seed),
+        granular: resolvePianoGranular(50, { voicingDensity: 10 }),
+      });
+      const highNotes = generatePianoComping(iiVI(), {
+        style: "swing", humanize: false, strum: false,
+        random: createPRNG(seed),
+        granular: resolvePianoGranular(50, { voicingDensity: 90 }),
+      });
+      const lowPitchCount = lowNotes.reduce((s, n) => s + n.pitches.length, 0);
+      const highPitchCount = highNotes.reduce((s, n) => s + n.pitches.length, 0);
+      lowAvg += lowNotes.length > 0 ? lowPitchCount / lowNotes.length : 0;
+      highAvg += highNotes.length > 0 ? highPitchCount / highNotes.length : 0;
+    }
+    expect(highAvg).toBeGreaterThanOrEqual(lowAvg);
+  });
+
+  it("rhythmicActivity — high produces more notes per measure", () => {
+    let highTotal = 0;
+    let lowTotal = 0;
+    for (const seed of SEEDS) {
+      const highNotes = generatePianoComping(longChords(), {
+        style: "swing", humanize: false, strum: false,
+        random: createPRNG(seed),
+        granular: resolvePianoGranular(50, { rhythmicActivity: 90 }),
+      });
+      const lowNotes = generatePianoComping(longChords(), {
+        style: "swing", humanize: false, strum: false,
+        random: createPRNG(seed),
+        granular: resolvePianoGranular(50, { rhythmicActivity: 10 }),
+      });
+      highTotal += highNotes.length;
+      lowTotal += lowNotes.length;
+    }
+    expect(highTotal).toBeGreaterThanOrEqual(lowTotal);
+  });
+
+  it("registerRange — high produces wider pitch spread", () => {
+    let highSpread = 0;
+    let lowSpread = 0;
+    for (const seed of SEEDS) {
+      const highNotes = generatePianoComping(iiVI(), {
+        style: "swing", humanize: false, strum: false,
+        random: createPRNG(seed),
+        granular: resolvePianoGranular(50, { registerRange: 90 }),
+      });
+      const lowNotes = generatePianoComping(iiVI(), {
+        style: "swing", humanize: false, strum: false,
+        random: createPRNG(seed),
+        granular: resolvePianoGranular(50, { registerRange: 15 }),
+      });
+      const allHighPitches = highNotes.flatMap(n => n.pitches);
+      const allLowPitches = lowNotes.flatMap(n => n.pitches);
+      if (allHighPitches.length > 0) highSpread += Math.max(...allHighPitches) - Math.min(...allHighPitches);
+      if (allLowPitches.length > 0) lowSpread += Math.max(...allLowPitches) - Math.min(...allLowPitches);
+    }
+    expect(highSpread).toBeGreaterThanOrEqual(lowSpread);
+  });
+
+  it("anticipation — high produces more pre-change notes", () => {
+    const chords: ChordEvent[] = [
+      makeChord("D", "m7", 0, 2),
+      makeChord("G", "7", 2, 2),
+      makeChord("C", "maj7", 4, 2),
+      makeChord("A", "m7", 6, 2),
+    ];
+    const changeTimes = [2, 4, 6];
+
+    let highAntic = 0;
+    let lowAntic = 0;
+    for (const seed of SEEDS) {
+      const highNotes = generatePianoComping(chords, {
+        style: "swing", humanize: false, strum: false,
+        random: createPRNG(seed),
+        granular: resolvePianoGranular(50, { anticipation: 75 }),
+      });
+      const lowNotes = generatePianoComping(chords, {
+        style: "swing", humanize: false, strum: false,
+        random: createPRNG(seed),
+        granular: resolvePianoGranular(50, { anticipation: 5 }),
+      });
+      for (const ct of changeTimes) {
+        highAntic += highNotes.filter(n => n.time >= ct - 0.3 && n.time < ct).length;
+        lowAntic += lowNotes.filter(n => n.time >= ct - 0.3 && n.time < ct).length;
+      }
+    }
+    expect(highAntic).toBeGreaterThanOrEqual(lowAntic);
+  });
+
+  it("no granular = backward compatible", () => {
+    for (const seed of SEEDS) {
+      const noGranular = generatePianoComping(iiVI(), {
+        style: "swing", humanize: false, strum: false,
+        random: createPRNG(seed),
+      });
+      const undefinedGranular = generatePianoComping(iiVI(), {
+        style: "swing", humanize: false, strum: false,
+        random: createPRNG(seed),
+        granular: undefined,
+      });
+      expect(noGranular.length).toBe(undefinedGranular.length);
+      for (let i = 0; i < noGranular.length; i++) {
+        expect(noGranular[i].pitches).toEqual(undefinedGranular[i].pitches);
+        expect(noGranular[i].time).toBeCloseTo(undefinedGranular[i].time, 6);
+        expect(noGranular[i].velocity).toBe(undefinedGranular[i].velocity);
+      }
+    }
+  });
 });

@@ -25,6 +25,7 @@ Deep technical articles about how JMove and the generator work:
 
 ## Features
 
+- **Per-Instrument Complexity** — 3 general sliders (drumComplexity, pianoComplexity, bassComplexity) drive 13 granular sub-controls via piecewise linear mapping. Drums: tomFrequency, fillIntensity, rideWash, ghostDensity, cymbalColor. Piano: voicingDensity, rhythmicActivity, registerRange, anticipation. Bass: chromaticApproach, registerWidth, syncopation, beatVariety. Manual overrides take precedence over derived values
 - **Musicality Engine** — phrase-level intelligence: dynamic drops, air gaps, harmonic anticipation, passing chords, conversation dynamics, motif memory. Four parameters (creativity, conversation, airGaps, harmonicFreedom) control how musical and surprising the output sounds
 - **Ensemble Coordination** — `generateEnsemble()` produces drums, bass, and piano as a coordinated band. Kick patterns shape bass timing, bass register guides piano voicings, drum density modulates comping activity
 - **Seedable & Reproducible** — deterministic PRNG (xoshiro128**) with per-instrument streams. Save a seed, replay the exact same take
@@ -222,6 +223,12 @@ GM_DRUMS.HI_HAT_CLOSED // 42
 GM_DRUMS.HI_HAT_OPEN  // 46
 GM_DRUMS.RIDE          // 51
 GM_DRUMS.CRASH         // 49
+GM_DRUMS.SPLASH        // 55
+GM_DRUMS.CHINA         // 52
+GM_DRUMS.TOM_HIGH      // 50
+GM_DRUMS.TOM_MID       // 47
+GM_DRUMS.TOM_LOW       // 45
+GM_DRUMS.TOM_FLOOR     // 43
 // ... and more
 ```
 
@@ -248,6 +255,9 @@ interface EnsembleOptions {
   conversation?: number;           // 0-100: inter-instrument responsiveness
   airGaps?: number;                // 0-100: intentional silence
   harmonicFreedom?: number;        // 0-100: reharmonization intensity
+  drumGranular?: DrumGranular;     // per-control drum overrides
+  pianoGranular?: PianoGranular;   // per-control piano overrides
+  bassGranular?: BassGranular;     // per-control bass overrides
 }
 
 interface EnsembleResult {
@@ -279,6 +289,54 @@ import { createPRNG, generateDrumPattern } from '@jmove/generator';
 const rng = createPRNG(42);
 const drums = generateDrumPattern({ style: 'swing', measures: 4, random: rng });
 // Same seed → same drums every time
+```
+
+### Complexity Mapping
+
+#### `resolveDrumGranular(complexity?, overrides?): DrumGranular`
+#### `resolvePianoGranular(complexity?, overrides?): PianoGranular`
+#### `resolveBassGranular(complexity?, overrides?): BassGranular`
+
+Map a general complexity slider (0-100, default 50) to per-control values. Manual overrides take precedence.
+
+```typescript
+import { resolveDrumGranular } from '@jmove/generator';
+
+// Complexity 70 → busier drums, override tom frequency to max
+const drum = resolveDrumGranular(70, { tomFrequency: 85 });
+// drum.tomFrequency = 85 (overridden)
+// drum.fillIntensity = 66 (derived from complexity 70)
+// drum.rideWash = 66, drum.ghostDensity = 58, drum.cymbalColor = 48
+
+// Pass to generateEnsemble
+const result = generateEnsemble({
+  chordEvents, style: 'swing', tempo: 140, measures: 12,
+  drumGranular: drum,
+});
+```
+
+```typescript
+interface DrumGranular {
+  tomFrequency: number;      // 0-100: tom probability in comping + micro-variation
+  fillIntensity: number;     // 0-100: fill frequency and size
+  rideWash: number;          // 0-100: ride cymbal density (sparse → dense)
+  ghostDensity: number;      // 0-100: ghost note frequency
+  cymbalColor: number;       // 0-100: splash/china substitution on section boundaries
+}
+
+interface PianoGranular {
+  voicingDensity: number;    // 0-100: shell (2-note) → full (4-note) voicings
+  rhythmicActivity: number;  // 0-100: sparse → dense comping patterns
+  registerRange: number;     // 0-100: register drift magnitude (narrow → wide)
+  anticipation: number;      // 0-100: harmonic anticipation probability
+}
+
+interface BassGranular {
+  chromaticApproach: number; // 0-100: diatonic → chromatic approach tones
+  registerWidth: number;     // 0-100: narrow → full 2-octave range
+  syncopation: number;       // 0-100: 8th-note enclosure fill probability
+  beatVariety: number;       // 0-100: predictable → adventurous beat 2 choices
+}
 ```
 
 ### Style Presets
@@ -446,7 +504,7 @@ Presets are validated against [`preset-schema.json`](preset-schema.json) and smo
 # Install
 npm install
 
-# Run tests (1081 tests)
+# Run tests (1196 tests)
 npm test
 
 # Watch mode
@@ -475,6 +533,7 @@ src/
   walkingBass.ts        Walking bass line generation
   pianoComping.ts       Piano voicing + comping patterns
   drumPatterns.ts       Drum pattern generation (19 styles)
+  complexityMapping.ts  Per-instrument complexity → granular controls
   stylePresets.ts       Built-in style presets
   autoDetectPreset.ts   Score analysis + preset recommendation
   grooveTemplates.ts    Micro-timing templates (GrooVAE-based)

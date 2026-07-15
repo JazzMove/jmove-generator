@@ -13,7 +13,7 @@
 
 import { tempoSwingMultiplier, dynamicMultiplier, instrumentSwingFactor } from "./swingUtils";
 import { getGrooveTemplate, applyGroove } from "./grooveTemplates";
-import type { BassNote, WalkingBassOptions, ChordEvent, PhraseIntent } from "./types";
+import type { BassNote, BassGranular, WalkingBassOptions, ChordEvent, PhraseIntent } from "./types";
 
 export type { BassNote, WalkingBassOptions, ChordEvent };
 
@@ -21,11 +21,25 @@ export type { BassNote, WalkingBassOptions, ChordEvent };
 // Set at generateWalkingBass entry, used by all internal helpers.
 // Safe: JS is single-threaded and generation is synchronous.
 let _rng: () => number = Math.random;
+let _bassGranular: BassGranular | undefined;
 
 // ── Constants ──
 
-const BASS_LOW = 28;  // E1
-const BASS_HIGH = 55; // G3
+const BASS_LOW_DEFAULT = 28;  // E1
+const BASS_HIGH_DEFAULT = 55; // G3
+
+// registerWidth (0-100) narrows/widens playable range around midpoint (MIDI 41 = F2)
+// 0 → ±6 semitones (MIDI 35-47), 100 → full range (MIDI 28-55)
+function getBassLow(): number {
+  if (!_bassGranular) return BASS_LOW_DEFAULT;
+  const t = _bassGranular.registerWidth / 100;
+  return Math.round(BASS_LOW_DEFAULT + (1 - t) * 7); // 0→35, 100→28
+}
+function getBassHigh(): number {
+  if (!_bassGranular) return BASS_HIGH_DEFAULT;
+  const t = _bassGranular.registerWidth / 100;
+  return Math.round(BASS_HIGH_DEFAULT - (1 - t) * 8); // 0→47, 100→55
+}
 
 
 const ROOT_SEMITONES: Record<string, number> = {
@@ -132,8 +146,8 @@ function rootToMidi(root: string): number {
   if (semitones === undefined) return 48; // C3 fallback
   // Place in bass range — find closest to E2 (MIDI 40)
   let midi = 36 + semitones; // octave 2
-  if (midi < BASS_LOW) midi += 12;
-  if (midi > BASS_HIGH) midi -= 12;
+  if (midi < getBassLow()) midi += 12;
+  if (midi > getBassHigh()) midi -= 12;
   return midi;
 }
 
@@ -146,8 +160,8 @@ function getChordTones(root: string, quality: string): number[] {
   for (const interval of intervals) {
     let pitch = rootMidi + interval;
     // Keep in range
-    while (pitch > BASS_HIGH) pitch -= 12;
-    while (pitch < BASS_LOW) pitch += 12;
+    while (pitch > getBassHigh()) pitch -= 12;
+    while (pitch < getBassLow()) pitch += 12;
     tones.push(pitch);
   }
   return tones;
@@ -177,7 +191,7 @@ function getScaleTones(root: string, quality: string): number[] {
     const base = 12 * (octave + 1) + rootPC; // C2=36, so octave 1 → 24+rootPC
     for (const interval of scale) {
       const pitch = base + interval;
-      if (pitch >= BASS_LOW && pitch <= BASS_HIGH) {
+      if (pitch >= getBassLow() && pitch <= getBassHigh()) {
         tones.push(pitch);
       }
     }
@@ -198,20 +212,30 @@ const APPROACH_VOCAB: Record<string, ApproachWeights> = {
 
 /** Approach tone to target with per-style vocabulary. */
 function approachTone(target: number, fromAbove: boolean, scaleTones?: number[], style?: string): number {
-  const weights = APPROACH_VOCAB[style ?? ""] ?? { chromatic: 0.80, diatonic: 0.12, doubleChrm: 0.08 };
+  const base = APPROACH_VOCAB[style ?? ""] ?? { chromatic: 0.80, diatonic: 0.12, doubleChrm: 0.08 };
+  // chromaticApproach (0-100): bias toward chromatic (high) or diatonic (low)
+  // At 50 = neutral (use style defaults). Scale chromatic weight by chromaticApproach/50.
+  let weights = base;
+  if (_bassGranular) {
+    const bias = _bassGranular.chromaticApproach / 50; // 0-2 range, 1=neutral
+    const chrm = Math.min(0.95, base.chromatic * bias);
+    const remaining = 1 - chrm;
+    const diaRatio = base.diatonic / (base.diatonic + base.doubleChrm) || 0.5;
+    weights = { chromatic: chrm, diatonic: remaining * diaRatio, doubleChrm: remaining * (1 - diaRatio) };
+  }
   const roll = _rng();
 
   // Double chromatic: two half-steps from same direction (e.g., Eb-D approaching C from above)
   if (roll < weights.doubleChrm) {
     const step1 = fromAbove ? target + 2 : target - 2;
-    if (step1 >= BASS_LOW && step1 <= BASS_HIGH) return step1;
+    if (step1 >= getBassLow() && step1 <= getBassHigh()) return step1;
   }
 
   // Diatonic whole-step
   if (roll < weights.doubleChrm + weights.diatonic) {
     if (scaleTones && scaleTones.length > 0) {
       const diatonic = fromAbove ? target + 2 : target - 2;
-      if (scaleTones.includes(diatonic) && diatonic >= BASS_LOW && diatonic <= BASS_HIGH) {
+      if (scaleTones.includes(diatonic) && diatonic >= getBassLow() && diatonic <= getBassHigh()) {
         return diatonic;
       }
     }
@@ -219,7 +243,7 @@ function approachTone(target: number, fromAbove: boolean, scaleTones?: number[],
 
   // Chromatic half-step (default/most common)
   const approach = fromAbove ? target + 1 : target - 1;
-  if (approach >= BASS_LOW && approach <= BASS_HIGH) return approach;
+  if (approach >= getBassLow() && approach <= getBassHigh()) return approach;
   return fromAbove ? target - 1 : target + 1;
 }
 
@@ -255,8 +279,9 @@ function passingTone(from: number, to: number, scaleTones: number[], chordTones:
     const pool = safe.length > 0 ? safe : candidates;
     const mid = (from + to) / 2;
     pool.sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid));
-    // 35% chance pick from top 3 for variety (breaks repetition)
-    if (pool.length >= 2 && _rng() < 0.35) {
+    // beatVariety (0-100): scales probability of picking non-nearest tone (0→10%, 40→35%, 100→80%)
+    const varietyProb = _bassGranular ? 0.10 + (_bassGranular.beatVariety / 100) * 0.70 : 0.35;
+    if (pool.length >= 2 && _rng() < varietyProb) {
       return pool[Math.min(Math.floor(_rng() * 3), pool.length - 1)];
     }
     return pool[0];
@@ -268,8 +293,8 @@ function passingTone(from: number, to: number, scaleTones: number[], chordTones:
 
 /** Clamp pitch to bass range. */
 function clamp(pitch: number): number {
-  while (pitch > BASS_HIGH) pitch -= 12;
-  while (pitch < BASS_LOW) pitch += 12;
+  while (pitch > getBassHigh()) pitch -= 12;
+  while (pitch < getBassLow()) pitch += 12;
   return pitch;
 }
 
@@ -394,10 +419,10 @@ function generateSwingMeasure(
     // Two-bar phrasing: bias target octave to alternate contour direction
     if (prevDirection === "up" && target >= beat1 && _rng() < 0.6) {
       const lower = clamp(target - 12);
-      if (lower >= BASS_LOW) target = lower;
+      if (lower >= getBassLow()) target = lower;
     } else if (prevDirection === "down" && target <= beat1 && _rng() < 0.6) {
       const higher = clamp(target + 12);
-      if (higher <= BASS_HIGH) target = higher;
+      if (higher <= getBassHigh()) target = higher;
     }
 
     // Jazz idiom: chord's 3rd as approach when half-step below next root
@@ -433,8 +458,9 @@ function generateSwingMeasure(
     const ct2 = chordTones.filter(t => Math.abs(t - third1) <= 3 && t !== beat1);
     if (ct2.length > 0) {
       ct2.sort((a, b) => Math.abs(a - third1) - Math.abs(b - third1));
-      // 35% chance second-nearest for variety (breaks deterministic repetition)
-      beat2 = (ct2.length >= 2 && _rng() < 0.35) ? ct2[1] : ct2[0];
+      // beatVariety scales second-nearest pick probability
+      const bt2Prob = _bassGranular ? 0.10 + (_bassGranular.beatVariety / 100) * 0.70 : 0.35;
+      beat2 = (ct2.length >= 2 && _rng() < bt2Prob) ? ct2[1] : ct2[0];
     } else {
       // Fallback: scale degree, filter dissonant
       const deg1 = scaleDegreeToMidi(beat1, direction > 0 ? 1 : -1, scaleTones);
@@ -464,9 +490,10 @@ function generateSwingMeasure(
     }
   }
 
-  // Eighth-note enclosure on beat 4 (~15%, not on last chord)
-  const nearBoundary = pitches[3] <= BASS_LOW + 2 || pitches[3] >= BASS_HIGH - 2;
-  const doEnclosure = !isLastChord && !nearBoundary && _rng() < 0.15;
+  // Eighth-note enclosure on beat 4 — syncopation (0-100) scales probability: 0→0%, 30→15%, 100→40%
+  const enclosureProb = _bassGranular ? _bassGranular.syncopation / 100 * 0.40 : 0.15;
+  const nearBoundary = pitches[3] <= getBassLow() + 2 || pitches[3] >= getBassHigh() - 2;
+  const doEnclosure = !isLastChord && !nearBoundary && _rng() < enclosureProb;
 
   if (doEnclosure) {
     const target = pitches[3];
@@ -920,7 +947,7 @@ function closestOctave(root: number, ref: number): number {
   let best = root;
   for (let oct = -2; oct <= 2; oct++) {
     const candidate = root + oct * 12;
-    if (candidate >= BASS_LOW && candidate <= BASS_HIGH && Math.abs(candidate - ref) < Math.abs(best - ref)) {
+    if (candidate >= getBassLow() && candidate <= getBassHigh() && Math.abs(candidate - ref) < Math.abs(best - ref)) {
       best = candidate;
     }
   }
@@ -1669,11 +1696,13 @@ export function generateWalkingBass(
 ): BassNote[] {
   if (chords.length === 0) return [];
   const prevRng = _rng;
+  const prevGranular = _bassGranular;
   _rng = options.random ?? Math.random;
+  _bassGranular = options.granular;
 
   const style = options.style ?? "swing";
   const tempo = options.tempo ?? 120;
-  if (tempo <= 0) { _rng = prevRng; throw new RangeError(`tempo must be > 0, got ${tempo}`); }
+  if (tempo <= 0) { _rng = prevRng; _bassGranular = prevGranular; throw new RangeError(`tempo must be > 0, got ${tempo}`); }
   const humanize = options.humanize ?? false;
   const beatDuration = 60 / tempo;
 
@@ -1918,6 +1947,7 @@ export function generateWalkingBass(
   }
 
   _rng = prevRng;
+  _bassGranular = prevGranular;
   return notes;
 }
 

@@ -71,6 +71,11 @@ export type {
   EnsembleOptions,
   EnsembleResult,
   MeasureSlice,
+
+  // Per-instrument granular types
+  DrumGranular,
+  PianoGranular,
+  BassGranular,
 } from "./types";
 
 // ── Jam Generator ──
@@ -123,5 +128,11 @@ export { irealStyleToPracticeStyle } from "./styleMapping";
 // ── Ensemble ──
 export { generateEnsemble, generateEnsembleMeasures } from "./ensemble";
 
+// ── Complexity Mapping ──
+export { resolveDrumGranular, resolvePianoGranular, resolveBassGranular } from "./complexityMapping";
+
 // ── PRNG ──
 export { createPRNG, randomSeed, deriveStream, STREAM_DRUMS, STREAM_BASS, STREAM_PIANO } from "./prng";
+
+// ── Version ──
+export const GENERATOR_VERSION = "1.2.6";

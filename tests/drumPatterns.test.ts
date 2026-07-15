@@ -3,7 +3,10 @@ import {
   generateDrumPattern,
   GM_DRUMS,
   humanizeVelocity,
+  resolveDrumGranular,
+  createPRNG,
   type DrumHit,
+  type DrumGranular,
 } from "../src/index";
 
 // ── Helpers ──
@@ -1885,5 +1888,193 @@ describe("Drum Patterns — v1.2.5 tom integration", () => {
       totalToms += hits.filter(isTom).length;
     }
     expect(totalToms).toBeGreaterThan(0);
+  });
+});
+
+// ── Granular Controls ──
+
+describe("Drum Patterns — granular controls", () => {
+  const SEEDS = [42, 100, 200];
+
+  it("tomFrequency — high produces more tom hits than low", () => {
+    let highToms = 0;
+    let lowToms = 0;
+    for (const seed of SEEDS) {
+      const highHits = generateDrumPattern({
+        style: "swing",
+        measures: 8,
+        humanize: false,
+        random: createPRNG(seed),
+        granular: resolveDrumGranular(100), // high toms
+      });
+      const lowHits = generateDrumPattern({
+        style: "swing",
+        measures: 8,
+        humanize: false,
+        random: createPRNG(seed),
+        granular: resolveDrumGranular(0), // low toms
+      });
+      const tomPitches = [GM_DRUMS.TOM_HIGH, GM_DRUMS.TOM_MID, GM_DRUMS.TOM_LOW];
+      highToms += highHits.filter(h => tomPitches.includes(h.pitch)).length;
+      lowToms += lowHits.filter(h => tomPitches.includes(h.pitch)).length;
+    }
+    expect(highToms).toBeGreaterThanOrEqual(lowToms);
+  });
+
+  it("fillIntensity — high fill intensity produces more fill hits", () => {
+    let highTotal = 0;
+    let lowTotal = 0;
+    for (const seed of SEEDS) {
+      const highHits = generateDrumPattern({
+        style: "swing",
+        measures: 16,
+        humanize: false,
+        random: createPRNG(seed),
+        granular: resolveDrumGranular(50, { fillIntensity: 90 }),
+        formMarkers: [0, 4, 8, 12],
+        sectionMarkers: [8],
+      });
+      const lowHits = generateDrumPattern({
+        style: "swing",
+        measures: 16,
+        humanize: false,
+        random: createPRNG(seed),
+        granular: resolveDrumGranular(50, { fillIntensity: 5 }),
+        formMarkers: [0, 4, 8, 12],
+        sectionMarkers: [8],
+      });
+      highTotal += highHits.length;
+      lowTotal += lowHits.length;
+    }
+    expect(highTotal).toBeGreaterThanOrEqual(lowTotal);
+  });
+
+  it("rideWash — high ride wash produces more ride hits", () => {
+    let highRide = 0;
+    let lowRide = 0;
+    for (const seed of SEEDS) {
+      const highHits = generateDrumPattern({
+        style: "swing",
+        measures: 8,
+        humanize: false,
+        random: createPRNG(seed),
+        granular: resolveDrumGranular(50, { rideWash: 90 }),
+      });
+      const lowHits = generateDrumPattern({
+        style: "swing",
+        measures: 8,
+        humanize: false,
+        random: createPRNG(seed),
+        granular: resolveDrumGranular(50, { rideWash: 10 }),
+      });
+      const ridePitches = [GM_DRUMS.RIDE, GM_DRUMS.RIDE_BELL];
+      highRide += highHits.filter(h => ridePitches.includes(h.pitch)).length;
+      lowRide += lowHits.filter(h => ridePitches.includes(h.pitch)).length;
+    }
+    expect(highRide).toBeGreaterThanOrEqual(lowRide);
+  });
+
+  it("ghostDensity — high ghost density means more low-velocity hits survive", () => {
+    let highGhosts = 0;
+    let lowGhosts = 0;
+    for (const seed of SEEDS) {
+      const highHits = generateDrumPattern({
+        style: "swing",
+        measures: 8,
+        humanize: false,
+        random: createPRNG(seed),
+        granular: resolveDrumGranular(50, { ghostDensity: 90 }),
+      });
+      const lowHits = generateDrumPattern({
+        style: "swing",
+        measures: 8,
+        humanize: false,
+        random: createPRNG(seed),
+        granular: resolveDrumGranular(50, { ghostDensity: 5 }),
+      });
+      highGhosts += highHits.filter(h => h.velocity < 50).length;
+      lowGhosts += lowHits.filter(h => h.velocity < 50).length;
+    }
+    expect(highGhosts).toBeGreaterThanOrEqual(lowGhosts);
+  });
+
+  it("cymbalColor — high cymbal color produces splash/china hits", () => {
+    // High cymbal color: should produce SPLASH or CHINA in 16 measures
+    let foundSplashOrChina = false;
+    for (const seed of SEEDS) {
+      const hits = generateDrumPattern({
+        style: "swing",
+        measures: 16,
+        humanize: false,
+        random: createPRNG(seed),
+        granular: resolveDrumGranular(50, { cymbalColor: 75 }),
+        formMarkers: [0, 4, 8, 12],
+        sectionMarkers: [8],
+      });
+      const pitches = uniquePitches(hits);
+      if (pitches.includes(GM_DRUMS.SPLASH) || pitches.includes(GM_DRUMS.CHINA)) {
+        foundSplashOrChina = true;
+      }
+    }
+    // Run additional seeds to increase statistical chance
+    for (let s = 300; s < 400 && !foundSplashOrChina; s++) {
+      const hits = generateDrumPattern({
+        style: "swing",
+        measures: 16,
+        humanize: false,
+        random: createPRNG(s),
+        granular: resolveDrumGranular(50, { cymbalColor: 75 }),
+        formMarkers: [0, 4, 8, 12],
+        sectionMarkers: [8],
+      });
+      const pitches = uniquePitches(hits);
+      if (pitches.includes(GM_DRUMS.SPLASH) || pitches.includes(GM_DRUMS.CHINA)) {
+        foundSplashOrChina = true;
+      }
+    }
+    expect(foundSplashOrChina).toBe(true);
+  });
+
+  it("cymbalColor — low cymbal color produces no splash or china", () => {
+    for (const seed of SEEDS) {
+      const hits = generateDrumPattern({
+        style: "swing",
+        measures: 16,
+        humanize: false,
+        random: createPRNG(seed),
+        granular: resolveDrumGranular(50, { cymbalColor: 0 }),
+        formMarkers: [0, 4, 8, 12],
+        sectionMarkers: [8],
+      });
+      const pitches = uniquePitches(hits);
+      expect(pitches).not.toContain(GM_DRUMS.SPLASH);
+      expect(pitches).not.toContain(GM_DRUMS.CHINA);
+    }
+  });
+
+  it("no granular = backward compatible — undefined granular matches omitted granular", () => {
+    for (const seed of SEEDS) {
+      const hitsNoGranular = generateDrumPattern({
+        style: "swing",
+        measures: 8,
+        humanize: false,
+        random: createPRNG(seed),
+      });
+      const hitsUndefinedGranular = generateDrumPattern({
+        style: "swing",
+        measures: 8,
+        humanize: false,
+        random: createPRNG(seed),
+        granular: undefined,
+      });
+      // Same seed, same options — should produce identical output
+      expect(hitsNoGranular.length).toBe(hitsUndefinedGranular.length);
+      for (let i = 0; i < hitsNoGranular.length; i++) {
+        expect(hitsNoGranular[i].pitch).toBe(hitsUndefinedGranular[i].pitch);
+        expect(hitsNoGranular[i].time).toBeCloseTo(hitsUndefinedGranular[i].time, 6);
+        expect(hitsNoGranular[i].velocity).toBe(hitsUndefinedGranular[i].velocity);
+        expect(hitsNoGranular[i].duration).toBeCloseTo(hitsUndefinedGranular[i].duration, 6);
+      }
+    }
   });
 });

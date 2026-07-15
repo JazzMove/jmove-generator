@@ -20,6 +20,30 @@ export type BassStyle = PracticeStyle;
 export type PianoStyle = PracticeStyle;
 export type DrumStyle = PracticeStyle;
 
+// ── Per-Instrument Granular Controls ──
+
+export interface DrumGranular {
+  tomFrequency: number;      // 0-100: how often toms appear in grooves (0=none, 100=Elvin Jones)
+  fillIntensity: number;     // 0-100: fill frequency + complexity (0=no fills, 100=Buddy Rich)
+  rideWash: number;          // 0-100: ride looseness (0=tight quarters, 100=washy 16ths)
+  ghostDensity: number;      // 0-100: ghost note frequency (0=clean, 100=Wackerman cascades)
+  cymbalColor: number;       // 0-100: crash/splash/china variety on section hits
+}
+
+export interface PianoGranular {
+  voicingDensity: number;    // 0-100: shell(2-note) → compact(3) → full(4-note) voicings
+  rhythmicActivity: number;  // 0-100: sparse → dense hits per bar
+  registerRange: number;     // 0-100: narrow register → wide ±2 octaves
+  anticipation: number;      // 0-100: harmonic anticipation probability
+}
+
+export interface BassGranular {
+  chromaticApproach: number; // 0-100: diatonic-heavy → chromatic → double-chromatic
+  registerWidth: number;     // 0-100: narrow → full 2-octave range
+  syncopation: number;       // 0-100: straight quarters → frequent 8th/16th fills
+  beatVariety: number;       // 0-100: nearest chord tone → mixed chord tones on beat 2
+}
+
 export interface StyleParameters {
   swingAmount: number;  // 0-100: 0=straight 8ths, 50=light swing, 100=hard triplet
   density: number;      // 0-100: sparse vs busy
@@ -29,6 +53,13 @@ export interface StyleParameters {
   conversation?: number;     // 0-100: how much instruments listen and respond to each other
   airGaps?: number;          // 0-100: intentional silence frequency — breathing room
   harmonicFreedom?: number;  // 0-100: reharmonization, passing chords, anticipation
+  // ── Per-Instrument Complexity ──
+  drumComplexity?: number;   // 0-100: general drum complexity (drives granular defaults)
+  pianoComplexity?: number;  // 0-100: general piano complexity
+  bassComplexity?: number;   // 0-100: general bass complexity
+  drumGranular?: DrumGranular;
+  pianoGranular?: PianoGranular;
+  bassGranular?: BassGranular;
 }
 
 export interface InstrumentStyles {
@@ -143,6 +174,7 @@ export interface WalkingBassOptions {
   kickTimes?: number[];
   random?: () => number;
   bandContext?: BandContext;
+  granular?: BassGranular;
 }
 
 export interface ChordEvent {
@@ -172,6 +204,7 @@ export interface PianoCompingOptions {
   measureInfo?: { totalMeasures: number; measureDuration: number; sections?: SongSection[] };
   random?: () => number;
   bandContext?: BandContext;
+  granular?: PianoGranular;
 }
 
 // ── Drum Pattern Types ──
@@ -208,6 +241,7 @@ export interface DrumPatternOptions {
   fillHint?: "section" | "phrase" | "setup" | false;
   /** Streaming: persisted drum state for phrase continuity across 1-measure calls */
   drumState?: DrumState;
+  granular?: DrumGranular;
 }
 
 // ── Groove Template Types ──
@@ -316,6 +350,10 @@ export interface EnsembleOptions {
   conversation?: number;          // 0-100: inter-instrument responsiveness
   airGaps?: number;               // 0-100: intentional silence frequency
   harmonicFreedom?: number;       // 0-100: reharmonization, passing chords
+  // ── Per-Instrument Granular ──
+  drumGranular?: DrumGranular;
+  pianoGranular?: PianoGranular;
+  bassGranular?: BassGranular;
 }
 
 export interface EnsembleResult {

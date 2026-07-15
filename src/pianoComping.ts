@@ -1285,7 +1285,10 @@ export function generatePianoComping(
     : 1.0;
 
   const bandCtx = options.bandContext;
-  const useShell = density !== undefined && density < 35;
+  const pianoGranular = options.granular;
+  // voicingDensity: low → shell voicings (2-note), high → full voicings (4-note)
+  const voicingThreshold = pianoGranular ? pianoGranular.voicingDensity : 50;
+  const useShell = voicingThreshold < 35 || (density !== undefined && density < 35);
   const drumDensityRestBoost = bandCtx && bandCtx.drumDensity > 0.6
     ? 0.08 * bandCtx.drumDensity : 0;
   const baseRestChance = 0.15 * (1 - (density ?? 50) / 100) + drumDensityRestBoost;
@@ -1322,7 +1325,9 @@ export function generatePianoComping(
 
   // ── Harmonic Anticipation State ──
   // Probability of playing next chord voicing on beat 4-and, creating forward motion.
-  const anticipationProb = intent?.anticipationChance ?? harmonicFreedom * 0.35;
+  // anticipation granular (0-100) maps directly to probability; falls back to harmonicFreedom
+  const anticipationProb = intent?.anticipationChance
+    ?? (pianoGranular ? pianoGranular.anticipation / 100 : harmonicFreedom * 0.35);
   // Passing chord probability: insert chromatic approach chord between changes
   const passingChordProb = intent?.passingChordChance ?? harmonicFreedom * 0.25;
 
@@ -1398,11 +1403,14 @@ export function generatePianoComping(
 
     // ── Register Drift ──
     // Shift voicings up during builds/climaxes, down during releases/drops.
+    // registerRange (0-100) scales max drift: 0=no shift, 50=±12, 100=±24 semitones
+    const maxRegShift = pianoGranular ? Math.round(pianoGranular.registerRange / 100 * 24) : 24;
+    const regDriftProb = pianoGranular ? 0.1 + (pianoGranular.registerRange / 100) * 0.3 : 0.3;
     const arc = phraseIntent?.arc;
     if (arc === "build" || arc === "climax") {
-      if (registerShift < 24) registerShift += (_rng() < 0.3 ? 12 : 0);
+      if (registerShift < maxRegShift) registerShift += (_rng() < regDriftProb ? 12 : 0);
     } else if (arc === "release" || arc === "drop") {
-      if (registerShift > -24) registerShift -= (_rng() < 0.3 ? 12 : 0);
+      if (registerShift > -maxRegShift) registerShift -= (_rng() < regDriftProb ? 12 : 0);
     } else {
       // Sustain: drift back toward center
       if (registerShift > 0 && _rng() < 0.2) registerShift -= 12;
@@ -1419,7 +1427,9 @@ export function generatePianoComping(
       rhythm = evolveMotif(loopRhythm, loopBarsLeft, creativity, _rng);
       loopBarsLeft--;
     } else {
-      const picked = pickRhythm(style, density, recentRhythmIndices, inferredTimeSig);
+      // rhythmicActivity overrides density for rhythm pattern selection
+      const rhythmDensity = pianoGranular ? pianoGranular.rhythmicActivity : density;
+      const picked = pickRhythm(style, rhythmDensity, recentRhythmIndices, inferredTimeSig);
       rhythm = picked.rhythm;
       recentRhythmIndices.unshift(picked.index);
       if (recentRhythmIndices.length > 2) recentRhythmIndices.pop();

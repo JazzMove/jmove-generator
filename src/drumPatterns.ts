@@ -15,7 +15,7 @@
 
 import { tempoSwingMultiplier, dynamicMultiplier, instrumentSwingFactor } from "./swingUtils";
 import { getGrooveTemplate, applyGroove, drumPitchToElement } from "./grooveTemplates";
-import type { DrumHit, DrumPatternOptions, PhraseIntent } from "./types";
+import type { DrumHit, DrumGranular, DrumPatternOptions, PhraseIntent } from "./types";
 
 export type { DrumHit, DrumPatternOptions };
 
@@ -33,6 +33,8 @@ export const GM_DRUMS = {
   RIDE: 51,
   RIDE_BELL: 53,
   CRASH: 49,
+  SPLASH: 55,
+  CHINA: 52,
   TOM_HIGH: 50,
   TOM_MID: 47,
   TOM_LOW: 45,
@@ -2363,15 +2365,19 @@ function generateStochasticComping(
   density: number,
   tendency: CompingTendency,
   rng: () => number = Math.random,
+  tomScale: number = 1,
 ): PatternHit[] {
   const densityScale = 0.5 + (density / 100) * 1.0;
   const hits: PatternHit[] = [];
+  const TOM_PITCHES: Set<number> = new Set([GM_DRUMS.TOM_HIGH, GM_DRUMS.TOM_MID, GM_DRUMS.TOM_LOW, GM_DRUMS.TOM_FLOOR]);
 
   for (const [beatStr, slots] of Object.entries(table.slots)) {
     const beat = parseFloat(beatStr);
     for (const slot of slots) {
       const tendencyBoost = tendency.favored.includes(beatStr) ? 2.0 : 1.0;
-      const adjustedProb = Math.min(1.0, slot.probability * densityScale * tendencyBoost);
+      const isTom = TOM_PITCHES.has(slot.drum);
+      const tomMult = isTom ? tomScale : 1;
+      const adjustedProb = Math.min(1.0, slot.probability * densityScale * tendencyBoost * tomMult);
       if (rng() < adjustedProb) {
         hits.push({ drum: slot.drum, beat, velocity: slot.velocity, ghost: slot.ghost });
       }
@@ -2443,6 +2449,7 @@ export function applyMicroVariation(
   density: number,
   humanize: boolean,
   random?: () => number,
+  granular?: DrumGranular,
 ): void {
   const rng = random ?? Math.random;
   if (!MICRO_VARIATION_STYLES.has(style)) return;
@@ -2489,10 +2496,11 @@ export function applyMicroVariation(
     });
   }
 
-  // Tom ghost on random offbeat (~8%) — adds melodic color between kick/snare
+  // Tom ghost on random offbeat (~8% base, scaled by tomFrequency) — adds melodic color between kick/snare
   // Excluded from swing/coolJazz (too sparse), modal (minimal), jazzWaltz (3/4 too tight)
   const TOM_MICRO_EXCLUDED = ["swing", "coolJazz", "modal", "jazzWaltz"];
-  if (rng() < 0.08 && !TOM_MICRO_EXCLUDED.includes(style) && beatsPerMeasure >= 4) {
+  const tomMicroProb = 0.08 * (granular ? granular.tomFrequency / 40 : 1);
+  if (rng() < tomMicroProb && !TOM_MICRO_EXCLUDED.includes(style) && beatsPerMeasure >= 4) {
     const tomPitches = [GM_DRUMS.TOM_HIGH, GM_DRUMS.TOM_MID];
     const tomPitch = tomPitches[Math.floor(rng() * tomPitches.length)];
     const beat = Math.floor(rng() * Math.min(beatsPerMeasure, 4));
@@ -2844,7 +2852,9 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
   // Ride + hihat rotation: when rideVariants present, swap timbre every 4-8 bars
   const rideVariants = patternSet.rideVariants;
   const hhVariants = patternSet.hihatVariants;
-  let rideIdx = rideVariants ? Math.floor(rng() * rideVariants.length) : -1;
+  // rideWash biases variant selection: low wash → sparse (idx 0), high → dense (higher idx)
+  const rideWashBias = options.granular ? options.granular.rideWash / 50 : 1; // 0-2 range, 1=neutral
+  let rideIdx = rideVariants ? Math.min(rideVariants.length - 1, Math.floor(rng() * rideVariants.length * rideWashBias)) : -1;
   let hhIdx = hhVariants ? Math.floor(rng() * hhVariants.length) : -1;
   let barsOnRide = 0;
   let rideHoldBars = rideVariants ? (4 + Math.floor(rng() * 5)) : Infinity;
@@ -2877,7 +2887,9 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
     if (rideVariants && barsOnRide >= rideHoldBars) {
       const rideCandidates = Array.from({ length: rideVariants.length }, (_, i) => i)
         .filter((i) => i !== rideIdx);
-      rideIdx = rideCandidates[Math.floor(rng() * rideCandidates.length)];
+      // rideWash biases rotation: high wash → prefer higher (denser) indices
+      const rideRotIdx = Math.min(rideCandidates.length - 1, Math.floor(rng() * rideCandidates.length * rideWashBias));
+      rideIdx = rideCandidates[rideRotIdx];
       // Also rotate hihat — filter current to guarantee change
       if (hhVariants && hhVariants.length > 1) {
         const hhCandidates = Array.from({ length: hhVariants.length }, (_, i) => i)
@@ -2961,8 +2973,14 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
         // BandContext: crash velocity scales with energy (soft intros, big climaxes)
         const crashBaseVel = isSectionStart ? 85 : 70;
         const crashVel = Math.round(crashBaseVel * (0.6 + energy * 0.4));
+        // cymbalColor: probability to substitute crash with splash or china for timbral variety
+        const cymColor = options.granular ? options.granular.cymbalColor : 0;
+        let cymbalPitch: number = GM_DRUMS.CRASH;
+        if (cymColor > 0 && rng() < cymColor / 100) {
+          cymbalPitch = rng() < 0.6 ? GM_DRUMS.SPLASH : GM_DRUMS.CHINA;
+        }
         hits.push({
-          pitch: GM_DRUMS.CRASH,
+          pitch: cymbalPitch,
           time: humanizeTime(measureStart, humanize, style, GM_DRUMS.CRASH, rng),
           duration: isSectionStart ? 0.15 : 0.08,
           velocity: humanizeVelocity(crashVel, false, humanize, rng),
@@ -2986,8 +3004,9 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
 
       // Style-specific fill frequency: Wackerman fills frequently and dramatically,
       // Alfa Mist is sparse and broken-beat, others are standard jazz.
-      const sectionProb = (style === "alfaMist" ? 0.35 : style === "holdsworth" ? 0.75 : style === "metheny" ? 0.70 : 0.6) * energyFillMult;
-      const phraseProb = (style === "alfaMist" ? 0.20 : style === "holdsworth" ? 0.55 : style === "metheny" ? 0.50 : 0.4) * energyFillMult;
+      const fillScale = options.granular ? options.granular.fillIntensity / 50 : 1;
+      const sectionProb = (style === "alfaMist" ? 0.35 : style === "holdsworth" ? 0.75 : style === "metheny" ? 0.70 : 0.6) * energyFillMult * fillScale;
+      const phraseProb = (style === "alfaMist" ? 0.20 : style === "holdsworth" ? 0.55 : style === "metheny" ? 0.50 : 0.4) * energyFillMult * fillScale;
 
       if (isBeforeSectionMarker && rng() < sectionProb) {
         // Big fill before major section boundary
@@ -3008,9 +3027,10 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
     }
 
     // Comping: stochastic per-beat generation for jazz styles, fixed arrays for others
+    const tomScale = options.granular ? options.granular.tomFrequency / 40 : 1;
     let compHits: PatternHit[];
     if (isStochastic && stochasticTable && tendency) {
-      compHits = generateStochasticComping(stochasticTable, density, tendency, rng);
+      compHits = generateStochasticComping(stochasticTable, density, tendency, rng, tomScale);
     } else {
       compHits = patternSet.variations[variationIdx];
     }
@@ -3022,7 +3042,9 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
     // BandContext: energy-aware ghost note threshold — low energy strips ghosts earlier
     // Arc adjustment: build/climax keep more ghosts (busier), release/drop strip them (sparser)
     // Cap at 40 to always preserve some ghost notes (was uncapped to 55, stripping all ghosts in drops)
-    const ghostThreshold = bandCtx ? Math.min(40, Math.round(15 + (1 - energy) * 20 + arcGhostAdjust)) : 15;
+    // ghostDensity slider: high = more ghosts survive (lower threshold), low = cleaner sound
+    const ghostShift = options.granular ? (options.granular.ghostDensity - 40) * -0.4 : 0;
+    const ghostThreshold = bandCtx ? Math.min(40, Math.round(15 + (1 - energy) * 20 + arcGhostAdjust + ghostShift)) : Math.round(15 + ghostShift);
 
     for (const hit of pattern) {
       if (hit.beat >= beatsPerMeasure) continue;
@@ -3061,7 +3083,7 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
       });
     }
 
-    applyMicroVariation(hits, measureStart, beatDuration, beatsPerMeasure, style, density, humanize, rng);
+    applyMicroVariation(hits, measureStart, beatDuration, beatsPerMeasure, style, density, humanize, rng, options.granular);
 
     barsOnPattern++;
     barsOnRide++;
