@@ -285,11 +285,17 @@ export function getGrooveTemplate(style: string): GrooveTemplate {
 
 /**
  * Apply groove template timing to a time value.
- * Returns time + bias + random jitter from template.
+ * Returns time + bias + jitter from template.
+ * Uses triangular distribution (peaked at center) instead of uniform -
+ * most hits cluster near intended position, with rare larger displacements.
+ * This matches real musician timing distributions (GrooVAE research).
  */
 export function applyGroove(time: number, element: ElementTiming, random?: () => number): number {
   const rng = random ?? Math.random;
-  return time + element.bias + (rng() - 0.5) * 2 * element.jitter;
+  const u = rng();
+  // Triangular distribution: peaked at 0, range [-1, 1]
+  const tri = u < 0.5 ? Math.sqrt(2 * u) - 1 : 1 - Math.sqrt(2 * (1 - u));
+  return time + element.bias + tri * element.jitter;
 }
 
 /**

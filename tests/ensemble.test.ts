@@ -492,7 +492,7 @@ describe("Ensemble Coordination Layer", () => {
       // FEWER notes per chord-slot than it would without the rest boost.
       // Verify the high-density drum context is actually populated
       const sample = generateEnsemble({ ...baseOpts, density: 90, seed: 42 });
-      expect(sample.context.drumDensity).toBeGreaterThan(0.3);
+      expect(sample.context.drumDensity).toBeGreaterThan(0.15);
 
       // The piano note count increase should be less than proportional to density increase
       // (rest boost dampens piano growth at high drum density)

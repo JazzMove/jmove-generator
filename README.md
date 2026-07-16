@@ -473,7 +473,7 @@ Presets are validated against [`preset-schema.json`](preset-schema.json) and smo
 
 ```bash
 npm install                      # install dependencies
-npm test                         # run tests (1223 tests)
+npm test                         # run tests (1251 tests)
 npm run test:watch               # watch mode
 npm run lint                     # lint
 npm run typecheck                # type check

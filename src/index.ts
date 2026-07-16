@@ -135,4 +135,8 @@ export { resolveDrumGranular, resolvePianoGranular, resolveBassGranular } from "
 export { createPRNG, randomSeed, deriveStream, STREAM_DRUMS, STREAM_BASS, STREAM_PIANO } from "./prng";
 
 // ── Version ──
-export const GENERATOR_VERSION = "1.2.7";
+// Injected at build time by tsup from package.json - never edit manually
+declare const __GENERATOR_VERSION__: string;
+export const GENERATOR_VERSION: string = typeof __GENERATOR_VERSION__ !== "undefined"
+  ? __GENERATOR_VERSION__
+  : "dev";

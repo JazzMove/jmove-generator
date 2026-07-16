@@ -73,6 +73,26 @@ describe("Piano Comping — range constraints", () => {
       }
     }
   });
+
+  it("range holds for all chord qualities across all roots", () => {
+    const roots = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
+    const qualities = [
+      "7", "m7", "maj7", "m7b5", "dim7", "aug7", "9", "m9", "maj9",
+      "13", "7#11", "7alt", "sus4", "7b9", "7#9", "6", "m6",
+    ];
+    for (const root of roots) {
+      for (const q of qualities) {
+        const chords = [makeChord(root, q, 0), makeChord(root, q, 2)];
+        const notes = generatePianoComping(chords, { style: "swing", humanize: false, strum: false });
+        for (const note of notes) {
+          for (const p of note.pitches) {
+            expect(p).toBeGreaterThanOrEqual(PIANO_LOW);
+            expect(p).toBeLessThanOrEqual(PIANO_HIGH);
+          }
+        }
+      }
+    }
+  });
 });
 
 // ── Voicing Tests ──
@@ -364,6 +384,73 @@ describe("Piano Comping — musical content", () => {
     const pcsC = notesC[0].pitches.map((p) => p % 12).sort((a, b) => a - b);
     const pcsF = notesF[0].pitches.map((p) => p % 12).sort((a, b) => a - b);
     expect(pcsC).not.toEqual(pcsF);
+  });
+});
+
+// ── Voice Leading Distance (greedy matching) Tests ──
+
+describe("Piano Comping — voice leading distance (greedy min-cost matching)", () => {
+  it("Type A to Type B transition: motion stays low across voicing types", () => {
+    // Dm7 → G7 → Cmaj7: standard ii-V-I forces Type A/B crossover
+    // Old sorted-index comparison would produce jumpy motion here
+    const chords = [
+      makeChord("D", "m7", 0),
+      makeChord("G", "7", 2),
+      makeChord("C", "maj7", 4),
+      makeChord("A", "m7", 6),
+      makeChord("D", "7", 8),
+      makeChord("G", "maj7", 10),
+    ];
+    let totalMotion = 0;
+    let transitions = 0;
+    for (let trial = 0; trial < 20; trial++) {
+      const notes = generatePianoComping(chords, { style: "swing", humanize: false, strum: false });
+      for (let i = 1; i < notes.length; i++) {
+        if (Math.abs(notes[i].time - notes[i - 1].time) < 0.1) continue; // same chord
+        const prev = notes[i - 1].pitches;
+        const curr = notes[i].pitches;
+        const n = Math.min(prev.length, curr.length);
+        let motion = 0;
+        // Use greedy matching to measure (mirrors internal algorithm)
+        for (let a = 0; a < n; a++) {
+          let best = Infinity;
+          for (let b = 0; b < curr.length; b++) {
+            best = Math.min(best, Math.abs(prev[a] - curr[b]));
+          }
+          motion += best;
+        }
+        totalMotion += motion;
+        transitions++;
+      }
+    }
+    const avgMotion = totalMotion / transitions;
+    // Greedy matching should keep avg motion per transition under 10 semitones total
+    expect(avgMotion, `avg voice motion ${avgMotion.toFixed(1)}`).toBeLessThan(10);
+  });
+
+  it("long chromatic root motion maintains smooth voicings", () => {
+    // Giant Steps-like: large root jumps should still produce smooth voice leading
+    const chords = [
+      makeChord("B", "maj7", 0),
+      makeChord("D", "7", 2),
+      makeChord("G", "maj7", 4),
+      makeChord("Bb", "7", 6),
+      makeChord("Eb", "maj7", 8),
+    ];
+    for (let trial = 0; trial < 10; trial++) {
+      const notes = generatePianoComping(chords, { style: "swing", humanize: false, strum: false });
+      for (let i = 1; i < notes.length; i++) {
+        if (Math.abs(notes[i].time - notes[i - 1].time) < 0.1) continue;
+        const prev = notes[i - 1].pitches;
+        const curr = notes[i].pitches;
+        // No single voice should jump more than an octave
+        for (const p of prev) {
+          let closest = Infinity;
+          for (const c of curr) closest = Math.min(closest, Math.abs(p - c));
+          expect(closest, `voice jump ${closest} from ${prev} to ${curr}`).toBeLessThanOrEqual(12);
+        }
+      }
+    }
   });
 });
 

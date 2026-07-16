@@ -584,20 +584,60 @@ function buildVoicing(root: string, template: VoicingTemplate): number[] {
     if (base + maxInterval > PIANO_HIGH) base -= 12;
   }
 
-  return template.intervals.map((i) => base + i);
+  const clamped = template.intervals.map((i) => {
+    let p = base + i;
+    while (p < PIANO_LOW) p += 12;
+    while (p > PIANO_HIGH) p -= 12;
+    return p;
+  });
+  return [...new Set(clamped)].sort((a, b) => a - b);
 }
 
-/** Compute total voice-leading distance between two voicings. */
+/** Compute total voice-leading distance between two voicings.
+ *  Uses greedy minimum-cost matching: each voice in `a` finds its closest
+ *  unmatched voice in `b`. This correctly handles Type A vs Type B voicings
+ *  where sorted-index comparison fails (3rd-on-bottom vs 7th-on-bottom). */
 function voiceLeadingDistance(a: number[], b: number[]): number {
   if (a.length === 0 || b.length === 0) return 999;
-  let total = 0;
-  const len = Math.min(a.length, b.length);
-  // Sort both for consistent comparison
-  const sa = [...a].sort((x, y) => x - y);
-  const sb = [...b].sort((x, y) => x - y);
-  for (let i = 0; i < len; i++) {
-    total += Math.abs(sa[i] - sb[i]);
+
+  // Build cost matrix: distance from each note in a to each note in b
+  const na = a.length;
+  const nb = b.length;
+  const costs: number[][] = [];
+  for (let i = 0; i < na; i++) {
+    costs[i] = [];
+    for (let j = 0; j < nb; j++) {
+      costs[i][j] = Math.abs(a[i] - b[j]);
+    }
   }
+
+  // Greedy matching: pick smallest cost pair, mark both used, repeat.
+  // For 4-note voicings (16 pairs) this is fast and near-optimal.
+  const usedA = new Set<number>();
+  const usedB = new Set<number>();
+  let total = 0;
+  const pairs = Math.min(na, nb);
+
+  for (let p = 0; p < pairs; p++) {
+    let bestCost = Infinity;
+    let bestI = 0;
+    let bestJ = 0;
+    for (let i = 0; i < na; i++) {
+      if (usedA.has(i)) continue;
+      for (let j = 0; j < nb; j++) {
+        if (usedB.has(j)) continue;
+        if (costs[i][j] < bestCost) {
+          bestCost = costs[i][j];
+          bestI = i;
+          bestJ = j;
+        }
+      }
+    }
+    usedA.add(bestI);
+    usedB.add(bestJ);
+    total += bestCost;
+  }
+
   return total;
 }
 
@@ -824,12 +864,13 @@ function buildQuartalVoicing(root: string, quality?: string): number[] {
 
   const base = 60 + rootPC; // C4 — keeps quartal voicings in mid register
   const pitches = intervals.map(i => base + i);
-  // Fold into playable range
-  return pitches.map((p) => {
+  // Fold into playable range, then dedup (octave-apart intervals can collide after clamping)
+  const clamped = pitches.map((p) => {
     while (p > PIANO_HIGH) p -= 12;
     while (p < PIANO_LOW) p += 12;
     return p;
-  }).sort((a, b) => a - b);
+  });
+  return [...new Set(clamped)].sort((a, b) => a - b);
 }
 
 /** Open 5ths voicing — wide intervals, Holdsworth keyboard signature.
@@ -863,11 +904,13 @@ function buildOpen5thsVoicing(root: string, quality: string): number[] {
     base + 12 + seventh,     // 7th (octave up)
   ];
 
-  return pitches.map(p => {
+  // Fold into playable range, then dedup (octave-apart intervals can collide after clamping)
+  const clamped = pitches.map(p => {
     while (p > PIANO_HIGH) p -= 12;
     while (p < PIANO_LOW) p += 12;
     return p;
-  }).sort((a, b) => a - b);
+  });
+  return [...new Set(clamped)].sort((a, b) => a - b);
 }
 
 /** Standard Evans rootless voicing with voice-leading optimization. */
@@ -876,9 +919,13 @@ function buildStandardVoicing(
   quality: string,
   prevPitches: number[] | null,
   shell: boolean,
+  resolving = false,
 ): number[] {
   const q = quality.replace(/\/.*$/, "");
-  const templates = resolveVoicingQuality(q);
+  // ii-V-I: when dominant resolves to I, use altered templates as third option.
+  // No extra rng calls - voice-leading comparison chooses closest.
+  const useAltered = resolving && isDominantQuality(q);
+  const templates = resolveVoicingQuality(useAltered ? "7alt" : q);
 
   if (!templates) {
     const r = rootMidi(root);
@@ -894,6 +941,20 @@ function buildStandardVoicing(
 
   if (!prevPitches) {
     return shell ? toShellVoicing(voicingA) : voicingA;
+  }
+
+  // When resolving, also consider the standard dominant voicing
+  // and let voice-leading distance pick the best option (3-way comparison)
+  if (useAltered) {
+    const stdTemplates = resolveVoicingQuality(q);
+    if (stdTemplates) {
+      const stdA = buildVoicing(root, stdTemplates[0]);
+      const stdB = buildVoicing(root, stdTemplates[1]);
+      const candidates = [voicingA, voicingB, stdA, stdB];
+      const dists = candidates.map(c => voiceLeadingDistance(prevPitches!, c));
+      const best = candidates[dists.indexOf(Math.min(...dists))];
+      return shell ? toShellVoicing(best) : best;
+    }
   }
 
   const distA = voiceLeadingDistance(prevPitches, voicingA);
@@ -932,6 +993,21 @@ function buildRootPositionVoicing(root: string, quality: string): number[] {
   }).sort((a, b) => a - b);
 }
 
+/** Detect dominant chord quality (not minor, not major 7th, not dim/sus). */
+function isDominantQuality(q: string): boolean {
+  const c = q.replace(/\/.*$/, "");
+  if (c.startsWith("m") && !c.startsWith("maj")) return false;
+  if (c.includes("maj")) return false;
+  if (c.includes("dim")) return false;
+  if (c.includes("sus")) return false;
+  return c.includes("7") || c.includes("9") || c.includes("13");
+}
+
+/** Check if root motion is V-I (up a perfect 4th = 5 semitones). */
+function isResolvingDominant(currentRoot: string, nextRoot: string): boolean {
+  return (rootMidi(nextRoot) - rootMidi(currentRoot) + 12) % 12 === 5;
+}
+
 /** Pick best voicing type based on style, with variety tracking.
  *  `lastType` is a mutable ref [value] — avoids picking same voicing type consecutively. */
 function pickVoicing(
@@ -941,6 +1017,7 @@ function pickVoicing(
   style?: string,
   shell = false,
   lastType?: [number],
+  resolving = false,
 ): number[] {
   // Helper: pick from weighted options, avoiding lastType when possible
   const pickWithVariety = (options: [number, () => number[]][]): number[] => {
@@ -1032,7 +1109,7 @@ function pickVoicing(
     return buildRootPositionVoicing(root, quality);
   }
 
-  return buildStandardVoicing(root, quality, prevPitches, shell);
+  return buildStandardVoicing(root, quality, prevPitches, shell, resolving);
 }
 
 /** Reduce to 2-note shell voicing (3rd + 7th — the guide tones). */
@@ -1305,11 +1382,14 @@ export function generatePianoComping(
   const bandCtx = options.bandContext;
   const pianoGranular = options.granular;
   // voicingDensity: low → shell voicings (2-note), high → full voicings (4-note)
+  // At fast tempos (>220), force shell voicings - dense chords blur at speed
   const voicingThreshold = pianoGranular ? pianoGranular.voicingDensity : 50;
-  const useShell = voicingThreshold < 35 || (density !== undefined && density < 35);
+  const useShell = tempo > 220 || voicingThreshold < 35 || (density !== undefined && density < 35);
   const drumDensityRestBoost = bandCtx && bandCtx.drumDensity > 0.6
     ? 0.08 * bandCtx.drumDensity : 0;
-  const baseRestChance = 0.15 * (1 - (density ?? 50) / 100) + drumDensityRestBoost;
+  // Increase rests at fast tempos: uptempo comping should be sparse
+  const tempoRestBoost = tempo > 200 ? Math.min(0.20, (tempo - 200) / 500) : 0;
+  const baseRestChance = 0.15 * (1 - (density ?? 50) / 100) + drumDensityRestBoost + tempoRestBoost;
   const notes: CompNote[] = [];
   let prevPitches: number[] | null = null;
   let wasRest = false;
@@ -1418,7 +1498,13 @@ export function generatePianoComping(
     }
     wasRest = false;
 
-    const pitches = pickVoicing(chord.root, chord.quality, prevPitches, style, useShell, voicingTypeRef);
+    // ── ii-V-I Awareness ──
+    // On V-I resolutions, bias voicing toward altered tones for tension.
+    // Uses chord index as deterministic selector to avoid PRNG stream shift.
+    const isResolving = !!(nextChord && isDominantQuality(chord.quality)
+      && isResolvingDominant(chord.root, nextChord.root));
+
+    const pitches = pickVoicing(chord.root, chord.quality, prevPitches, style, useShell, voicingTypeRef, isResolving);
     prevPitches = pitches;
 
     // ── Register Drift ──
@@ -1448,7 +1534,10 @@ export function generatePianoComping(
       loopBarsLeft--;
     } else {
       // rhythmicActivity overrides density for rhythm pattern selection
-      const rhythmDensity = pianoGranular ? pianoGranular.rhythmicActivity : density;
+      // At fast tempos (>200), cap effective density to prefer sparser patterns
+      const tempoDensityCap = tempo > 200 ? Math.max(20, 100 - (tempo - 200) * 0.5) : 100;
+      const rawRhythmDensity = pianoGranular ? pianoGranular.rhythmicActivity : density;
+      const rhythmDensity = rawRhythmDensity !== undefined ? Math.min(rawRhythmDensity, tempoDensityCap) : Math.min(50, tempoDensityCap);
       const picked = pickRhythm(style, rhythmDensity, recentRhythmIndices, inferredTimeSig);
       rhythm = picked.rhythm;
       recentRhythmIndices.unshift(picked.index);
@@ -1537,9 +1626,10 @@ export function generatePianoComping(
       // Apply register drift + bass collision avoidance
       let finalPitches = registerShift !== 0
         ? usePitches.map(p => {
-            const shifted = p + registerShift;
-            // Clamp to playable piano range
-            return shifted > PIANO_HIGH ? shifted - 12 : shifted < PIANO_LOW ? shifted + 12 : shifted;
+            let shifted = p + registerShift;
+            while (shifted > PIANO_HIGH) shifted -= 12;
+            while (shifted < PIANO_LOW) shifted += 12;
+            return shifted;
           })
         : usePitches;
       if (bandCtx?.bassRegister === "high") {

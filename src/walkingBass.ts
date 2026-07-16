@@ -231,12 +231,19 @@ function approachTone(target: number, fromAbove: boolean, scaleTones?: number[],
     if (step1 >= getBassLow() && step1 <= getBassHigh()) return step1;
   }
 
-  // Diatonic whole-step
+  // Diatonic: nearest scale tone above/below target
   if (roll < weights.doubleChrm + weights.diatonic) {
     if (scaleTones && scaleTones.length > 0) {
-      const diatonic = fromAbove ? target + 2 : target - 2;
-      if (scaleTones.includes(diatonic) && diatonic >= getBassLow() && diatonic <= getBassHigh()) {
-        return diatonic;
+      // Find the nearest scale tone in the approach direction
+      const candidates = scaleTones.filter(t =>
+        fromAbove ? t > target : t < target
+      );
+      if (candidates.length > 0) {
+        candidates.sort((a, b) => Math.abs(a - target) - Math.abs(b - target));
+        const diatonic = candidates[0];
+        if (diatonic >= getBassLow() && diatonic <= getBassHigh()) {
+          return diatonic;
+        }
       }
     }
   }
@@ -402,8 +409,46 @@ function generateSwingMeasure(
 
   // ── Contour-based approach: compute beat 4 (target) FIRST ──
 
-  // Beat 1: always root (strong harmonic anchor, tests enforce this)
-  const beat1 = rootPitch;
+  // Beat 1: root ~65%, 5th ~25%, 3rd ~10% (varies by style).
+  // Non-root beat 1 creates motion and avoids the "MIDI bass" plodding feel.
+  // Real bassists (Ron Carter, Ray Brown) use non-root tones ~30-40% of time.
+  let beat1: number;
+  const beat1Roll = _rng();
+  // Place 5th and 3rd close to prevPitch for smooth voice leading
+  let fifthPitch = clamp(rootPitch + 7);
+  if (prevPitch !== null) {
+    while (fifthPitch > prevPitch + 6) fifthPitch -= 12;
+    while (fifthPitch < prevPitch - 6) fifthPitch += 12;
+    fifthPitch = clamp(fifthPitch);
+  }
+  let thirdPitch: number | null = null;
+  if (chordTones.length > 1) {
+    let tp = clamp(rootPitch + (chordTones[1] - chordTones[0]));
+    if (prevPitch !== null) {
+      while (tp > prevPitch + 6) tp -= 12;
+      while (tp < prevPitch - 6) tp += 12;
+    }
+    thirdPitch = clamp(tp);
+  }
+  // First chord always root (establish tonality)
+  if (!prevPitch) {
+    beat1 = rootPitch;
+  } else if (beat1Roll < 0.65) {
+    beat1 = rootPitch;
+  } else if (beat1Roll < 0.90) {
+    beat1 = fifthPitch;
+  } else if (thirdPitch !== null) {
+    // 3rd on beat 1 - smooth voice leading from previous bar's beat 4
+    beat1 = thirdPitch;
+  } else {
+    beat1 = rootPitch;
+  }
+
+  // Guard: if non-root beat 1 creates a large leap from approach note,
+  // fall back to root (which is always close via register placement)
+  if (prevPitch !== null && beat1 !== rootPitch && Math.abs(beat1 - prevPitch) > 7) {
+    beat1 = rootPitch;
+  }
 
   // Beat 4: approach tone to next root
   let beat4: number;
@@ -491,7 +536,10 @@ function generateSwingMeasure(
   }
 
   // Eighth-note enclosure on beat 4 — syncopation (0-100) scales probability: 0→0%, 30→15%, 100→40%
-  const enclosureProb = _bassGranular ? _bassGranular.syncopation / 100 * 0.40 : 0.15;
+  // Reduce at fast tempos: full probability up to 180, linear decay to 0 at 300
+  const t = tempo ?? 120;
+  const tempoEnclosureScale = t <= 180 ? 1.0 : Math.max(0, 1.0 - (t - 180) / 120);
+  const enclosureProb = (_bassGranular ? _bassGranular.syncopation / 100 * 0.40 : 0.15) * tempoEnclosureScale;
   const nearBoundary = pitches[3] <= getBassLow() + 2 || pitches[3] >= getBassHigh() - 2;
   const doEnclosure = !isLastChord && !nearBoundary && _rng() < enclosureProb;
 
@@ -529,28 +577,40 @@ function generateSwingMeasure(
   }));
 }
 
-// ── Bossa Style (root-5th pattern, half notes) ──
+// ── Bossa Style (root-5th with variations, half notes) ──
 
 function generateBossaMeasure(
   chord: ChordEvent,
   beatDuration: number,
+  prevPitch?: number | null,
 ): BassNote[] {
-  const rootMidi = rootToMidi(chord.root);
-  const fifth = clamp(rootMidi + 7);
+  const root = rootToMidi(chord.root);
+  const rootPitch = prevPitch != null ? closestOctave(root, prevPitch) : root;
+  const chordTones = getChordTones(chord.root, chord.quality);
+  const fifth = clamp(rootPitch + 7);
+  const third = chordTones.length > 1 ? clamp(rootPitch + (chordTones[1] - chordTones[0])) : fifth;
+
+  // Bossa bass patterns beyond basic root-5th (Joao Gilberto, Ron Carter bossa):
+  // Pattern 0: root → 5th (standard, 50%)
+  // Pattern 1: root → 3rd (color, 25%)
+  // Pattern 2: root → chromatic approach to next root (leading tone, 15%)
+  // Pattern 3: 5th → root (inverted, 10%) — only after first chord
+  const roll = _rng();
+  let p1: number, p2: number;
+  if (prevPitch == null || roll < 0.50) {
+    // First chord always root-5th; standard pattern 50% otherwise
+    p1 = rootPitch; p2 = fifth;
+  } else if (roll < 0.75) {
+    p1 = rootPitch; p2 = third;
+  } else if (roll < 0.90) {
+    p1 = rootPitch; p2 = clamp(rootPitch - 1);
+  } else {
+    p1 = fifth; p2 = rootPitch;
+  }
 
   return [
-    {
-      pitch: rootMidi,
-      time: chord.time,
-      duration: beatDuration * 2 * 0.9,
-      velocity: 95,
-    },
-    {
-      pitch: fifth,
-      time: chord.time + beatDuration * 2,
-      duration: beatDuration * 2 * 0.9,
-      velocity: 80,
-    },
+    { pitch: p1, time: chord.time, duration: beatDuration * 2 * 0.9, velocity: 95 },
+    { pitch: p2, time: chord.time + beatDuration * 2, duration: beatDuration * 2 * 0.9, velocity: 80 },
   ];
 }
 
@@ -559,38 +619,51 @@ function generateBossaMeasure(
 function generateLatinMeasure(
   chord: ChordEvent,
   beatDuration: number,
+  prevPitch?: number | null,
 ): BassNote[] {
-  const rootMidi = rootToMidi(chord.root);
-  const fifth = clamp(rootMidi + 7);
-  const octave = clamp(rootMidi + 12);
+  const root = rootToMidi(chord.root);
+  const rootPitch = prevPitch != null ? closestOctave(root, prevPitch) : root;
+  const chordTones = getChordTones(chord.root, chord.quality);
+  const fifth = clamp(rootPitch + 7);
+  const third = chordTones.length > 1 ? clamp(rootPitch + (chordTones[1] - chordTones[0])) : fifth;
+  const octave = clamp(rootPitch + 12);
 
-  // Tumbao: anticipated bass pattern (root, 5th, octave, 5th syncopated)
-  return [
-    {
-      pitch: rootMidi,
-      time: chord.time,
-      duration: beatDuration * 1.4,
-      velocity: 100,
-    },
-    {
-      pitch: fifth,
-      time: chord.time + beatDuration * 1.5,
-      duration: beatDuration * 0.9,
-      velocity: 80,
-    },
-    {
-      pitch: octave,
-      time: chord.time + beatDuration * 2.5,
-      duration: beatDuration * 0.9,
-      velocity: 90,
-    },
-    {
-      pitch: fifth,
-      time: chord.time + beatDuration * 3.5,
-      duration: beatDuration * 0.4,
-      velocity: 75,
-    },
-  ];
+  // Tumbao variations (Cachao, Israel Lopez, Oscar D'Leon):
+  // Pattern 0: classic root-5-oct-5 (standard, 40%)
+  // Pattern 1: root-3-5-root (melodic, 25%)
+  // Pattern 2: root-5-3-chromatic (approach, 20%)
+  // Pattern 3: anticipated root on beat 4.5 (2-3 clave, 15%) — only after first chord
+  const roll = _rng();
+  if (prevPitch == null || roll < 0.40) {
+    return [
+      { pitch: rootPitch, time: chord.time, duration: beatDuration * 1.4, velocity: 100 },
+      { pitch: fifth, time: chord.time + beatDuration * 1.5, duration: beatDuration * 0.9, velocity: 80 },
+      { pitch: octave, time: chord.time + beatDuration * 2.5, duration: beatDuration * 0.9, velocity: 90 },
+      { pitch: fifth, time: chord.time + beatDuration * 3.5, duration: beatDuration * 0.4, velocity: 75 },
+    ];
+  } else if (roll < 0.65) {
+    return [
+      { pitch: rootPitch, time: chord.time, duration: beatDuration * 1.4, velocity: 100 },
+      { pitch: third, time: chord.time + beatDuration * 1.5, duration: beatDuration * 0.9, velocity: 80 },
+      { pitch: fifth, time: chord.time + beatDuration * 2.5, duration: beatDuration * 0.9, velocity: 85 },
+      { pitch: rootPitch, time: chord.time + beatDuration * 3.5, duration: beatDuration * 0.4, velocity: 75 },
+    ];
+  } else if (roll < 0.85) {
+    const approach = clamp(rootPitch - 1);
+    return [
+      { pitch: rootPitch, time: chord.time, duration: beatDuration * 1.4, velocity: 100 },
+      { pitch: fifth, time: chord.time + beatDuration * 1.5, duration: beatDuration * 0.9, velocity: 80 },
+      { pitch: third, time: chord.time + beatDuration * 2.5, duration: beatDuration * 0.9, velocity: 85 },
+      { pitch: approach, time: chord.time + beatDuration * 3.5, duration: beatDuration * 0.4, velocity: 70 },
+    ];
+  } else {
+    // Anticipated: skip beat 1, syncopated entry on "and" of 4
+    return [
+      { pitch: fifth, time: chord.time + beatDuration * 0.5, duration: beatDuration * 0.9, velocity: 85 },
+      { pitch: rootPitch, time: chord.time + beatDuration * 1.5, duration: beatDuration * 1.4, velocity: 100 },
+      { pitch: octave, time: chord.time + beatDuration * 3, duration: beatDuration * 0.9, velocity: 90 },
+    ];
+  }
 }
 
 // ── FUSION ──
@@ -1775,10 +1848,10 @@ export function generateWalkingBass(
       measureNotes = oddMeterNotes;
     } else switch (style) {
       case "bossa":
-        measureNotes = generateBossaMeasure(chord, beatDuration);
+        measureNotes = generateBossaMeasure(chord, beatDuration, prevPitch);
         break;
       case "latin":
-        measureNotes = generateLatinMeasure(chord, beatDuration);
+        measureNotes = generateLatinMeasure(chord, beatDuration, prevPitch);
         break;
       case "fusion":
         measureNotes = generateFusionMeasure(chord, beatDuration, prevPitch);

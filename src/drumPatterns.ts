@@ -87,36 +87,33 @@ const SWING_RIDE_B: Pattern = [
 
 const SWING_RIDES = [SWING_RIDE_A, SWING_RIDE_B];
 
-// HH A: pedal on 2 and 4 + ghost pulse (felt, not prominent)
+// HH A: pedal on 2 and 4 — standard jazz foot hat (most common)
 const SWING_HIHAT_A: Pattern = [
   { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 1, velocity: 55 },
   { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 3, velocity: 55 },
-  // Ghost pulse woven in (stays through rotation)
-  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 0, velocity: 30, ghost: true },
-  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 0.5, velocity: 25, ghost: true },
-  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 1.5, velocity: 25, ghost: true },
-  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 2, velocity: 30, ghost: true },
-  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 2.5, velocity: 25, ghost: true },
-  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 3.5, velocity: 25, ghost: true },
 ];
 
-// HH B: pedal on all beats + ghost pulse — Philly Joe Jones driving feel
+// HH B: pedal on all beats — Philly Joe Jones driving feel
 const SWING_HIHAT_B: Pattern = [
   { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 0, velocity: 42 },
   { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 1, velocity: 55 },
   { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 2, velocity: 42 },
   { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 3, velocity: 55 },
-  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 0.5, velocity: 25, ghost: true },
-  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 1.5, velocity: 25, ghost: true },
-  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 2.5, velocity: 25, ghost: true },
-  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 3.5, velocity: 25, ghost: true },
 ];
 
-const SWING_HIHATS = [SWING_HIHAT_A, SWING_HIHAT_B];
+// HH C: pedal on 2 and 4 + light ghost on upbeats (busier sections only)
+const SWING_HIHAT_C: Pattern = [
+  { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 1, velocity: 55 },
+  { drum: GM_DRUMS.HI_HAT_PEDAL, beat: 3, velocity: 55 },
+  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 1.5, velocity: 22, ghost: true },
+  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 3.5, velocity: 22, ghost: true },
+];
+
+const SWING_HIHATS = [SWING_HIHAT_A, SWING_HIHAT_A, SWING_HIHAT_B, SWING_HIHAT_C];
 
 const SWING_KICK_SNARE: Pattern[] = [
-  // Jazz kick/snare = very sparse, mostly felt. Drummer "feathers" the kick.
-  // Variation 1: feathered kick on 1, ghost snare
+  // Jazz kick/snare = sparse but with occasional accented hits for groove definition.
+  // Variation 1: feathered kick on 1, ghost snare on 2-and
   [
     { drum: GM_DRUMS.KICK, beat: 0, velocity: 55 },
     { drum: GM_DRUMS.SNARE, beat: 1.67, velocity: 30, ghost: true },
@@ -126,14 +123,25 @@ const SWING_KICK_SNARE: Pattern[] = [
     { drum: GM_DRUMS.KICK, beat: 0, velocity: 50 },
     { drum: GM_DRUMS.KICK, beat: 2, velocity: 45 },
   ],
-  // Variation 3: just kick on 1 (most common in jazz)
+  // Variation 3: kick on 1, accented snare on 4 (Tony Williams comping)
   [
     { drum: GM_DRUMS.KICK, beat: 0, velocity: 55 },
+    { drum: GM_DRUMS.SNARE, beat: 3, velocity: 80 },
   ],
   // Variation 4: kick 1, light snare comp on 4-and
   [
     { drum: GM_DRUMS.KICK, beat: 0, velocity: 50 },
     { drum: GM_DRUMS.SNARE, beat: 3.67, velocity: 30, ghost: true },
+  ],
+  // Variation 5: accented snare on 4, ghost kick (Philly Joe conversational)
+  [
+    { drum: GM_DRUMS.KICK, beat: 0, velocity: 40, ghost: true },
+    { drum: GM_DRUMS.SNARE, beat: 3, velocity: 75 },
+  ],
+  // Variation 6: kick 1, cross-stick on 4 (brush feel)
+  [
+    { drum: GM_DRUMS.KICK, beat: 0, velocity: 55 },
+    { drum: GM_DRUMS.CROSS_STICK, beat: 3, velocity: 65 },
   ],
 ];
 
@@ -3026,9 +3034,13 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
       // Energy multiplier: at energy 0.3 fills are 40% as likely, at 1.0 fully likely
       const energyFillMult = 0.2 + energy * 0.8;
 
+      // Tempo fill scaling: reduce fill frequency at fast tempos (>220)
+      // Fills at fast tempos sound cluttered and unmusical
+      const tempoFillScale = tempo > 220 ? Math.max(0.3, 1.0 - (tempo - 220) / 200) : 1.0;
+
       // Style-specific fill frequency: Wackerman fills frequently and dramatically,
       // Alfa Mist is sparse and broken-beat, others are standard jazz.
-      const fillScale = options.granular ? options.granular.fillIntensity / 50 : 1;
+      const fillScale = (options.granular ? options.granular.fillIntensity / 50 : 1) * tempoFillScale;
       const sectionProb = (style === "alfaMist" ? 0.35 : style === "holdsworth" ? 0.55 : style === "metheny" ? 0.70 : 0.6) * energyFillMult * fillScale;
       const phraseProb = (style === "alfaMist" ? 0.20 : style === "holdsworth" ? 0.30 : style === "metheny" ? 0.50 : 0.4) * energyFillMult * fillScale;
 
@@ -3067,8 +3079,10 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
     // Arc adjustment: build/climax keep more ghosts (busier), release/drop strip them (sparser)
     // Cap at 40 to always preserve some ghost notes (was uncapped to 55, stripping all ghosts in drops)
     // ghostDensity slider: high = more ghosts survive (lower threshold), low = cleaner sound
+    // Fast tempo shift: raise threshold to strip ghosts at speed (>220 BPM)
+    const tempoGhostShift = tempo > 220 ? Math.min(15, (tempo - 220) * 0.15) : 0;
     const ghostShift = options.granular ? (options.granular.ghostDensity - 40) * -0.4 : 0;
-    const ghostThreshold = bandCtx ? Math.min(40, Math.round(15 + (1 - energy) * 20 + arcGhostAdjust + ghostShift)) : Math.round(15 + ghostShift);
+    const ghostThreshold = bandCtx ? Math.min(40, Math.round(15 + (1 - energy) * 20 + arcGhostAdjust + ghostShift + tempoGhostShift)) : Math.round(15 + ghostShift + tempoGhostShift);
 
     for (const hit of pattern) {
       if (hit.beat >= beatsPerMeasure) continue;

@@ -416,12 +416,14 @@ describe("Drum Patterns — form markers (crash)", () => {
 // ── Phase J: Swing Hi-Hat Pulse ──
 
 describe("Drum Patterns — swing hi-hat pulse", () => {
-  it("swing pattern includes closed hi-hat ghost pulse", () => {
-    const hits = generateDrumPattern({ style: "swing", measures: 2, humanize: false, density: 50 });
+  it("swing pattern includes hi-hat pedal and optional ghost pulse", () => {
+    const hits = generateDrumPattern({ style: "swing", measures: 4, humanize: false, density: 50 });
+    const pedalHihats = hitsOf(hits, GM_DRUMS.HI_HAT_PEDAL);
     const closedHihats = hitsOf(hits, GM_DRUMS.HI_HAT_CLOSED);
-    const openHihats = hitsOf(hits, GM_DRUMS.HI_HAT_OPEN);
-    // Ghost pulse integrated into HH variants: 4-6 ghost hats per measure
-    expect(closedHihats.length + openHihats.length).toBeGreaterThanOrEqual(8);
+    // Pedal hi-hat on 2 and 4 is standard (2-4 per measure)
+    expect(pedalHihats.length).toBeGreaterThanOrEqual(8);
+    // Ghost closed hi-hat is sparse (only in HH C variant, 0-2 per measure)
+    expect(closedHihats.length).toBeLessThanOrEqual(16);
   });
 
   it("pulse hi-hat notes are very soft (pocket feel)", () => {

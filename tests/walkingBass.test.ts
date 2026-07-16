@@ -12,6 +12,10 @@ import {
 // ── Constants ──
 const BASS_LOW = 28;  // E1
 const BASS_HIGH = 55; // G3
+const ROOT_SEMITONES: Record<string, number> = {
+  "C": 0, "Db": 1, "D": 2, "Eb": 3, "E": 4, "F": 5,
+  "Gb": 6, "G": 7, "Ab": 8, "A": 9, "Bb": 10, "B": 11,
+};
 
 // ── Helpers ──
 
@@ -79,17 +83,13 @@ describe("Walking Bass — swing", () => {
     expect(notes.length).toBe(4);
   });
 
-  it("beat 1 is root or 5th of chord", () => {
-    // Run 50 times to account for randomness
-    const rootC = 48; // C3
-    const fifthC = 55; // G3
-    const rootC_alt = 36; // C2
+  it("beat 1 is chord tone (root, 5th, or 3rd)", () => {
     for (let i = 0; i < 50; i++) {
       const chords = [makeChord("C", "maj7", 0)];
       const notes = generateWalkingBass(chords, { style: "swing", tempo: 120 });
       const beat1 = notes[0].pitch % 12;
-      // Root = C (0) or 5th = G (7)
-      expect([0, 7]).toContain(beat1);
+      // Root = C (0), 3rd = E (4), 5th = G (7)
+      expect([0, 4, 7]).toContain(beat1);
     }
   });
 
@@ -119,6 +119,29 @@ describe("Walking Bass — swing", () => {
     }
     // At least 80% of trials should have chromatic/diatonic approach
     expect(approachCount / trials).toBeGreaterThanOrEqual(0.8);
+  });
+
+  it("diatonic approach finds half-step scale positions (E-F, B-C)", () => {
+    // F major: scale has E-F half step. Approach to F from above should use E (not F#)
+    // Run many trials to catch diatonic approaches
+    let correctDiatonic = 0;
+    let wrongDiatonic = 0;
+    const trials = 200;
+    for (let t = 0; t < trials; t++) {
+      const chords = [makeChord("C", "maj7", 0), makeChord("F", "maj7", 2)];
+      const notes = generateWalkingBass(chords, { style: "swing", tempo: 120 });
+      const lastOfBar0 = [...notes].filter(n => n.time < 2 - 0.05).pop()!;
+      // F target = 5 (mod 12). Approach from above:
+      // Correct diatonic: E (4) = half step. Old bug: target+2 = G (7) = wrong
+      const pc = lastOfBar0.pitch % 12;
+      const fPC = 5;
+      const dist = Math.min(Math.abs(pc - fPC), 12 - Math.abs(pc - fPC));
+      if (dist === 1) correctDiatonic++; // half step (chromatic or correct diatonic)
+      if (pc === 7) wrongDiatonic++; // G = old bug (target + 2 = always whole step)
+    }
+    // Should never see the old bug (G as approach to F from above)
+    // Allow small count since G could appear as a chord tone on beat 4 (not approach)
+    expect(wrongDiatonic / trials, `wrong diatonic (G): ${wrongDiatonic}/${trials}`).toBeLessThan(0.15);
   });
 
   it("produces correct timing", () => {
@@ -163,6 +186,83 @@ describe("Walking Bass — swing", () => {
   });
 });
 
+// ── Beat 1 Non-Root Distribution ──
+
+describe("Walking Bass — beat 1 non-root distribution", () => {
+  it("multi-bar: beat 1 is root ~65%, 5th ~25%, 3rd ~10% (first bar always root)", () => {
+    let rootCount = 0;
+    let fifthCount = 0;
+    let thirdCount = 0;
+    let otherCount = 0;
+    const trials = 200;
+
+    for (let i = 0; i < trials; i++) {
+      const chords = [
+        makeChord("C", "maj7", 0), makeChord("F", "7", 2),
+        makeChord("G", "7", 4), makeChord("C", "maj7", 6),
+        makeChord("A", "m7", 8), makeChord("D", "7", 10),
+      ];
+      const notes = generateWalkingBass(chords, { style: "swing", tempo: 120 });
+      // Skip first chord (always root) - check bars 2-6
+      for (let bar = 1; bar < chords.length; bar++) {
+        const chordTime = chords[bar].time;
+        const beat1Note = notes.find(n => Math.abs(n.time - chordTime) < 0.1);
+        if (!beat1Note) continue;
+        const pc = beat1Note.pitch % 12;
+        const rootPC = ROOT_SEMITONES[chords[bar].root];
+        const fifthPC = (rootPC + 7) % 12;
+        const q = chords[bar].quality;
+        const isMinor = q.startsWith("m") && !q.startsWith("maj");
+        const thirdPC = isMinor ? (rootPC + 3) % 12 : (rootPC + 4) % 12;
+
+        if (pc === rootPC) rootCount++;
+        else if (pc === fifthPC) fifthCount++;
+        else if (pc === thirdPC) thirdCount++;
+        else otherCount++;
+      }
+    }
+
+    const total = rootCount + fifthCount + thirdCount + otherCount;
+    const rootPct = rootCount / total;
+    const fifthPct = fifthCount / total;
+    const thirdPct = thirdCount / total;
+
+    // Root should dominate (55-80%), 5th significant (10-35%), 3rd minor (2-20%)
+    expect(rootPct, `root: ${(rootPct * 100).toFixed(1)}%`).toBeGreaterThan(0.50);
+    expect(rootPct, `root: ${(rootPct * 100).toFixed(1)}%`).toBeLessThan(0.85);
+    expect(fifthPct, `5th: ${(fifthPct * 100).toFixed(1)}%`).toBeGreaterThan(0.05);
+    expect(thirdPct + fifthPct, `non-root: ${((thirdPct + fifthPct) * 100).toFixed(1)}%`).toBeGreaterThan(0.10);
+    expect(otherCount, `unexpected pitch classes: ${otherCount}`).toBe(0);
+  });
+
+  it("first bar is always root", () => {
+    for (let i = 0; i < 50; i++) {
+      const chords = [makeChord("E", "m7", 0), makeChord("A", "7", 2)];
+      const notes = generateWalkingBass(chords, { style: "swing", tempo: 120 });
+      expect(notes[0].pitch % 12).toBe(4); // E is always root on first bar
+    }
+  });
+
+  it("voice-leading guard: no beat 1 jumps > 7 from previous bar", () => {
+    for (let trial = 0; trial < 50; trial++) {
+      const chords = [
+        makeChord("C", "maj7", 0), makeChord("Gb", "7", 2),
+        makeChord("B", "maj7", 4), makeChord("Eb", "m7", 6),
+      ];
+      const notes = generateWalkingBass(chords, { style: "swing", tempo: 120 });
+      for (let i = 1; i < chords.length; i++) {
+        const prevLast = notes.filter(n => n.time < chords[i].time).pop();
+        const currFirst = notes.find(n => Math.abs(n.time - chords[i].time) < 0.1);
+        if (!prevLast || !currFirst) continue;
+        expect(
+          Math.abs(currFirst.pitch - prevLast.pitch),
+          `bar ${i}: ${prevLast.pitch}→${currFirst.pitch}`
+        ).toBeLessThanOrEqual(7);
+      }
+    }
+  });
+});
+
 // ── Bossa Style Tests ──
 
 describe("Walking Bass — bossa", () => {
@@ -178,10 +278,19 @@ describe("Walking Bass — bossa", () => {
     expect(notes[0].pitch % 12).toBe(9); // A
   });
 
-  it("second note is 5th", () => {
+  it("second note is a chord tone (root, 3rd, 5th, or approach)", () => {
+    // Bossa now varies: 50% 5th, 25% 3rd, 15% approach, 10% root
     const chords = [makeChord("A", "m7", 0)];
-    const notes = generateWalkingBass(chords, { style: "bossa", tempo: 140 });
-    expect(notes[1].pitch % 12).toBe(4); // E (5th of A)
+    const rootPC = 9; // A
+    const thirdPC = 0; // C (minor 3rd)
+    const fifthPC = 4; // E
+    let valid = 0;
+    for (let i = 0; i < 50; i++) {
+      const notes = generateWalkingBass(chords, { style: "bossa", tempo: 140 });
+      const pc = notes[1].pitch % 12;
+      if (pc === rootPC || pc === thirdPC || pc === fifthPC || pc === 8 /* G#, chromatic approach */) valid++;
+    }
+    expect(valid).toBe(50); // all should be valid chord tones or approach
   });
 
   it("uses half-note durations (monophonic fill)", () => {
@@ -193,15 +302,54 @@ describe("Walking Bass — bossa", () => {
     // Last note keeps original duration
     expect(notes[1].duration).toBeGreaterThan(0);
   });
+
+  it("all 4 patterns appear across many trials", () => {
+    // Pattern distribution: root-5th (50%), root-3rd (25%), root-approach (15%), 5th-root (10%)
+    // Use multi-chord progressions so prevPitch is set (enables all patterns)
+    const chords = [
+      makeChord("C", "maj7", 0),
+      makeChord("F", "7", 4),
+      makeChord("G", "7", 8),
+      makeChord("C", "maj7", 12),
+    ];
+    let rootFifth = 0, rootThird = 0, rootApproach = 0, fifthRoot = 0;
+    const trials = 200;
+    for (let i = 0; i < trials; i++) {
+      const notes = generateWalkingBass(chords, { style: "bossa", tempo: 120 });
+      // Check 2nd chord onwards (first chord is always root-5th)
+      for (let c = 1; c < 4; c++) {
+        const n1 = notes[c * 2];
+        const n2 = notes[c * 2 + 1];
+        const n1pc = n1.pitch % 12;
+        const n2pc = n2.pitch % 12;
+        const chordRoot = [0, 5, 7, 0][c]; // C, F, G, C
+        if (n1pc === chordRoot && n2pc === (chordRoot + 7) % 12) rootFifth++;
+        else if (n1pc !== chordRoot && n2pc === chordRoot) fifthRoot++;
+        else if (n1pc === chordRoot) {
+          // Differentiate 3rd vs approach
+          const dist = Math.abs(n2.pitch - n1.pitch);
+          if (dist <= 2) rootApproach++;
+          else rootThird++;
+        }
+      }
+    }
+    // All patterns should appear at least once (200*3=600 samples)
+    expect(rootFifth).toBeGreaterThan(0);
+    expect(rootThird).toBeGreaterThan(0);
+    expect(rootApproach).toBeGreaterThan(0);
+    expect(fifthRoot).toBeGreaterThan(0);
+  });
 });
 
 // ── Latin Style Tests ──
 
 describe("Walking Bass — latin", () => {
-  it("produces 4 notes per measure (tumbao pattern)", () => {
+  it("produces 3-4 notes per measure (tumbao variations)", () => {
+    // Latin now has pattern variations: 3-note anticipated and 4-note standard
     const chords = [makeChord("C", "maj7", 0)];
     const notes = generateWalkingBass(chords, { style: "latin", tempo: 100 });
-    expect(notes.length).toBe(4);
+    expect(notes.length).toBeGreaterThanOrEqual(3);
+    expect(notes.length).toBeLessThanOrEqual(4);
   });
 
   it("first note is root", () => {
@@ -216,6 +364,35 @@ describe("Walking Bass — latin", () => {
     const beatDur = 60 / 120;
     // Second note at beat 1.5 (syncopated)
     expect(notes[1].time).toBeCloseTo(beatDur * 1.5);
+  });
+
+  it("all 4 tumbao patterns appear across many trials", () => {
+    // Pattern 0: classic (4 notes, root first) - 40%
+    // Pattern 1: melodic (4 notes, root first) - 25%
+    // Pattern 2: approach (4 notes, root first) - 20%
+    // Pattern 3: anticipated (3 notes, NOT root first) - 15%
+    const chords = [
+      makeChord("C", "maj7", 0),
+      makeChord("F", "7", 4),
+      makeChord("G", "7", 8),
+    ];
+    let fourNote = 0, threeNote = 0;
+    const trials = 200;
+    for (let i = 0; i < trials; i++) {
+      const notes = generateWalkingBass(chords, { style: "latin", tempo: 120 });
+      // Count notes per chord (chord at idx 1+ to skip first-chord guard)
+      const beatDur = 60 / 120;
+      for (let c = 1; c < 3; c++) {
+        const chordStart = c * 4 * beatDur;
+        const chordEnd = (c + 1) * 4 * beatDur;
+        const chordNotes = notes.filter(n => n.time >= chordStart - 0.01 && n.time < chordEnd - 0.01);
+        if (chordNotes.length === 4) fourNote++;
+        else if (chordNotes.length === 3) threeNote++;
+      }
+    }
+    // Both 3-note and 4-note patterns should appear
+    expect(fourNote).toBeGreaterThan(0);
+    expect(threeNote).toBeGreaterThan(0);
   });
 });
 

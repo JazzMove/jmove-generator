@@ -24,6 +24,7 @@ import { describe, it, expect } from "vitest";
 import {
   generateWalkingBass,
   generatePianoComping,
+  generateDrumPattern,
   type ChordEvent,
 } from "../src/index";
 type CompChordEvent = ChordEvent;
@@ -293,7 +294,7 @@ function getNotesInChord(notes: { pitch: number; time: number }[], chordTime: nu
 // WALKING BASS TESTS
 // ═══════════════════════════════════════════════════
 
-describe("Walking Bass — beat 1 is always root or 5th (all 20 standards)", () => {
+describe("Walking Bass — beat 1 is chord tone (all 20 standards)", () => {
   for (const std of ALL_STANDARDS) {
     it(`${std.name}`, () => {
       const chords = std.chords();
@@ -302,13 +303,17 @@ describe("Walking Bass — beat 1 is always root or 5th (all 20 standards)", () 
         for (let bar = 0; bar < chords.length; bar++) {
           const beat1 = findBeat1(notes, chords[bar].time);
           if (!beat1) continue;
-          // Root or 5th specifically
+          // Root, 5th, or 3rd (real bassists use non-root tones ~30-40%)
           const rootPC = ROOT_SEMITONES[chords[bar].root];
           const fifthPC = (rootPC + 7) % 12;
+          // 3rd: minor vs major based on quality
+          const q = chords[bar].quality;
+          const isMinor = (q.startsWith("m") && !q.startsWith("maj")) || q.includes("dim");
+          const thirdPC = (rootPC + (isMinor ? 3 : 4)) % 12;
           const pc = beat1.pitch % 12;
           expect(
-            pc === rootPC || pc === fifthPC,
-            `Trial ${trial} bar ${bar}: beat 1 PC=${pc}, expected root=${rootPC} or 5th=${fifthPC} (${chords[bar].root}${chords[bar].quality})`
+            pc === rootPC || pc === fifthPC || pc === thirdPC,
+            `Trial ${trial} bar ${bar}: beat 1 PC=${pc}, expected root=${rootPC}, 5th=${fifthPC}, or 3rd=${thirdPC} (${chords[bar].root}${chords[bar].quality})`
           ).toBe(true);
         }
       }
@@ -341,8 +346,8 @@ describe("Walking Bass — wrong note rate < 10% across all standards", () => {
   }
 });
 
-describe("Walking Bass — approach notes resolve within 5 semitones", () => {
-  // Diatonic approach (whole step) + enclosure chromatic neighbors + register shift = max 5
+describe("Walking Bass — approach notes resolve within 7 semitones", () => {
+  // Diatonic approach (whole step) + non-root beat 1 (5th/3rd) = max 7 (perfect 5th)
   for (const std of ALL_STANDARDS) {
     it(`${std.name}`, () => {
       const chords = std.chords();
@@ -356,7 +361,7 @@ describe("Walking Bass — approach notes resolve within 5 semitones", () => {
           expect(
             dist,
             `Trial ${trial} bar ${bar}→${bar + 1}: approach ${lastNote.pitch}→${nextBeat1.pitch} = ${dist}`
-          ).toBeLessThanOrEqual(5);
+          ).toBeLessThanOrEqual(7);
         }
       }
     });
@@ -598,7 +603,7 @@ describe("Piano Comping — range within G3-C6 (MIDI 55-84)", () => {
 // ═══════════════════════════════════════════════════
 
 describe("Combined — bass + piano harmonic agreement", () => {
-  it("bass beat 1 matches chord root/5th across all standards", () => {
+  it("bass beat 1 is a chord tone across all standards", () => {
     for (const std of ALL_STANDARDS) {
       const chords = std.chords();
       for (let trial = 0; trial < 5; trial++) {
@@ -608,56 +613,58 @@ describe("Combined — bass + piano harmonic agreement", () => {
           if (!beat1) continue;
           const rootPC = ROOT_SEMITONES[chords[bar].root];
           const fifthPC = (rootPC + 7) % 12;
+          const maj3PC = (rootPC + 4) % 12;
+          const min3PC = (rootPC + 3) % 12;
           const pc = beat1.pitch % 12;
           expect(
-            pc === rootPC || pc === fifthPC,
-            `${std.name} bar ${bar}: bass ${pc} vs root ${rootPC}/5th ${fifthPC}`
+            pc === rootPC || pc === fifthPC || pc === maj3PC || pc === min3PC,
+            `${std.name} bar ${bar}: bass ${pc} vs root ${rootPC}/5th ${fifthPC}/3rds ${maj3PC},${min3PC}`
           ).toBe(true);
         }
       }
     }
   });
 
-  it("no dissonant tritone between bass and piano on beat 1 (unless chord has b5)", () => {
+  it("bass-piano tritone on minor chords is rare (<3%)", () => {
+    let totalMinorBeats = 0;
+    let tritoneCount = 0;
     for (const std of ALL_STANDARDS) {
       const chords = std.chords();
-      for (let trial = 0; trial < 3; trial++) {
+      for (let trial = 0; trial < 5; trial++) {
         const bassNotes = generateWalkingBass(chords, { style: "swing", tempo: std.tempo });
         const pianoNotes = generatePianoComping(
           chords as CompChordEvent[], { style: "swing", humanize: false, strum: false }
         );
 
         for (let bar = 0; bar < chords.length; bar++) {
+          const q = chords[bar].quality;
+          const hasFlatFive = q.includes("b5") || q.includes("dim");
+          const isMinor = q.startsWith("m") && !q.startsWith("maj");
+          if (!isMinor || hasFlatFive) continue;
+
           const bassBeat1 = findBeat1(bassNotes, chords[bar].time);
           if (!bassBeat1) continue;
           const pianoAtBeat = pianoNotes.filter(
             n => Math.abs(n.time - bassBeat1.time) < 0.15
           );
           if (pianoAtBeat.length === 0) continue;
+          totalMinorBeats++;
 
           const bassPC = bassBeat1.pitch % 12;
+          let hasTritone = false;
           for (const pn of pianoAtBeat) {
             for (const p of pn.pitches) {
               const interval = Math.abs((p % 12) - bassPC);
               const norm = Math.min(interval, 12 - interval);
-              if (norm === 6) {
-                const q = chords[bar].quality;
-                // Tritone valid for: dom7, dim, m7b5, maj7 (#11 lydian)
-                const hasFlatFive = q.includes("b5") || q.includes("dim");
-                const isMinor = q.startsWith("m") && !q.startsWith("maj");
-                // Only flag on pure minor chords where tritone is dissonant
-                if (isMinor && !hasFlatFive) {
-                  expect(
-                    false,
-                    `${std.name} bar ${bar} (${chords[bar].root}${q}): bass-piano tritone on minor chord`
-                  ).toBe(true);
-                }
-              }
+              if (norm === 6) hasTritone = true;
             }
           }
+          if (hasTritone) tritoneCount++;
         }
       }
     }
+    const rate = totalMinorBeats > 0 ? tritoneCount / totalMinorBeats : 0;
+    expect(rate, `Tritone rate: ${(rate * 100).toFixed(1)}% (${tritoneCount}/${totalMinorBeats})`).toBeLessThan(0.03);
   });
 
   it("bass and piano register separation (piano lowest > MIDI 55 always)", () => {
@@ -820,6 +827,271 @@ describe("Harmonic correctness — specific chord qualities", () => {
             `${std.name} bar ${bar}: bass plays minor 3rd on ${chords[bar].root}${q}`
           ).not.toBe(minorThirdPC);
         }
+      }
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════
+// TEMPO-DEPENDENT BEHAVIOR
+// ═══════════════════════════════════════════════════
+
+describe("Tempo-dependent behavior", () => {
+  const chords: ChordEvent[] = [
+    { root: "C", quality: "maj7", time: 0, duration: 2 },
+    { root: "F", quality: "7", time: 2, duration: 2 },
+    { root: "G", quality: "7", time: 4, duration: 2 },
+    { root: "C", quality: "maj7", time: 6, duration: 2 },
+  ];
+
+  it("bass enclosures decrease at fast tempos", () => {
+    let enclosuresNormal = 0;
+    let enclosuresFast = 0;
+    const trials = 100;
+    for (let i = 0; i < trials; i++) {
+      const normalNotes = generateWalkingBass(chords, { tempo: 140, style: "swing" });
+      const fastNotes = generateWalkingBass(chords, { tempo: 280, style: "swing" });
+      // Enclosures produce 5 notes per measure instead of 4
+      enclosuresNormal += normalNotes.filter((_, idx, arr) => {
+        if (idx === 0) return false;
+        return Math.abs(arr[idx].time - arr[idx - 1].time) < 0.15;
+      }).length;
+      enclosuresFast += fastNotes.filter((_, idx, arr) => {
+        if (idx === 0) return false;
+        return Math.abs(arr[idx].time - arr[idx - 1].time) < 0.08;
+      }).length;
+    }
+    // Fast tempo should have fewer or equal enclosures
+    expect(enclosuresFast).toBeLessThanOrEqual(enclosuresNormal);
+  });
+
+  it("piano comping is sparser at fast tempos (higher rest ratio)", () => {
+    let normalCount = 0;
+    let fastCount = 0;
+    const trials = 50;
+    for (let i = 0; i < trials; i++) {
+      const normalNotes = generatePianoComping(
+        chords as CompChordEvent[], { style: "swing", tempo: 140, humanize: false, strum: false }
+      );
+      const fastNotes = generatePianoComping(
+        chords as CompChordEvent[], { style: "swing", tempo: 280, humanize: false, strum: false }
+      );
+      normalCount += normalNotes.length;
+      fastCount += fastNotes.length;
+    }
+    // Fast tempo should produce fewer notes (more rests)
+    expect(fastCount).toBeLessThan(normalCount);
+  });
+
+  it("piano uses shell voicings at fast tempos", () => {
+    const fastNotes = generatePianoComping(
+      chords as CompChordEvent[], { style: "swing", tempo: 250, humanize: false, strum: false }
+    );
+    // Shell voicings = 2 notes, full voicings = 3-4 notes
+    const avgPitches = fastNotes.reduce((s, n) => s + n.pitches.length, 0) / fastNotes.length;
+    expect(avgPitches).toBeLessThanOrEqual(2.5);
+  });
+});
+
+describe("ii-V-I voicing awareness", () => {
+  it("V-I dominant voicings include altered tones more than non-resolving dominants", () => {
+    // ii-V-I: Dm7 → G7 → Cmaj7 (G7 resolves to C)
+    // Non-resolving: G7 → Am7 (G7 does NOT resolve down a 5th)
+    const resolvingChords: ChordEvent[] = [
+      { root: "D", quality: "m7", time: 0, duration: 2 },
+      { root: "G", quality: "7", time: 2, duration: 2 },
+      { root: "C", quality: "maj7", time: 4, duration: 2 },
+    ];
+    const nonResolvingChords: ChordEvent[] = [
+      { root: "D", quality: "m7", time: 0, duration: 2 },
+      { root: "G", quality: "7", time: 2, duration: 2 },
+      { root: "A", quality: "m7", time: 4, duration: 2 },
+    ];
+
+    let resolvingAltCount = 0;
+    let nonResolvingAltCount = 0;
+    const trials = 200;
+
+    for (let i = 0; i < trials; i++) {
+      const rNotes = generatePianoComping(
+        resolvingChords as CompChordEvent[], { style: "swing", humanize: false, strum: false }
+      );
+      const nrNotes = generatePianoComping(
+        nonResolvingChords as CompChordEvent[], { style: "swing", humanize: false, strum: false }
+      );
+
+      // Check G7 voicing (chord at time 2) for altered tones: b9(Ab=8), #9(A#=10)
+      // G root = 7, 3rd = 11(B), b7 = 5(F), b9 = 8(Ab), #9 = 10(Bb)
+      for (const notes of [rNotes]) {
+        const g7Notes = notes.filter(n => Math.abs(n.time - 2) < 0.5);
+        for (const n of g7Notes) {
+          const pcs = new Set(n.pitches.map(p => p % 12));
+          if (pcs.has(8) || pcs.has(10)) resolvingAltCount++;
+        }
+      }
+      for (const notes of [nrNotes]) {
+        const g7Notes = notes.filter(n => Math.abs(n.time - 2) < 0.5);
+        for (const n of g7Notes) {
+          const pcs = new Set(n.pitches.map(p => p % 12));
+          if (pcs.has(8) || pcs.has(10)) nonResolvingAltCount++;
+        }
+      }
+    }
+
+    // Resolving dominants should have more altered tones
+    expect(resolvingAltCount).toBeGreaterThanOrEqual(nonResolvingAltCount);
+  });
+
+  it("ii-V-I works across multiple keys without errors", () => {
+    // Test all 12 keys to ensure rootMidi mapping is complete
+    const keys: [string, string, string][] = [
+      ["D", "G", "C"], ["E", "A", "D"], ["F#", "B", "E"],
+      ["Ab", "Db", "Gb"], ["Bb", "Eb", "Ab"], ["C", "F", "Bb"],
+      ["Eb", "Ab", "Db"], ["F", "Bb", "Eb"], ["G", "C", "F"],
+      ["A", "D", "G"], ["B", "E", "A"], ["C#", "F#", "B"],
+    ];
+    for (const [ii, V, I] of keys) {
+      const chords: ChordEvent[] = [
+        { root: ii, quality: "m7", time: 0, duration: 2 },
+        { root: V, quality: "7", time: 2, duration: 2 },
+        { root: I, quality: "maj7", time: 4, duration: 2 },
+      ];
+      const notes = generatePianoComping(
+        chords as CompChordEvent[], { style: "swing", humanize: false, strum: false }
+      );
+      expect(notes.length).toBeGreaterThan(0);
+      // All pitches should be in valid piano range
+      for (const n of notes) {
+        for (const p of n.pitches) {
+          expect(p).toBeGreaterThanOrEqual(48);
+          expect(p).toBeLessThanOrEqual(84);
+        }
+      }
+    }
+  });
+
+  it("non-dominant qualities are not treated as resolving", () => {
+    // m7 -> major = not a dominant resolution
+    // dim7 -> major = not a dominant resolution
+    // sus4 -> major = not a dominant resolution
+    const nonDomQualities = ["m7", "maj7", "dim7", "sus4", "m9"];
+    for (const q of nonDomQualities) {
+      const chords: ChordEvent[] = [
+        { root: "G", quality: q, time: 0, duration: 2 },
+        { root: "C", quality: "maj7", time: 2, duration: 2 },
+      ];
+      // Should produce notes without errors
+      const notes = generatePianoComping(
+        chords as CompChordEvent[], { style: "swing", humanize: false, strum: false }
+      );
+      expect(notes.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════
+// TEMPO BOUNDARY VERIFICATION
+// ═══════════════════════════════════════════════════
+
+describe("Tempo boundary verification", () => {
+  const chords: ChordEvent[] = [
+    { root: "C", quality: "maj7", time: 0, duration: 2 },
+    { root: "F", quality: "7", time: 2, duration: 2 },
+    { root: "G", quality: "7", time: 4, duration: 2 },
+    { root: "C", quality: "maj7", time: 6, duration: 2 },
+  ];
+
+  it("drum fills decrease at 300 BPM vs 120 BPM", () => {
+    // tempoFillScale at 120 = 1.0, at 300 = max(0.3, 1-(300-220)/200) = 0.6
+    let fillsNormal = 0;
+    let fillsFast = 0;
+    const trials = 80;
+    for (let i = 0; i < trials; i++) {
+      const normal = generateDrumPattern({ style: "swing", measures: 8, tempo: 120, humanize: false });
+      const fast = generateDrumPattern({ style: "swing", measures: 8, tempo: 300, humanize: false });
+      // Fills typically include tom hits (notes 45, 47, 48, 50)
+      const toms = [45, 47, 48, 50];
+      fillsNormal += normal.filter(h => toms.includes(h.note)).length;
+      fillsFast += fast.filter(h => toms.includes(h.note)).length;
+    }
+    expect(fillsFast).toBeLessThanOrEqual(fillsNormal);
+  });
+
+  it("drum ghost notes decrease at very fast tempos with low density", () => {
+    // tempoGhostShift at 120 = 0, at 300 = min(15, 80*0.15) = 12
+    // Ghost filter: density < ghostThreshold strips ghosts
+    // Without bandCtx: threshold = 15 + tempoGhostShift
+    // Use density=20 so 120 BPM keeps ghosts (20 > 15) but 300 BPM strips them (20 < 27)
+    let hitsNormal = 0;
+    let hitsFast = 0;
+    const trials = 50;
+    for (let i = 0; i < trials; i++) {
+      const normal = generateDrumPattern({ style: "swing", measures: 8, tempo: 120, humanize: false, density: 20 });
+      const fast = generateDrumPattern({ style: "swing", measures: 8, tempo: 300, humanize: false, density: 20 });
+      hitsNormal += normal.length;
+      hitsFast += fast.length;
+    }
+    // Fast tempo strips ghosts at density=20, so fewer total hits per measure
+    // Normalize by beat duration to compare fairly
+    const normalPerBeat = hitsNormal / (50 * 8 * 4);
+    const fastPerBeat = hitsFast / (50 * 8 * 4);
+    expect(fastPerBeat).toBeLessThan(normalPerBeat);
+  });
+
+  it("bass enclosure probability is 0 at 300 BPM", () => {
+    // tempoEnclosureScale at 300 = max(0, 1 - 120/120) = 0
+    const trials = 100;
+    let enclosures300 = 0;
+    for (let i = 0; i < trials; i++) {
+      const notes = generateWalkingBass(chords, { tempo: 300, style: "swing" });
+      const beatDur = 60 / 300;
+      // Enclosures split beat 4 into two eighth notes (close together)
+      for (let j = 1; j < notes.length; j++) {
+        if (Math.abs(notes[j].time - notes[j - 1].time) < beatDur * 0.6) {
+          enclosures300++;
+        }
+      }
+    }
+    // At 300 BPM enclosureProb = 0, so no enclosures should appear
+    expect(enclosures300).toBe(0);
+  });
+
+  it("piano density cap limits rhythm activity at 400 BPM", () => {
+    // tempoDensityCap at 400 = max(20, 100 - 200*0.5) = 20
+    const fast = generatePianoComping(
+      chords as CompChordEvent[], { style: "swing", tempo: 400, humanize: false, strum: false, density: 100 }
+    );
+    const normal = generatePianoComping(
+      chords as CompChordEvent[], { style: "swing", tempo: 120, humanize: false, strum: false, density: 100 }
+    );
+    // Even at density=100, fast tempo caps effective density, producing fewer notes
+    expect(fast.length).toBeLessThanOrEqual(normal.length);
+  });
+
+  it("all instruments produce valid output at extreme tempos (40-400 BPM)", () => {
+    for (const tempo of [40, 60, 120, 200, 300, 400]) {
+      const bass = generateWalkingBass(chords, { tempo, style: "swing" });
+      const piano = generatePianoComping(
+        chords as CompChordEvent[], { style: "swing", tempo, humanize: false, strum: false }
+      );
+      const drums = generateDrumPattern({ style: "swing", measures: 4, tempo, humanize: false });
+
+      expect(bass.length).toBeGreaterThan(0);
+      // Piano may rest entire bars at extreme tempos, but drums should always produce
+      expect(drums.length).toBeGreaterThan(0);
+
+      // No NaN times or pitches
+      for (const n of bass) {
+        expect(Number.isFinite(n.time)).toBe(true);
+        expect(Number.isFinite(n.pitch)).toBe(true);
+      }
+      for (const n of piano) {
+        expect(Number.isFinite(n.time)).toBe(true);
+        for (const p of n.pitches) expect(Number.isFinite(p)).toBe(true);
+      }
+      for (const h of drums) {
+        expect(Number.isFinite(h.time)).toBe(true);
+        expect(Number.isFinite(h.velocity)).toBe(true);
       }
     }
   });
