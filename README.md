@@ -1,6 +1,6 @@
 # @jmove/generator
 
-Jazz backing track generator — walking bass lines, piano comping, drum patterns, and full jam sessions from chord progressions.
+Jazz backing track generator. Walking bass, piano comping, drum patterns, and full ensemble sessions from chord progressions.
 
 Zero dependencies. TypeScript. ESM + CJS.
 
@@ -10,35 +10,45 @@ Zero dependencies. TypeScript. ESM + CJS.
 
 ## Demo
 
-Try the live app at **[jmove.it.com](https://jmove.it.com)** — the Practice Player uses this package to generate all backing tracks in real time.
+Try the live app at **[jmove.it.com](https://jmove.it.com)** - the Practice Player uses this package to generate all backing tracks in real time.
 
 ### Stories
 
 Deep technical articles about how JMove and the generator work:
 
-- [Inside @jmove/generator: Every Algorithm Explained](https://upfusion.net/stories/open-source-jazz-generator) — Evans voicings, stochastic drum comping, groove templates, 996 tests
-- [Building JMove: Architecture of a Jazz Practice Tool](https://upfusion.net/stories/building-jmove) — three engines, two languages, 45 chord qualities, 26 style presets
-- [Walking Bass from First Principles](https://upfusion.net/stories/walking-bass-from-first-principles) — contour-first planning, approach weights, two-bar phrasing arcs
-- [1,511 Jazz Standards in Your Browser](https://upfusion.net/stories/jazz-standards-browser) — iReal Pro URI decoding, 43-rule quality map, 748KB offline database
-- [Five Ways to See a Chord](https://upfusion.net/stories/five-notation-views) — Zustand sync, DFS fretboard search, Viterbi voice-leading optimizer
-- [14 Ways to Reharmonize a Jazz Standard](https://upfusion.net/stories/14-ways-to-reharmonize) — tritone subs to Coltrane changes, every technique with history and theory
+- [Inside @jmove/generator: Every Algorithm Explained](https://upfusion.net/stories/open-source-jazz-generator) - Evans voicings, stochastic drum comping, groove templates
+- [Building JMove: Architecture of a Jazz Practice Tool](https://upfusion.net/stories/building-jmove) - three engines, two languages, 45 chord qualities, 26 style presets
+- [Walking Bass from First Principles](https://upfusion.net/stories/walking-bass-from-first-principles) - contour-first planning, approach weights, two-bar phrasing arcs
+- [1,511 Jazz Standards in Your Browser](https://upfusion.net/stories/jazz-standards-browser) - iReal Pro URI decoding, 43-rule quality map, 748KB offline database
+- [Five Ways to See a Chord](https://upfusion.net/stories/five-notation-views) - Zustand sync, DFS fretboard search, Viterbi voice-leading optimizer
+- [14 Ways to Reharmonize a Jazz Standard](https://upfusion.net/stories/14-ways-to-reharmonize) - tritone subs to Coltrane changes, every technique with history and theory
+
+---
 
 ## Features
 
-- **Per-Instrument Complexity** — 3 general sliders (drumComplexity, pianoComplexity, bassComplexity) drive 13 granular sub-controls via piecewise linear mapping. Drums: tomFrequency, fillIntensity, rideWash, ghostDensity, cymbalColor. Piano: voicingDensity, rhythmicActivity, registerRange, anticipation. Bass: chromaticApproach, registerWidth, syncopation, beatVariety. Manual overrides take precedence over derived values
-- **Musicality Engine** — phrase-level intelligence: dynamic drops, air gaps, harmonic anticipation, passing chords, conversation dynamics, motif memory. Four parameters (creativity, conversation, airGaps, harmonicFreedom) control how musical and surprising the output sounds
-- **Ensemble Coordination** — `generateEnsemble()` produces drums, bass, and piano as a coordinated band. Kick patterns shape bass timing, bass register guides piano voicings, drum density modulates comping activity
-- **Seedable & Reproducible** — deterministic PRNG (xoshiro128**) with per-instrument streams. Save a seed, replay the exact same take
-- **Jam Session Generator** — random chord progressions across 17 jazz forms (blues, rhythm changes, AABA, modal, Coltrane matrix, and more)
-- **Walking Bass** — rule-based walking lines with dissonance filtering, chromatic approaches, pattern variety, 19 styles (swing, bossa, Latin tumbao, neo-soul, math rock, IDM), proper odd-meter groupings (11/8, 7/8, 5/4)
-- **Piano Comping** — Bill Evans rootless voicings (Type A/B), quartal, shell, cluster — all quality-aware (diatonic intervals per chord type), voice-led with rhythmic templates per style
-- **Drum Patterns** — 19 styles with humanization, ghost notes, groove templates based on GrooVAE research. Holdsworth preset features Chad Wackerman-inspired drumming: cross-stick interjections, ghost cascades, linear fills, 11/8-specific patterns with asymmetric grouping accents
-- **23 Style Presets** — Classic Swing to IDM, with per-instrument style overrides and tuned musicality parameters
-- **Auto-Detect** — analyze a score to recommend the best preset
-- **Full Song Form** — multi-section arrangements with dynamic shaping
-- **Phrase-Aware Generation** — 2/4/8-bar phrase boundaries with section-driven dynamics (intro sparse, shout dense)
-- **Streaming Iterator** — `generateEnsembleMeasures()` yields measure-by-measure for incremental generation
-- **Groove Templates** — structured micro-timing offsets per instrument, not random jitter
+**Generation**
+- **Ensemble Coordination** - `generateEnsemble()` produces drums, bass, and piano as a coordinated band. Kick patterns shape bass timing, bass register guides piano voicings, drum density modulates comping activity
+- **Streaming Iterator** - `generateEnsembleMeasures()` yields measure-by-measure for incremental generation
+- **Jam Session Generator** - random chord progressions across 17 jazz forms (blues, rhythm changes, AABA, modal, Coltrane matrix, and more)
+
+**Instruments**
+- **Walking Bass** - rule-based walking lines with dissonance filtering, chromatic approaches, pattern variety, 19 styles (swing, bossa, Latin tumbao, neo-soul, math rock, IDM), proper odd-meter groupings (11/8, 7/8, 5/4)
+- **Piano Comping** - Bill Evans rootless voicings (Type A/B), quartal, shell, cluster - all quality-aware with diatonic intervals per chord type, voice-led with rhythmic templates per style
+- **Drum Patterns** - 19 styles with humanization, ghost notes, groove templates based on GrooVAE research. Holdsworth preset features Chad Wackerman-inspired drumming: cross-stick interjections, ghost cascades, linear fills, 11/8-specific patterns
+
+**Intelligence**
+- **Musicality Engine** - phrase-level intelligence: dynamic drops, air gaps, harmonic anticipation, passing chords, conversation dynamics, motif memory. Four parameters (creativity, conversation, airGaps, harmonicFreedom) control musical character
+- **Per-Instrument Complexity** - 3 general sliders drive 13 granular sub-controls via piecewise linear mapping. Manual overrides take precedence over derived values
+- **Full Song Form** - multi-section arrangements with dynamic shaping and section-driven dynamics (intro sparse, shout dense)
+- **Auto-Detect** - analyze a score to recommend the best preset
+
+**Quality**
+- **Seedable and Reproducible** - deterministic PRNG (xoshiro128**) with per-instrument streams. Save a seed, replay the exact same take
+- **Groove Templates** - structured micro-timing offsets per instrument, not random jitter
+- **23 Style Presets** - Classic Swing to IDM, with per-instrument style overrides and tuned musicality parameters
+
+---
 
 ## Install
 
@@ -47,6 +57,8 @@ npm install @jmove/generator
 ```
 
 Requires Node.js 20+.
+
+---
 
 ## Quick Start
 
@@ -64,14 +76,14 @@ const session = generateJamSession({
   timeSignature: [4, 4],
 });
 
-// Generate coordinated ensemble (drums → bass → piano)
+// Generate coordinated ensemble (drums -> bass -> piano)
 const chords = scoreChordsToEvents(session.score.measures);
 const result = generateEnsemble({
   chordEvents: chords,
   style: 'swing',
   tempo: 140,
   measures: 12,
-  seed: 42,  // deterministic — omit for random
+  seed: 42,  // deterministic - omit for random
 });
 
 console.log(result.drums.length, 'drum hits');
@@ -96,6 +108,8 @@ const piano = generatePianoComping(chords, { style: 'swing', tempo: 140 });
 const drums = generateDrumPattern({ style: 'swing', tempo: 140, measures: 12 });
 ```
 
+---
+
 ## API Reference
 
 ### Jam Session
@@ -106,19 +120,19 @@ Generate a complete chord progression with score.
 
 ```typescript
 interface JamConfig {
-  key: JamKey;                    // 'C' | 'Db' | 'D' | ... | 'B'
-  form: JamForm;                  // 'blues12' | 'rhythm32' | 'aaba32' | ...
-  style: PracticeStyle;           // 'swing' | 'bossa' | 'funk' | ...
-  tempo: number;                  // BPM (must be > 0)
+  key: JamKey;                     // 'C' | 'Db' | 'D' | ... | 'B'
+  form: JamForm;                   // 'blues12' | 'rhythm32' | 'aaba32' | ...
+  style: PracticeStyle;            // 'swing' | 'bossa' | 'funk' | ...
+  tempo: number;                   // BPM (must be > 0)
   timeSignature: [number, number]; // e.g. [4, 4], [3, 4], [7, 8]
-  measures?: number;              // override measure count (for 'free' form)
+  measures?: number;               // override measure count (for 'free' form)
 }
 
 interface JamResult {
-  score: QuantizedScore;          // full score with measures and chords
+  score: QuantizedScore;           // full score with measures and chords
   config: JamConfig;
-  progressionLabel: string;       // e.g. "Bb7 | Eb7 | Bb7 | ..."
-  sections?: SongSection[];       // for 'fullSong' form
+  progressionLabel: string;        // e.g. "Bb7 | Eb7 | Bb7 | ..."
+  sections?: SongSection[];        // for 'fullSong' form
 }
 ```
 
@@ -132,13 +146,11 @@ Get available forms for a style (e.g. waltz styles get waltz-compatible forms).
 
 #### `enrichQuality(quality): string`
 
-Normalize chord quality strings (e.g. `'-'` → `'m'`, `'^7'` → `'maj7'`).
+Normalize chord quality strings (e.g. `'-'` -> `'m'`, `'^7'` -> `'maj7'`).
 
 ### Walking Bass
 
-#### `generateWalkingBass(chords: ChordEvent[], options?: WalkingBassOptions): BassNote[]`
-
-Generate a walking bass line from chord events.
+#### `generateWalkingBass(chords, options?): BassNote[]`
 
 ```typescript
 interface BassNote {
@@ -149,7 +161,7 @@ interface BassNote {
 }
 
 interface WalkingBassOptions {
-  style?: string;    // affects pattern: swing=quarter walk, bossa=root-5th, latin=tumbao
+  style?: string;    // swing=quarter walk, bossa=root-5th, latin=tumbao
   tempo?: number;    // affects swing ratio and dynamics
   swingAmount?: number;
   density?: number;
@@ -163,13 +175,11 @@ Extract chord events with timing from score measures.
 
 ### Piano Comping
 
-#### `generatePianoComping(chords: ChordEvent[], options?: PianoCompingOptions): CompNote[]`
-
-Generate piano voicings with rhythmic comping patterns.
+#### `generatePianoComping(chords, options?): CompNote[]`
 
 ```typescript
 interface CompNote {
-  pitches: number[];  // MIDI pitches (chord voicing)
+  pitches: number[];  // MIDI pitches (chord voicing, G3-C6)
   time: number;
   duration: number;
   velocity: number;
@@ -181,16 +191,14 @@ interface PianoCompingOptions {
   humanize?: boolean;
   swingAmount?: number;
   density?: number;
-  strum?: boolean;    // arpeggiate voicings
-  strumMs?: number;   // strum speed in ms
+  strum?: boolean;    // arpeggiate voicings (3+ note chords only)
+  strumMs?: number;   // strum speed in ms (default 20)
 }
 ```
 
 ### Drum Patterns
 
-#### `generateDrumPattern(options: DrumPatternOptions): DrumHit[]`
-
-Generate a drum pattern for the specified style and duration.
+#### `generateDrumPattern(options): DrumHit[]`
 
 ```typescript
 interface DrumHit {
@@ -217,24 +225,23 @@ interface DrumPatternOptions {
 General MIDI drum map constants:
 
 ```typescript
-GM_DRUMS.KICK          // 36
-GM_DRUMS.SNARE         // 38
-GM_DRUMS.HI_HAT_CLOSED // 42
-GM_DRUMS.HI_HAT_OPEN  // 46
-GM_DRUMS.RIDE          // 51
-GM_DRUMS.CRASH         // 49
-GM_DRUMS.SPLASH        // 55
-GM_DRUMS.CHINA         // 52
-GM_DRUMS.TOM_HIGH      // 50
-GM_DRUMS.TOM_MID       // 47
-GM_DRUMS.TOM_LOW       // 45
-GM_DRUMS.TOM_FLOOR     // 43
-// ... and more
+GM_DRUMS.KICK           // 36
+GM_DRUMS.SNARE          // 38
+GM_DRUMS.HI_HAT_CLOSED  // 42
+GM_DRUMS.HI_HAT_OPEN   // 46
+GM_DRUMS.RIDE           // 51
+GM_DRUMS.CRASH          // 49
+GM_DRUMS.SPLASH         // 55
+GM_DRUMS.CHINA          // 52
+GM_DRUMS.TOM_HIGH       // 50
+GM_DRUMS.TOM_MID        // 47
+GM_DRUMS.TOM_LOW        // 45
+GM_DRUMS.TOM_FLOOR      // 43
 ```
 
 ### Ensemble
 
-#### `generateEnsemble(options: EnsembleOptions): EnsembleResult`
+#### `generateEnsemble(options): EnsembleResult`
 
 Generate a coordinated ensemble with built-in alignment and phrase awareness.
 
@@ -245,33 +252,33 @@ interface EnsembleOptions {
   tempo: number;
   measures: number;
   timeSignature?: [number, number];
-  sections?: SongSection[];        // section-driven dynamics
+  sections?: SongSection[];
   density?: number;                // 0-100
   swingAmount?: number;            // 0-100
   strumMs?: number;                // 0-30
   seed?: number;                   // omit = random, provide = deterministic
   instrumentStyles?: InstrumentStyles;
-  creativity?: number;             // 0-100: surprise frequency
-  conversation?: number;           // 0-100: inter-instrument responsiveness
-  airGaps?: number;                // 0-100: intentional silence
-  harmonicFreedom?: number;        // 0-100: reharmonization intensity
-  drumGranular?: DrumGranular;     // per-control drum overrides
-  pianoGranular?: PianoGranular;   // per-control piano overrides
-  bassGranular?: BassGranular;     // per-control bass overrides
+  creativity?: number;             // 0-100
+  conversation?: number;           // 0-100
+  airGaps?: number;                // 0-100
+  harmonicFreedom?: number;        // 0-100
+  drumGranular?: DrumGranular;
+  pianoGranular?: PianoGranular;
+  bassGranular?: BassGranular;
 }
 
 interface EnsembleResult {
   drums: DrumHit[];
   bass: BassNote[];
   piano: CompNote[];
-  seed: number;                    // always returned for replay
-  context: BandContext;            // coordination state (kick times, bass register, etc.)
+  seed: number;
+  context: BandContext;
 }
 ```
 
-#### `generateEnsembleMeasures(options: EnsembleOptions): Generator<MeasureSlice>`
+#### `generateEnsembleMeasures(options): Generator<MeasureSlice>`
 
-Streaming version — yields one measure at a time for incremental generation.
+Streaming version - yields one measure at a time.
 
 ```typescript
 for (const slice of generateEnsembleMeasures(options)) {
@@ -279,16 +286,13 @@ for (const slice of generateEnsembleMeasures(options)) {
 }
 ```
 
-#### `createPRNG(seed: number): RandomFn`
+#### `createPRNG(seed): RandomFn`
 
-Create a seedable random function (xoshiro128**). Pass to any generator via the `random` option for deterministic output.
+Seedable random function (xoshiro128**). Same seed = same output.
 
 ```typescript
-import { createPRNG, generateDrumPattern } from '@jmove/generator';
-
 const rng = createPRNG(42);
 const drums = generateDrumPattern({ style: 'swing', measures: 4, random: rng });
-// Same seed → same drums every time
 ```
 
 ### Complexity Mapping
@@ -297,18 +301,14 @@ const drums = generateDrumPattern({ style: 'swing', measures: 4, random: rng });
 #### `resolvePianoGranular(complexity?, overrides?): PianoGranular`
 #### `resolveBassGranular(complexity?, overrides?): BassGranular`
 
-Map a general complexity slider (0-100, default 50) to per-control values. Manual overrides take precedence.
+Map a general complexity slider (0-100) to per-control values. Manual overrides take precedence.
 
 ```typescript
-import { resolveDrumGranular } from '@jmove/generator';
-
-// Complexity 70 → busier drums, override tom frequency to max
 const drum = resolveDrumGranular(70, { tomFrequency: 85 });
-// drum.tomFrequency = 85 (overridden)
+// drum.tomFrequency = 85  (overridden)
 // drum.fillIntensity = 66 (derived from complexity 70)
 // drum.rideWash = 66, drum.ghostDensity = 58, drum.cymbalColor = 48
 
-// Pass to generateEnsemble
 const result = generateEnsemble({
   chordEvents, style: 'swing', tempo: 140, measures: 12,
   drumGranular: drum,
@@ -317,25 +317,25 @@ const result = generateEnsemble({
 
 ```typescript
 interface DrumGranular {
-  tomFrequency: number;      // 0-100: tom probability in comping + micro-variation
-  fillIntensity: number;     // 0-100: fill frequency and size
-  rideWash: number;          // 0-100: ride cymbal density (sparse → dense)
-  ghostDensity: number;      // 0-100: ghost note frequency
-  cymbalColor: number;       // 0-100: splash/china substitution on section boundaries
+  tomFrequency: number;       // 0-100
+  fillIntensity: number;      // 0-100
+  rideWash: number;           // 0-100
+  ghostDensity: number;       // 0-100
+  cymbalColor: number;        // 0-100
 }
 
 interface PianoGranular {
-  voicingDensity: number;    // 0-100: shell (2-note) → full (4-note) voicings
-  rhythmicActivity: number;  // 0-100: sparse → dense comping patterns
-  registerRange: number;     // 0-100: register drift magnitude (narrow → wide)
-  anticipation: number;      // 0-100: harmonic anticipation probability
+  voicingDensity: number;     // 0-100
+  rhythmicActivity: number;   // 0-100
+  registerRange: number;      // 0-100
+  anticipation: number;       // 0-100
 }
 
 interface BassGranular {
-  chromaticApproach: number; // 0-100: diatonic → chromatic approach tones
-  registerWidth: number;     // 0-100: narrow → full 2-octave range
-  syncopation: number;       // 0-100: 8th-note enclosure fill probability
-  beatVariety: number;       // 0-100: predictable → adventurous beat 2 choices
+  chromaticApproach: number;  // 0-100
+  registerWidth: number;      // 0-100
+  syncopation: number;        // 0-100
+  beatVariety: number;        // 0-100
 }
 ```
 
@@ -343,7 +343,7 @@ interface BassGranular {
 
 #### `STYLE_PRESETS: StylePreset[]`
 
-23 built-in presets:
+23 built-in presets across 6 categories:
 
 | Category | Presets |
 |----------|---------|
@@ -360,67 +360,35 @@ interface StylePreset {
   name: string;
   description: string;
   style: PracticeStyle;
-  instrumentStyles?: {     // per-instrument overrides
-    bass?: PracticeStyle;
-    piano?: PracticeStyle;
-    drums?: PracticeStyle;
-  };
+  instrumentStyles?: { bass?: PracticeStyle; piano?: PracticeStyle; drums?: PracticeStyle };
   parameters: {
-    swingAmount: number;   // 0-100
-    density: number;       // 0-100
-    strumMs?: number;      // 0-30: piano chord strum spread in ms
-    creativity?: number;   // 0-100: surprise frequency
-    conversation?: number; // 0-100: inter-instrument responsiveness
-    airGaps?: number;      // 0-100: intentional silence
-    harmonicFreedom?: number; // 0-100: reharmonization intensity
+    swingAmount: number;
+    density: number;
+    strumMs?: number;
+    creativity?: number;
+    conversation?: number;
+    airGaps?: number;
+    harmonicFreedom?: number;
   };
   tempoRange: [number, number];
 }
 ```
 
-#### `STYLE_LABELS: Record<PracticeStyle, string>`
-
-Display names for all 19 practice styles.
-
-#### `STYLE_CATEGORIES: Record<string, PracticeStyle[]>`
-
-Styles grouped by category (Traditional, Modern, Latin, Groove, Experimental).
-
-#### `autoDetectPreset(score: QuantizedScore): StylePreset`
+#### `autoDetectPreset(score): StylePreset`
 
 Analyze a score and return the best-matching preset based on tempo, time signature, chord content, and style hints.
 
-### Groove & Swing Utilities
+### Groove and Swing
 
-#### `getGrooveTemplate(style): GrooveTemplate`
-
-Get micro-timing template for a style. Templates define per-instrument bias and jitter values based on GrooVAE research.
-
-#### `applyGroove(time, element, template): number`
-
-Apply groove displacement to a note time.
-
-#### `tempoSwingMultiplier(tempo): number`
-
-Tempo-dependent swing scaling. Slow tempos swing harder; fast tempos straighten out.
-
-#### `instrumentSwingFactor(role): number`
-
-Per-instrument swing scaling. Ride swings hardest, bass walks straighter, piano between.
-
-#### `humanizeTime(time, amount?): number`
-
-Add timing jitter to a note.
-
-#### `humanizeVelocity(velocity, amount?): number`
-
-Add velocity variation to a note.
-
-### Style Mapping
-
-#### `irealStyleToPracticeStyle(irealStyle): PracticeStyle`
-
-Convert iReal Pro style strings (e.g. `"Medium Swing"`, `"Bossa Nova"`) to generator styles.
+| Function | Purpose |
+|----------|---------|
+| `getGrooveTemplate(style)` | Micro-timing template per instrument (GrooVAE-based) |
+| `applyGroove(time, element, rng)` | Apply groove displacement to a note |
+| `tempoSwingMultiplier(tempo)` | Slow tempos swing harder, fast tempos straighten |
+| `instrumentSwingFactor(role)` | Ride swings hardest, bass walks straighter |
+| `humanizeTime(time, amount?)` | Timing jitter |
+| `humanizeVelocity(vel, amount?)` | Velocity variation |
+| `irealStyleToPracticeStyle(str)` | Convert iReal Pro style strings to generator styles |
 
 ### Constants
 
@@ -432,12 +400,14 @@ TIME_SIGNATURE_GROUPS // grouped time signatures
 ALL_TIME_SIGNATURES   // all supported time signatures
 ```
 
+---
+
 ## Styles
 
 19 styles with distinct algorithms for bass, piano, and drums:
 
-| Style | Swing | Bass | Piano | Drums |
-|-------|-------|------|-------|-------|
+| Style | Feel | Bass | Piano | Drums |
+|-------|------|------|-------|-------|
 | `swing` | Triplet swing | Quarter-note walk | Rootless voicings, syncopated | Ride + hi-hat 2&4 |
 | `bossa` | Straight 8ths | Root-5th pattern | Montuno rhythm | Cross-stick + syncopated kick |
 | `latin` | Straight 8ths | Tumbao pattern | Montuno variations | Cascara + clave |
@@ -452,18 +422,20 @@ ALL_TIME_SIGNATURES   // all supported time signatures
 | `shuffleBlues` | Triplet shuffle | Shuffle bass | Blues comping | Shuffle groove |
 | `neoSoul` | Broken feel | Erykah-style | Glasper voicings | J Dilla pocket |
 | `contemporaryJazz` | Moderate | Nordic clarity | Avishai Cohen trio | Brushes/sticks mix |
-| `holdsworth` | Straight | Melodic minor | Wide voicings | Wackerman: bell ride, cross-stick, ghost cascades, 11/8-aware |
+| `holdsworth` | Straight | Melodic minor | Wide voicings | Wackerman: bell ride, cross-stick, ghost cascades |
 | `alfaMist` | Broken beat | Lo-fi chromatic | Rhodes, chromatic | Broken beat |
 | `metheny` | Light swing | Jaco melodic | Lydian shimmer | Bob Moses brushes |
 | `mathRock` | Straight | Angular | Staccato | Odd groupings |
 | `idm` | Generative | Glitch patterns | Algorithmic | Generative |
 
+---
+
 ## Forms
 
 17 chord progression forms:
 
-| Form | Measures | Description |
-|------|----------|-------------|
+| Form | Bars | Description |
+|------|------|-------------|
 | `blues12` | 12 | 12-bar blues |
 | `minorBlues12` | 12 | Minor blues |
 | `rhythm32` | 32 | Rhythm changes (I Got Rhythm) |
@@ -482,58 +454,46 @@ ALL_TIME_SIGNATURES   // all supported time signatures
 | `fullSong` | varies | Multi-section arrangement |
 | `free` | custom | Free form (set `measures` in config) |
 
+---
+
 ## Community Presets
 
 Contribute new style presets! See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ```bash
-# Copy the template
 cp preset-template.ts presets/your-preset.ts
-
-# Edit and validate
 npx tsx scripts/validate-preset.ts presets/your-preset.ts
-
-# Submit a PR
 ```
 
 Presets are validated against [`preset-schema.json`](preset-schema.json) and smoke-tested with the generator.
 
+---
+
 ## Development
 
 ```bash
-# Install
-npm install
-
-# Run tests (1196 tests)
-npm test
-
-# Watch mode
-npm run test:watch
-
-# Lint + type check
-npm run lint
-npm run typecheck
-
-# Build (ESM + CJS + .d.ts)
-npm run build
-
-# Validate community presets
-npm run validate-preset -- --all
+npm install                      # install dependencies
+npm test                         # run tests (1223 tests)
+npm run test:watch               # watch mode
+npm run lint                     # lint
+npm run typecheck                # type check
+npm run build                    # build (ESM + CJS + .d.ts)
+npm run validate-preset -- --all # validate community presets
 ```
 
 ## Architecture
 
 ```
 src/
-  index.ts              Barrel exports (public API)
-  types.ts              All public type definitions
-  ensemble.ts           Ensemble coordination layer (generateEnsemble)
+  index.ts              Public API exports
+  types.ts              Type definitions
+  ensemble.ts           Ensemble coordination (generateEnsemble)
   prng.ts               Seedable PRNG (xoshiro128**)
   jamGenerator.ts       Chord progression generation (17 forms)
   walkingBass.ts        Walking bass line generation
   pianoComping.ts       Piano voicing + comping patterns
   drumPatterns.ts       Drum pattern generation (19 styles)
-  complexityMapping.ts  Per-instrument complexity → granular controls
+  complexityMapping.ts  Complexity slider -> granular controls
   stylePresets.ts       Built-in style presets
   autoDetectPreset.ts   Score analysis + preset recommendation
   grooveTemplates.ts    Micro-timing templates (GrooVAE-based)

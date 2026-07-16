@@ -21,8 +21,8 @@ let _rng: () => number = Math.random;
 
 // ── Constants ──
 
-const PIANO_LOW = 48;  // C3
-const PIANO_HIGH = 76; // E5 (enough room for Type B voicings with 13th)
+const PIANO_LOW = 55;  // G3 — jazz comping floor (avoids muddy C3-E3 voicings)
+const PIANO_HIGH = 84; // C6 — extended range for airy upper voicings
 
 const ROOT_SEMITONES: Record<string, number> = {
   C: 0, "C#": 1, Db: 1, D: 2, "D#": 3, Eb: 3,
@@ -566,10 +566,10 @@ function buildVoicing(root: string, template: VoicingTemplate): number[] {
   const minInterval = Math.min(...template.intervals);
   const maxInterval = Math.max(...template.intervals);
 
-  // Find the octave where entire voicing fits within PIANO range
-  // base = 12*k + rootPC, need: base+minInterval >= LOW && base+maxInterval <= HIGH
+  // Find the octave where entire voicing fits within PIANO range.
+  // Prefer k=4 (octave 4, middle register) then try k=3, k=5, k=2.
   let base = -1;
-  for (let k = 2; k <= 5; k++) {
+  for (const k of [4, 3, 5, 2]) {
     const candidate = 12 * k + rootPC;
     if (candidate + minInterval >= PIANO_LOW && candidate + maxInterval <= PIANO_HIGH) {
       base = candidate;
@@ -822,7 +822,7 @@ function buildQuartalVoicing(root: string, quality?: string): number[] {
     intervals = [4, 9, 14, 19];
   }
 
-  const base = 48 + rootPC;
+  const base = 60 + rootPC; // C4 — keeps quartal voicings in mid register
   const pitches = intervals.map(i => base + i);
   // Fold into playable range
   return pitches.map((p) => {
@@ -837,7 +837,7 @@ function buildQuartalVoicing(root: string, quality?: string): number[] {
 function buildOpen5thsVoicing(root: string, quality: string): number[] {
   const r = rootMidi(root);
   const q = quality.replace(/\/.*$/, "");
-  const base = 48 + r; // C3
+  const base = 60 + r; // C4 — avoids muddy low voicings
 
   // Determine 3rd quality — m(maj7) is minor despite containing "maj"
   const isMinor = (q.includes("m") && !q.includes("maj")) || q.includes("m(maj7)");
@@ -882,7 +882,7 @@ function buildStandardVoicing(
 
   if (!templates) {
     const r = rootMidi(root);
-    return [48 + r, 48 + r + 4, 48 + r + 7].map((p) => {
+    return [60 + r, 60 + r + 4, 60 + r + 7].map((p) => {
       while (p > PIANO_HIGH) p -= 12;
       while (p < PIANO_LOW) p += 12;
       return p;
@@ -905,7 +905,7 @@ function buildStandardVoicing(
 /** Root-position voicing for funk/blues (includes root, NOT rootless). */
 function buildRootPositionVoicing(root: string, quality: string): number[] {
   const r = rootMidi(root);
-  const base = 48 + r; // C3 range
+  const base = 60 + r; // C4 range — root position stays in mid register
 
   // Build from chord tones with root included
   const q = quality.replace(/\/.*$/, "");
@@ -1126,24 +1126,37 @@ function humanizeVelocity(vel: number, enabled: boolean): number {
 function strumSpread(notes: CompNote[], totalMs: number): CompNote[] {
   const result: CompNote[] = [];
   for (const note of notes) {
-    if (note.pitches.length <= 1) {
+    if (note.pitches.length <= 2) {
+      // Don't strum single notes or dyads (broken voicing pairs).
+      // Real pianists only roll 3+ note chords.
       result.push(note);
       continue;
     }
     // Sort low→high (natural hand roll from bottom)
     const sorted = [...note.pitches].sort((a, b) => a - b);
     const gapSec = (totalMs / 1000) / (sorted.length - 1);
+    // Proportional velocity decay: cap total drop at ~15% of base velocity.
+    // Prevents floor-stacking where multiple notes cluster at identical velocity.
+    const maxTotalDrop = Math.max(4, Math.round(note.velocity * 0.15));
+    const maxPerStep = Math.max(1, Math.round(maxTotalDrop / Math.max(1, sorted.length - 1)));
+    let velDrop = 0;
     for (let i = 0; i < sorted.length; i++) {
       result.push({
         pitches: [sorted[i]],
         time: note.time + i * gapSec,
         duration: note.duration - i * gapSec, // all release at ~same time
-        velocity: Math.max(40, note.velocity - i * 3),
+        velocity: Math.max(40, note.velocity - velDrop),
       });
+      velDrop += 1 + Math.round(_rng() * (maxPerStep - 1)); // proportional to base velocity
     }
   }
   return result;
 }
+
+// ── Beat Position Metadata ──
+// WeakMap tracks raw beat-in-bar for each note (set at creation, before humanization).
+// Used by broken voicings to reliably detect strong beats without time-rounding errors.
+const _noteBeat = new WeakMap<CompNote, number>();
 
 // ── Broken Voicings ──
 
@@ -1152,27 +1165,32 @@ const BROKEN_VOICING_STYLES = new Set(["swing", "hardBop", "coolJazz", "neoSoul"
 function applyBrokenVoicings(
   notes: CompNote[],
   style: string,
-  beatDuration: number,
-  swingAmount: number,
-  tempo: number,
+  beatDuration: number = 0.5,
 ): CompNote[] {
   if (!BROKEN_VOICING_STYLES.has(style)) return notes;
 
   const result: CompNote[] = [];
   for (const note of notes) {
-    if (note.pitches.length !== 4 || _rng() >= 0.20) {
+    // Skip non-4-note chords, 80% of chords, and beats near strong positions.
+    // Tolerance 0.5 catches swing-displaced "ands" that land near beats 1/3
+    // (e.g. rawBeatOffset 1.5 swings to ~1.9, perceptually on beat 2).
+    const rawBeat = _noteBeat.get(note);
+    const beatInMeasure = rawBeat !== undefined
+      ? rawBeat % 4
+      : (beatDuration > 0 ? (note.time / beatDuration) % 4 : 0);
+    const nearStrongBeat = beatInMeasure <= 0.5 || beatInMeasure >= 3.5
+      || Math.abs(beatInMeasure - 2) <= 0.5;
+    if (note.pitches.length !== 4 || _rng() >= 0.20 || nearStrongBeat) {
       result.push(note);
       continue;
     }
 
     const sorted = [...note.pitches].sort((a, b) => a - b);
-    const halfBeat = beatDuration * 0.5;
-    const effSwing = swingAmount * tempoSwingMultiplier(tempo) * instrumentSwingFactor("piano");
-    const swingOffset = (effSwing / 100) * (2 / 3 - 0.5);
-    const andOffset = halfBeat + swingOffset * beatDuration;
+    // Broken voicing gap: 40-80ms (tight pianist chord break)
+    const breakGap = 0.04 + _rng() * 0.04;
 
     // Skip broken voicing if second group would have no duration
-    if (note.duration <= andOffset + 0.05) {
+    if (note.duration <= breakGap + 0.05) {
       result.push(note);
       continue;
     }
@@ -1185,11 +1203,11 @@ function applyBrokenVoicings(
       velocity: note.velocity,
     });
 
-    // Group 2: top 2 notes on the "and"
+    // Group 2: top 2 notes slightly after (broken chord, not full "and")
     result.push({
       pitches: [sorted[2], sorted[3]],
-      time: note.time + andOffset,
-      duration: Math.max(0.05, note.duration - andOffset),
+      time: note.time + breakGap,
+      duration: Math.max(0.05, note.duration - breakGap),
       velocity: Math.max(40, note.velocity - 5),
     });
   }
@@ -1345,8 +1363,10 @@ export function generatePianoComping(
     if (beatsPerBar <= 0) return 78;
     const pct = beatPos / beatsPerBar;
     // Accent beat 1, dip mid-bar, slight lift beat 3 area, taper at end
-    // Curve: 85 → 68 → 75 → 65 (in 4/4)
-    return Math.round(85 - 20 * Math.sin(pct * Math.PI) + 10 * Math.sin(pct * 2 * Math.PI));
+    // Base curve: 85 → 68 → 75 → 65 (in 4/4), with ±6 humanized jitter
+    const base = 85 - 20 * Math.sin(pct * Math.PI) + 10 * Math.sin(pct * 2 * Math.PI);
+    const jitter = (_rng() - 0.5) * 12; // ±6 velocity
+    return Math.round(base + jitter);
   };
   const beatsPerBar = inferredTimeSig ? inferredTimeSig[0] : 4;
 
@@ -1475,12 +1495,14 @@ export function generatePianoComping(
         const passingPitches = pickVoicing(passingRoot, nextChord.quality, prevPitches, style, useShell, voicingTypeRef);
         const passingTime = chord.time + rawBeatOffset * beatDuration;
         if (passingTime < chord.time + chord.duration) {
-          notes.push({
+          const pn: CompNote = {
             pitches: [...passingPitches],
             time: humanizeTime(passingTime, humanize, style, rawBeatOffset),
             duration: beatDuration * 0.4,
             velocity: humanizeVelocity(Math.round(60 * velScale), humanize),
-          });
+          };
+          _noteBeat.set(pn, rawBeatOffset);
+          notes.push(pn);
         }
         continue; // passing chord replaces normal hit at this position
       }
@@ -1526,16 +1548,18 @@ export function generatePianoComping(
           finalPitches = finalPitches.map(p => p + 12);
         }
       }
-      notes.push({
+      const n: CompNote = {
         pitches: [...finalPitches],
         time: humanizeTime(time, humanize, style, rawBeatOffset),
         duration: duration * 0.95,
         velocity: humanizeVelocity(baseVel, humanize),
-      });
+      };
+      _noteBeat.set(n, rawBeatOffset);
+      notes.push(n);
     }
   }
 
-  const broken = applyBrokenVoicings(notes, style, beatDuration, swingAmount, tempo);
+  const broken = applyBrokenVoicings(notes, style, beatDuration);
 
   // Grace notes: alfaMist always, others based on creativity
   const graceProb = style === "alfaMist" ? 0.20
@@ -1547,8 +1571,9 @@ export function generatePianoComping(
   const graced = graceProb > 0 ? applyGraceNotes(broken, graceProb) : broken;
 
   graced.sort((a, b) => a.time - b.time);
+  const result = doStrum ? strumSpread(graced, strumMs) : graced;
   _rng = prevRng;
-  return doStrum ? strumSpread(graced, strumMs) : graced;
+  return result;
 }
 
 // ── Phrase Intent Lookup (piano-side) ──

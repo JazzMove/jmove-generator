@@ -955,7 +955,7 @@ describe("Jam Generator", () => {
       for (const note of piano) {
         expect(note.pitches.length).toBeGreaterThan(0);
         for (const p of note.pitches) {
-          expect(p).toBeGreaterThanOrEqual(48); // C3
+          expect(p).toBeGreaterThanOrEqual(55); // G3
           expect(p).toBeLessThanOrEqual(84);    // C6
         }
       }

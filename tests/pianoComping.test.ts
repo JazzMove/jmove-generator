@@ -9,8 +9,8 @@ import {
 } from "../src/index";
 
 // ── Constants ──
-const PIANO_LOW = 48;  // C3
-const PIANO_HIGH = 76; // E5
+const PIANO_LOW = 55;  // G3
+const PIANO_HIGH = 84; // C6
 
 // ── Helpers ──
 
@@ -30,7 +30,7 @@ function iiVI(): ChordEvent[] {
 // ── Range Tests ──
 
 describe("Piano Comping — range constraints", () => {
-  it("all pitches within C3–C5 (MIDI 48–72)", () => {
+  it("all pitches within G3–C6 (MIDI 55–84)", () => {
     const notes = generatePianoComping(iiVI(), { style: "swing", humanize: false, strum: false });
     for (const note of notes) {
       for (const p of note.pitches) {
@@ -656,20 +656,42 @@ describe("Piano Comping — broken voicings", () => {
     }
   });
 
-  it("second group is time-offset by ~half beat", () => {
-    const tempo = 120;
-    const beatDur = 60 / tempo;
+  it("suppressed near strong beats (within 0.5 beats of beats 1 and 3)", () => {
+    // Generate many trials and check that broken voicings never appear
+    // at beat positions 0-0.5, 1.5-2.5, or 3.5-4.0 (strong beat zone)
+    const beatDuration = 0.5; // 120 BPM
     for (let trial = 0; trial < 200; trial++) {
       const notes = generatePianoComping(iiVI(), {
-        style: "swing", humanize: false, strum: false, density: 50, tempo,
+        style: "swing", humanize: false, strum: false, density: 50, tempo: 120,
       });
       for (let i = 0; i < notes.length - 1; i++) {
         if (notes[i].pitches.length === 2 && notes[i + 1].pitches.length === 2 &&
-            notes[i + 1].time > notes[i].time && notes[i + 1].time - notes[i].time < 1.0) {
+            notes[i + 1].time > notes[i].time && notes[i + 1].time - notes[i].time < 0.1) {
+          // Found a broken voicing pair — check its beat position
+          const beatInMeasure = (notes[i].time / beatDuration) % 4;
+          // Should NOT be near beats 0 or 2 (tolerance 0.5)
+          const nearBeat0 = beatInMeasure <= 0.55 || beatInMeasure >= 3.45;
+          const nearBeat2 = Math.abs(beatInMeasure - 2) <= 0.55;
+          expect(nearBeat0 || nearBeat2,
+            `broken voicing at beatInMeasure=${beatInMeasure.toFixed(2)} (trial ${trial})`
+          ).toBe(false);
+        }
+      }
+    }
+  });
+
+  it("second group is time-offset by 40-80ms (tight pianist chord break)", () => {
+    for (let trial = 0; trial < 200; trial++) {
+      const notes = generatePianoComping(iiVI(), {
+        style: "swing", humanize: false, strum: false, density: 50, tempo: 120,
+      });
+      for (let i = 0; i < notes.length - 1; i++) {
+        if (notes[i].pitches.length === 2 && notes[i + 1].pitches.length === 2 &&
+            notes[i + 1].time > notes[i].time && notes[i + 1].time - notes[i].time < 0.5) {
           const offset = notes[i + 1].time - notes[i].time;
-          // Should be approximately half a beat (± swing adjustment)
-          expect(offset).toBeGreaterThan(beatDur * 0.3);
-          expect(offset).toBeLessThan(beatDur * 1.0);
+          // Broken chord gap: 40-80ms (tight pianist timing)
+          expect(offset).toBeGreaterThanOrEqual(0.035);
+          expect(offset).toBeLessThanOrEqual(0.085);
           return;
         }
       }
@@ -885,14 +907,17 @@ describe("Piano Comping — density full range", () => {
 // ── Strum Spread ──
 
 describe("Piano Comping — strum spreading", () => {
-  it("strum spreads multi-pitch chords into single-pitch notes", () => {
+  it("strum spreads 3+ pitch chords into single-pitch notes, dyads pass through", () => {
     const notes = generatePianoComping(iiVI(), {
       style: "swing", humanize: false, strum: true, strumMs: 25, density: 50,
     });
-    // All strummed notes should be single-pitch
+    // Strummed notes: max 2 pitches (dyads from broken voicings pass through intact)
     for (const note of notes) {
-      expect(note.pitches.length).toBe(1);
+      expect(note.pitches.length).toBeLessThanOrEqual(2);
     }
+    // At least some single-pitch notes from strummed 3-4 note chords
+    const singles = notes.filter(n => n.pitches.length === 1);
+    expect(singles.length).toBeGreaterThan(0);
   });
 
   it("strum off keeps multi-pitch voicings intact", () => {
@@ -901,6 +926,33 @@ describe("Piano Comping — strum spreading", () => {
     });
     const multiPitch = notes.filter(n => n.pitches.length > 1);
     expect(multiPitch.length).toBeGreaterThan(0);
+  });
+
+  it("strum velocity decay capped at ~15% of base, floor at 40", () => {
+    // Generate with strum and check velocity bounds
+    for (let trial = 0; trial < 50; trial++) {
+      const notes = generatePianoComping(iiVI(), {
+        style: "swing", humanize: false, strum: true, strumMs: 25, density: 50,
+      });
+      for (const n of notes) {
+        // No note below floor of 40
+        expect(n.velocity).toBeGreaterThanOrEqual(40);
+      }
+      // Find strum groups (single-pitch notes near same time)
+      for (let i = 0; i < notes.length - 3; i++) {
+        const group = [notes[i]];
+        for (let j = i + 1; j < notes.length && notes[j].time - notes[i].time < 0.05; j++) {
+          if (notes[j].pitches.length === 1) group.push(notes[j]);
+        }
+        if (group.length >= 3) {
+          const baseVel = group[0].velocity;
+          const lastVel = group[group.length - 1].velocity;
+          const totalDrop = baseVel - lastVel;
+          // Total drop should not exceed ~20% of base (15% cap + rounding tolerance)
+          expect(totalDrop).toBeLessThanOrEqual(Math.ceil(baseVel * 0.20) + 1);
+        }
+      }
+    }
   });
 
   it("strummed notes have decreasing velocity", () => {

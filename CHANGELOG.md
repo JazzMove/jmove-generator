@@ -4,6 +4,21 @@ All notable changes to `@jmove/generator` will be documented in this file.
 
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [1.2.8] - 2026-07-16
+
+### Fixed
+
+- **Piano register too low** — PIANO_LOW was 48 (C3), producing muddy voicings in octave 3. Raised to 55 (G3), PIANO_HIGH from 76 (E5) to 84 (C6). buildVoicing() now prefers k=4 (octave 4) instead of lowest valid octave. Quartal, open-5ths, and root-position builders changed from `base = 48` to `base = 60` (C4). First chord of Ab blues now starts at C4 instead of C3
+- **Broken voicing timing too wide** — broken voicings used swing "and" offset (~285ms), placing top pair audibly late. Tightened to 40-80ms gap (real pianist chord break, independent of tempo/swing)
+- **Broken voicing beat detection fragile** — strong-beat check computed beat position from humanized time, which groove bias could shift past tolerance. Now uses raw beat offset stored at note creation (WeakMap), immune to humanization/groove shifts. Tolerance widened from 0.15 to 0.5 beats to catch swing-displaced "ands" that land near strong beats
+- **Broken voicing + strum double displacement** — 2-note pairs from broken voicings were strummed again (+20ms each), creating 80-140ms total span. Strum now skips dyads (≤2 pitches) — only rolls 3+ note chords
+- **Broken voicings on downbeats** — broken chord split was applied on beats 1 and 3, making downbeat attacks feel audibly late. Now suppressed within ±0.5 beats of strong beats — only applied to clearly weak positions
+- **Strum velocity mechanical staircase** — fixed -3 per note decay made every chord sound identical. Randomized with proportional decay (total drop capped at 15% of base velocity)
+- **Velocity floor stacking** — hard floor=48 caused multiple notes to cluster at identical velocity on weak beats. Floor lowered to 40, decay proportional to base velocity
+- **Velocity contour too formulaic** — same sine-curve dynamic shape every measure created audible "energy waves". Added ±6 velocity jitter to break mechanical repetition
+- **Strum used Math.random instead of seeded PRNG** — `_rng` was restored to `prevRng` before `strumSpread()` call, causing strum randomization to use `Math.random` instead of seeded stream. Broke determinism
+- **buildStandardVoicing fallback at C3** — fallback triad still used `base = 48` after other builders moved to 60. Fixed to C4
+
 ## [1.2.7] - 2026-07-15
 
 ### Fixed
