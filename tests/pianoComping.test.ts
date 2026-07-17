@@ -1231,4 +1231,109 @@ describe("Piano Comping — granular controls", () => {
       }
     }
   });
+
+  it("pianoRegister=0 shifts range down", () => {
+    const lowPitches: number[] = [];
+    const defaultPitches: number[] = [];
+    for (const seed of SEEDS) {
+      const low = generatePianoComping(iiVI(), {
+        style: "swing", humanize: false, strum: false,
+        random: createPRNG(seed),
+        granular: resolvePianoGranular(50, { pianoRegister: 0 }),
+      });
+      const def = generatePianoComping(iiVI(), {
+        style: "swing", humanize: false, strum: false,
+        random: createPRNG(seed),
+        granular: resolvePianoGranular(50),
+      });
+      low.forEach(n => lowPitches.push(...n.pitches));
+      def.forEach(n => defaultPitches.push(...n.pitches));
+    }
+    const lowAvg = lowPitches.reduce((a, b) => a + b, 0) / lowPitches.length;
+    const defAvg = defaultPitches.reduce((a, b) => a + b, 0) / defaultPitches.length;
+    expect(lowAvg).toBeLessThan(defAvg);
+  });
+
+  it("pianoRegister=100 shifts range up", () => {
+    // Use low-register chords and many seeds to ensure shift is audible
+    const lowChords = [
+      makeChord("E", "m7", 0, 2),
+      makeChord("A", "7", 2, 2),
+      makeChord("D", "m7", 4, 2),
+      makeChord("G", "7", 6, 2),
+    ];
+    const moreSeeds = [42, 100, 200, 300, 400, 500, 600, 700, 800, 900];
+    const highPitches: number[] = [];
+    const defaultPitches: number[] = [];
+    for (const seed of moreSeeds) {
+      const high = generatePianoComping(lowChords, {
+        style: "swing", humanize: false, strum: false,
+        random: createPRNG(seed),
+        granular: resolvePianoGranular(50, { pianoRegister: 100 }),
+      });
+      const def = generatePianoComping(lowChords, {
+        style: "swing", humanize: false, strum: false,
+        random: createPRNG(seed),
+        granular: resolvePianoGranular(50),
+      });
+      high.forEach(n => highPitches.push(...n.pitches));
+      def.forEach(n => defaultPitches.push(...n.pitches));
+    }
+    const highAvg = highPitches.reduce((a, b) => a + b, 0) / highPitches.length;
+    const defAvg = defaultPitches.reduce((a, b) => a + b, 0) / defaultPitches.length;
+    expect(highAvg).toBeGreaterThanOrEqual(defAvg);
+    // Also verify minimum pitch is higher with high register
+    const highMin = Math.min(...highPitches);
+    const defMin = Math.min(...defaultPitches);
+    expect(highMin).toBeGreaterThanOrEqual(defMin);
+  });
+
+  it("pianoRegister=50 matches no-granular output", () => {
+    for (const seed of SEEDS) {
+      const reg50 = generatePianoComping(iiVI(), {
+        style: "swing", humanize: false, strum: false,
+        random: createPRNG(seed),
+        granular: resolvePianoGranular(50, { pianoRegister: 50 }),
+      });
+      const noGranular = generatePianoComping(iiVI(), {
+        style: "swing", humanize: false, strum: false,
+        random: createPRNG(seed),
+      });
+      expect(reg50.length).toBe(noGranular.length);
+      for (let i = 0; i < reg50.length; i++) {
+        expect(reg50[i].pitches).toEqual(noGranular[i].pitches);
+      }
+    }
+  });
+
+  it("pianoRegister extremes — all pitches stay within shifted range", () => {
+    const roots = ["C", "D", "Eb", "F#", "A", "Bb"];
+    const qualities = ["7", "m7", "maj7", "m7b5", "dim7", "sus4", "7alt"];
+    const styles = ["swing", "bossa", "ballad", "neoSoul", "ecm", "hardBop"] as const;
+    for (const reg of [0, 100]) {
+      // Expected range: reg=0 → [48, 77], reg=100 → [62, 91]
+      const shift = Math.round((reg - 50) / 50 * 7);
+      const expectedLow = 55 + shift;
+      const expectedHigh = 84 + shift;
+      for (const style of styles) {
+        for (const root of roots) {
+          for (const q of qualities) {
+            const chords = [makeChord(root, q, 0, 4)];
+            const notes = generatePianoComping(chords, {
+              style, humanize: false, strum: false,
+              granular: resolvePianoGranular(50, { pianoRegister: reg }),
+            });
+            for (const note of notes) {
+              for (const p of note.pitches) {
+                expect(p, `${style} ${root}${q} reg=${reg}: pitch ${p} out of [${expectedLow},${expectedHigh}]`)
+                  .toBeGreaterThanOrEqual(expectedLow);
+                expect(p, `${style} ${root}${q} reg=${reg}: pitch ${p} out of [${expectedLow},${expectedHigh}]`)
+                  .toBeLessThanOrEqual(expectedHigh);
+              }
+            }
+          }
+        }
+      }
+    }
+  });
 });

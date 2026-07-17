@@ -41,6 +41,7 @@ const PIANO_CURVES: Record<keyof PianoGranular, ControlCurve> = {
   rhythmicActivity:{ min: 10, default: 50, max: 90 },
   registerRange:   { min: 15, default: 50, max: 90 },
   anticipation:    { min: 5,  default: 35, max: 75 },
+  pianoRegister:   { min: 50, default: 50, max: 50 }, // always 50 (center) unless manually overridden
 };
 
 // ── Bass Curves ──
@@ -50,6 +51,7 @@ const BASS_CURVES: Record<keyof BassGranular, ControlCurve> = {
   registerWidth:     { min: 15, default: 50, max: 90 },
   syncopation:       { min: 0,  default: 30, max: 75 },
   beatVariety:       { min: 10, default: 40, max: 80 },
+  bassRegister:      { min: 50, default: 50, max: 50 }, // always 50 (center) unless manually overridden
 };
 
 // ── Resolve Functions ──
@@ -76,6 +78,7 @@ export function resolvePianoGranular(
     rhythmicActivity:overrides?.rhythmicActivity?? Math.round(lerp(PIANO_CURVES.rhythmicActivity, complexity)),
     registerRange:   overrides?.registerRange   ?? Math.round(lerp(PIANO_CURVES.registerRange, complexity)),
     anticipation:    overrides?.anticipation    ?? Math.round(lerp(PIANO_CURVES.anticipation, complexity)),
+    pianoRegister:   overrides?.pianoRegister   ?? 50,
   };
 }
 
@@ -88,5 +91,6 @@ export function resolveBassGranular(
     registerWidth:     overrides?.registerWidth     ?? Math.round(lerp(BASS_CURVES.registerWidth, complexity)),
     syncopation:       overrides?.syncopation       ?? Math.round(lerp(BASS_CURVES.syncopation, complexity)),
     beatVariety:       overrides?.beatVariety       ?? Math.round(lerp(BASS_CURVES.beatVariety, complexity)),
+    bassRegister:      overrides?.bassRegister      ?? 50,
   };
 }

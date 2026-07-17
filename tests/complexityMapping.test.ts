@@ -82,6 +82,7 @@ describe("Complexity Mapping", () => {
       expect(g.rhythmicActivity).toBe(50);
       expect(g.registerRange).toBe(50);
       expect(g.anticipation).toBe(35);
+      expect(g.pianoRegister).toBe(50);
     });
 
     it("overrides take precedence", () => {
@@ -96,6 +97,19 @@ describe("Complexity Mapping", () => {
       expect(g.rhythmicActivity).toBe(90);
       expect(g.registerRange).toBe(90);
       expect(g.anticipation).toBe(75);
+      expect(g.pianoRegister).toBe(50); // always 50 unless overridden
+    });
+
+    it("pianoRegister defaults to 50 regardless of complexity", () => {
+      expect(resolvePianoGranular(0).pianoRegister).toBe(50);
+      expect(resolvePianoGranular(50).pianoRegister).toBe(50);
+      expect(resolvePianoGranular(100).pianoRegister).toBe(50);
+    });
+
+    it("pianoRegister override takes effect", () => {
+      expect(resolvePianoGranular(50, { pianoRegister: 0 }).pianoRegister).toBe(0);
+      expect(resolvePianoGranular(50, { pianoRegister: 100 }).pianoRegister).toBe(100);
+      expect(resolvePianoGranular(50, { pianoRegister: 25 }).pianoRegister).toBe(25);
     });
   });
 
@@ -106,6 +120,7 @@ describe("Complexity Mapping", () => {
       expect(g.registerWidth).toBe(50);
       expect(g.syncopation).toBe(30);
       expect(g.beatVariety).toBe(40);
+      expect(g.bassRegister).toBe(50);
     });
 
     it("overrides take precedence", () => {
@@ -120,6 +135,19 @@ describe("Complexity Mapping", () => {
       expect(g.registerWidth).toBe(15);
       expect(g.syncopation).toBe(0);
       expect(g.beatVariety).toBe(10);
+      expect(g.bassRegister).toBe(50); // always 50 unless overridden
+    });
+
+    it("bassRegister defaults to 50 regardless of complexity", () => {
+      expect(resolveBassGranular(0).bassRegister).toBe(50);
+      expect(resolveBassGranular(50).bassRegister).toBe(50);
+      expect(resolveBassGranular(100).bassRegister).toBe(50);
+    });
+
+    it("bassRegister override takes effect", () => {
+      expect(resolveBassGranular(50, { bassRegister: 0 }).bassRegister).toBe(0);
+      expect(resolveBassGranular(50, { bassRegister: 100 }).bassRegister).toBe(100);
+      expect(resolveBassGranular(50, { bassRegister: 25 }).bassRegister).toBe(25);
     });
   });
 });
@@ -193,6 +221,6 @@ describe("GENERATOR_VERSION", () => {
   it("exports a semver string matching package.json", () => {
     // __GENERATOR_VERSION__ injected by tsup (build) and vitest (test) from package.json
     expect(GENERATOR_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
-    expect(GENERATOR_VERSION).toBe("1.3.1");
+    expect(GENERATOR_VERSION).toBe("1.3.2");
   });
 });

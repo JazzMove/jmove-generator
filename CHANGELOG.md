@@ -4,6 +4,14 @@ All notable changes to `@jmove/generator` will be documented in this file.
 
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [1.3.2] - 2026-07-17
+
+### Added
+
+- **Piano register slider** (`pianoRegister` in PianoGranular) - new 0-100 control that shifts the piano voicing range center up/down by up to a perfect fifth (7 semitones). 0=low (C3-F5), 50=default (G3-C6), 100=high (D4-G6). Independent of complexity slider (always defaults to 50 unless manually overridden)
+- **Bass register slider** (`bassRegister` in BassGranular) - new 0-100 control that shifts the bass range center up/down by up to a perfect fourth (5 semitones). 0=low (B0-D3), 50=default (E1-G3), 100=high (A1-C4). Composes with registerWidth (width narrows/widens, center shifts)
+- 12 new tests: register complexity independence, override precedence, shift at 0/100, identity, range constraints for both piano and bass
+
 ## [1.3.1] - 2026-07-17
 
 ### Changed

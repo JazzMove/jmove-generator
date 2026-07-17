@@ -34,15 +34,23 @@ const BASS_HIGH_DEFAULT = 55; // G3
 
 // registerWidth (0-100) narrows/widens playable range around midpoint (MIDI 41 = F2)
 // 0 → ±6 semitones (MIDI 35-47), 100 → full range (MIDI 28-55)
+// bassRegister (0-100) shifts center ±5 semitones (perfect fourth)
+// 0 = low (B0-D3), 50 = default (E1-G3), 100 = high (A1-C4)
 function getBassLow(): number {
   if (!_bassGranular) return BASS_LOW_DEFAULT;
   const t = _bassGranular.registerWidth / 100;
-  return Math.round(BASS_LOW_DEFAULT + (1 - t) * 7); // 0→35, 100→28
+  const widthLow = Math.round(BASS_LOW_DEFAULT + (1 - t) * 7); // 0→35, 100→28
+  const reg = _bassGranular.bassRegister ?? 50;
+  const regShift = Math.round((reg - 50) / 50 * 5);
+  return widthLow + regShift;
 }
 function getBassHigh(): number {
   if (!_bassGranular) return BASS_HIGH_DEFAULT;
   const t = _bassGranular.registerWidth / 100;
-  return Math.round(BASS_HIGH_DEFAULT - (1 - t) * 8); // 0→47, 100→55
+  const widthHigh = Math.round(BASS_HIGH_DEFAULT - (1 - t) * 8); // 0→47, 100→55
+  const reg = _bassGranular.bassRegister ?? 50;
+  const regShift = Math.round((reg - 50) / 50 * 5);
+  return widthHigh + regShift;
 }
 
 

@@ -12,17 +12,33 @@
 
 import { tempoSwingMultiplier, dynamicMultiplier, instrumentSwingFactor } from "./swingUtils";
 import { getGrooveTemplate, applyGroove } from "./grooveTemplates";
-import type { CompNote, PianoStyle, PianoCompingOptions, ChordEvent } from "./types";
+import type { CompNote, PianoStyle, PianoCompingOptions, ChordEvent, PianoGranular } from "./types";
 
 export type { CompNote, PianoStyle, PianoCompingOptions, ChordEvent };
 
 // ── Module-level PRNG ──
 let _rng: () => number = Math.random;
+let _pianoGranular: PianoGranular | undefined;
 
-// ── Constants ──
+// ── Register Constants ──
+// Base range: G3 (55) to C6 (84). pianoRegister (0-100) shifts center ±7 semitones.
+// 0 = low (C3-F5), 50 = default (G3-C6), 100 = high (D4-G6).
+const PIANO_LOW_DEFAULT = 55;
+const PIANO_HIGH_DEFAULT = 84;
 
-const PIANO_LOW = 55;  // G3 — jazz comping floor (avoids muddy C3-E3 voicings)
-const PIANO_HIGH = 84; // C6 — extended range for airy upper voicings
+function getPianoLow(): number {
+  if (!_pianoGranular) return PIANO_LOW_DEFAULT;
+  const reg = _pianoGranular.pianoRegister ?? 50;
+  const shift = Math.round((reg - 50) / 50 * 7);
+  return PIANO_LOW_DEFAULT + shift;
+}
+
+function getPianoHigh(): number {
+  if (!_pianoGranular) return PIANO_HIGH_DEFAULT;
+  const reg = _pianoGranular.pianoRegister ?? 50;
+  const shift = Math.round((reg - 50) / 50 * 7);
+  return PIANO_HIGH_DEFAULT + shift;
+}
 
 const ROOT_SEMITONES: Record<string, number> = {
   C: 0, "C#": 1, Db: 1, D: 2, "D#": 3, Eb: 3,
@@ -571,7 +587,7 @@ function buildVoicing(root: string, template: VoicingTemplate): number[] {
   let base = -1;
   for (const k of [4, 3, 5, 2]) {
     const candidate = 12 * k + rootPC;
-    if (candidate + minInterval >= PIANO_LOW && candidate + maxInterval <= PIANO_HIGH) {
+    if (candidate + minInterval >= getPianoLow() && candidate + maxInterval <= getPianoHigh()) {
       base = candidate;
       break;
     }
@@ -579,15 +595,15 @@ function buildVoicing(root: string, template: VoicingTemplate): number[] {
 
   if (base < 0) {
     // Fallback: fit as many as possible starting from lowest valid position
-    base = PIANO_LOW - minInterval;
+    base = getPianoLow() - minInterval;
     while ((base % 12) !== rootPC) base++;
-    if (base + maxInterval > PIANO_HIGH) base -= 12;
+    if (base + maxInterval > getPianoHigh()) base -= 12;
   }
 
   const clamped = template.intervals.map((i) => {
     let p = base + i;
-    while (p < PIANO_LOW) p += 12;
-    while (p > PIANO_HIGH) p -= 12;
+    while (p < getPianoLow()) p += 12;
+    while (p > getPianoHigh()) p -= 12;
     return p;
   });
   return [...new Set(clamped)].sort((a, b) => a - b);
@@ -687,7 +703,7 @@ function buildClusterVoicing(root: string, quality: string): number[] {
   for (let k = 3; k <= 5; k++) {
     const base = 12 * k + rootPC;
     const pitches = intervals.map(i => base + i);
-    if (pitches[0] >= PIANO_LOW && pitches[pitches.length - 1] <= PIANO_HIGH) {
+    if (pitches[0] >= getPianoLow() && pitches[pitches.length - 1] <= getPianoHigh()) {
       return pitches;
     }
   }
@@ -695,8 +711,8 @@ function buildClusterVoicing(root: string, quality: string): number[] {
   const base = 60 + rootPC;
   const clamped = intervals.map(i => {
     let p = base + i;
-    while (p > PIANO_HIGH) p -= 12;
-    while (p < PIANO_LOW) p += 12;
+    while (p > getPianoHigh()) p -= 12;
+    while (p < getPianoLow()) p += 12;
     return p;
   });
   return [...new Set(clamped)].sort((a, b) => a - b);
@@ -735,15 +751,15 @@ function buildAlfaMistInversionVoicing(root: string, quality: string): number[] 
   for (let k = 3; k <= 5; k++) {
     const base = 12 * k + rootPC;
     const pitches = intervals.map(i => base + i);
-    if (pitches[0] >= PIANO_LOW && pitches[pitches.length - 1] <= PIANO_HIGH) {
+    if (pitches[0] >= getPianoLow() && pitches[pitches.length - 1] <= getPianoHigh()) {
       return pitches;
     }
   }
   const base = 60 + rootPC;
   const clamped = intervals.map(i => {
     let p = base + i;
-    while (p > PIANO_HIGH) p -= 12;
-    while (p < PIANO_LOW) p += 12;
+    while (p > getPianoHigh()) p -= 12;
+    while (p < getPianoLow()) p += 12;
     return p;
   });
   return [...new Set(clamped)].sort((a, b) => a - b);
@@ -802,7 +818,7 @@ function buildOpenVoicing(root: string, quality: string): number[] {
   for (let k = 3; k <= 5; k++) {
     const base = 12 * k + rootPC;
     const pitches = intervals.map(i => base + i);
-    if (pitches[0] >= PIANO_LOW && pitches[pitches.length - 1] <= PIANO_HIGH) {
+    if (pitches[0] >= getPianoLow() && pitches[pitches.length - 1] <= getPianoHigh()) {
       return pitches;
     }
   }
@@ -810,8 +826,8 @@ function buildOpenVoicing(root: string, quality: string): number[] {
   const base = 60 + rootPC;
   const clamped = intervals.map(i => {
     let p = base + i;
-    while (p > PIANO_HIGH) p -= 12;
-    while (p < PIANO_LOW) p += 12;
+    while (p > getPianoHigh()) p -= 12;
+    while (p < getPianoLow()) p += 12;
     return p;
   });
   return [...new Set(clamped)].sort((a, b) => a - b);
@@ -869,8 +885,8 @@ function buildQuartalVoicing(root: string, quality?: string): number[] {
   const pitches = intervals.map(i => base + i);
   // Fold into playable range, then dedup (octave-apart intervals can collide after clamping)
   const clamped = pitches.map((p) => {
-    while (p > PIANO_HIGH) p -= 12;
-    while (p < PIANO_LOW) p += 12;
+    while (p > getPianoHigh()) p -= 12;
+    while (p < getPianoLow()) p += 12;
     return p;
   });
   return [...new Set(clamped)].sort((a, b) => a - b);
@@ -909,8 +925,8 @@ function buildOpen5thsVoicing(root: string, quality: string): number[] {
 
   // Fold into playable range, then dedup (octave-apart intervals can collide after clamping)
   const clamped = pitches.map(p => {
-    while (p > PIANO_HIGH) p -= 12;
-    while (p < PIANO_LOW) p += 12;
+    while (p > getPianoHigh()) p -= 12;
+    while (p < getPianoLow()) p += 12;
     return p;
   });
   return [...new Set(clamped)].sort((a, b) => a - b);
@@ -933,8 +949,8 @@ function buildStandardVoicing(
   if (!templates) {
     const r = rootMidi(root);
     return [60 + r, 60 + r + 4, 60 + r + 7].map((p) => {
-      while (p > PIANO_HIGH) p -= 12;
-      while (p < PIANO_LOW) p += 12;
+      while (p > getPianoHigh()) p -= 12;
+      while (p < getPianoLow()) p += 12;
       return p;
     });
   }
@@ -990,8 +1006,8 @@ function buildRootPositionVoicing(root: string, quality: string): number[] {
 
   const clamped = intervals.map(i => {
     let p = base + i;
-    while (p > PIANO_HIGH) p -= 12;
-    while (p < PIANO_LOW) p += 12;
+    while (p > getPianoHigh()) p -= 12;
+    while (p < getPianoLow()) p += 12;
     return p;
   });
   return [...new Set(clamped)].sort((a, b) => a - b);
@@ -1360,11 +1376,13 @@ export function generatePianoComping(
 ): CompNote[] {
   if (chords.length === 0) return [];
   const prevRng = _rng;
+  const prevGranular = _pianoGranular;
   _rng = options.random ?? Math.random;
+  _pianoGranular = options.granular;
 
   const style = options.style ?? "swing";
   const tempo = options.tempo ?? 120;
-  if (tempo <= 0) { _rng = prevRng; throw new RangeError(`tempo must be > 0, got ${tempo}`); }
+  if (tempo <= 0) { _rng = prevRng; _pianoGranular = prevGranular; throw new RangeError(`tempo must be > 0, got ${tempo}`); }
   const humanize = options.humanize ?? true;
   const density = options.density;
   const swingAmount = options.swingAmount ?? 100;
@@ -1640,8 +1658,8 @@ export function generatePianoComping(
       let finalPitches = registerShift !== 0
         ? usePitches.map(p => {
             let shifted = p + registerShift;
-            while (shifted > PIANO_HIGH) shifted -= 12;
-            while (shifted < PIANO_LOW) shifted += 12;
+            while (shifted > getPianoHigh()) shifted -= 12;
+            while (shifted < getPianoLow()) shifted += 12;
             return shifted;
           })
         : usePitches;
@@ -1676,6 +1694,7 @@ export function generatePianoComping(
   graced.sort((a, b) => a.time - b.time);
   const result = doStrum ? strumSpread(graced, strumMs) : graced;
   _rng = prevRng;
+  _pianoGranular = prevGranular;
   return result;
 }
 
@@ -1718,7 +1737,7 @@ function applyGraceNotes(notes: CompNote[], probability: number): CompNote[] {
     const target = sorted[innerIdx];
     const gracePitch = target - 1; // half-step below
 
-    if (gracePitch >= PIANO_LOW && note.time >= 0.030) {
+    if (gracePitch >= getPianoLow() && note.time >= 0.030) {
       // Insert grace note 30ms before main note (skip if too close to time 0)
       result.push({
         pitches: [gracePitch],

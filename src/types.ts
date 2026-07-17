@@ -35,6 +35,7 @@ export interface PianoGranular {
   rhythmicActivity: number;  // 0-100: sparse → dense hits per bar
   registerRange: number;     // 0-100: narrow register → wide ±2 octaves
   anticipation: number;      // 0-100: harmonic anticipation probability
+  pianoRegister: number;     // 0-100: base register center — 0=low (C3-F5), 50=default (G3-C6), 100=high (D4-G6)
 }
 
 export interface BassGranular {
@@ -42,6 +43,7 @@ export interface BassGranular {
   registerWidth: number;     // 0-100: narrow → full 2-octave range
   syncopation: number;       // 0-100: straight quarters → frequent 8th/16th fills
   beatVariety: number;       // 0-100: nearest chord tone → mixed chord tones on beat 2
+  bassRegister: number;      // 0-100: base register center — 0=low (B0-D3), 50=default (E1-G3), 100=high (A1-C4)
 }
 
 export interface StyleParameters {

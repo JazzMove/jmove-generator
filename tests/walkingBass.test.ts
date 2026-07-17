@@ -1126,7 +1126,7 @@ describe("Walking Bass — granular controls", () => {
       const notes = generateWalkingBass(longChords(), {
         style: "swing", tempo: 120,
         random: createPRNG(seed),
-        granular: { chromaticApproach: 50, registerWidth: 0, syncopation: 30, beatVariety: 40 },
+        granular: { chromaticApproach: 50, registerWidth: 0, syncopation: 30, beatVariety: 40, bassRegister: 50 },
       });
       const pitches = notes.map(n => n.pitch);
       // registerWidth=0 → getBassLow()=35, getBassHigh()=47, range ~12
@@ -1202,6 +1202,102 @@ describe("Walking Bass — granular controls", () => {
       break; // only need one pass since we iterate seeds internally
     }
     expect(highUnique).toBeGreaterThanOrEqual(lowUnique);
+  });
+
+  it("bassRegister=0 shifts range down", () => {
+    const lowPitches: number[] = [];
+    const defaultPitches: number[] = [];
+    for (const seed of SEEDS) {
+      const low = generateWalkingBass(longChords(), {
+        style: "swing", tempo: 120,
+        random: createPRNG(seed),
+        granular: resolveBassGranular(50, { bassRegister: 0 }),
+      });
+      const def = generateWalkingBass(longChords(), {
+        style: "swing", tempo: 120,
+        random: createPRNG(seed),
+        granular: resolveBassGranular(50),
+      });
+      low.forEach(n => lowPitches.push(n.pitch));
+      def.forEach(n => defaultPitches.push(n.pitch));
+    }
+    const lowAvg = lowPitches.reduce((a, b) => a + b, 0) / lowPitches.length;
+    const defAvg = defaultPitches.reduce((a, b) => a + b, 0) / defaultPitches.length;
+    expect(lowAvg).toBeLessThan(defAvg);
+  });
+
+  it("bassRegister=100 shifts range up", () => {
+    const highPitches: number[] = [];
+    const defaultPitches: number[] = [];
+    for (const seed of SEEDS) {
+      const high = generateWalkingBass(longChords(), {
+        style: "swing", tempo: 120,
+        random: createPRNG(seed),
+        granular: resolveBassGranular(50, { bassRegister: 100 }),
+      });
+      const def = generateWalkingBass(longChords(), {
+        style: "swing", tempo: 120,
+        random: createPRNG(seed),
+        granular: resolveBassGranular(50),
+      });
+      high.forEach(n => highPitches.push(n.pitch));
+      def.forEach(n => defaultPitches.push(n.pitch));
+    }
+    const highAvg = highPitches.reduce((a, b) => a + b, 0) / highPitches.length;
+    const defAvg = defaultPitches.reduce((a, b) => a + b, 0) / defaultPitches.length;
+    expect(highAvg).toBeGreaterThan(defAvg);
+  });
+
+  it("bassRegister=50 matches default granular output", () => {
+    // Bass getBassLow/getBassHigh depend on both registerWidth and bassRegister,
+    // so granular-with-defaults differs from no-granular (which uses full range).
+    // This test verifies explicit bassRegister=50 matches the default resolve.
+    for (const seed of SEEDS) {
+      const explicit = generateWalkingBass(iiVI(), {
+        style: "swing", tempo: 120,
+        random: createPRNG(seed),
+        granular: resolveBassGranular(50, { bassRegister: 50 }),
+      });
+      const defaulted = generateWalkingBass(iiVI(), {
+        style: "swing", tempo: 120,
+        random: createPRNG(seed),
+        granular: resolveBassGranular(50),
+      });
+      expect(explicit.length).toBe(defaulted.length);
+      for (let i = 0; i < explicit.length; i++) {
+        expect(explicit[i].pitch).toBe(defaulted[i].pitch);
+      }
+    }
+  });
+
+  it("bassRegister extremes — all pitches stay within shifted range", () => {
+    const roots = ["C", "D", "Eb", "F#", "A", "Bb"];
+    const qualities = ["7", "m7", "maj7", "m7b5"];
+    for (const reg of [0, 100]) {
+      const regShift = Math.round((reg - 50) / 50 * 5);
+      // Default registerWidth at complexity 50 = 50, so width factor = 0.5
+      // widthLow = 28 + (1-0.5)*7 = 32, widthHigh = 55 - (1-0.5)*8 = 51
+      const expectedLow = 32 + regShift;
+      const expectedHigh = 51 + regShift;
+      for (const root of roots) {
+        for (const q of qualities) {
+          const chords = [
+            { root, quality: q, time: 0, duration: 2 },
+            { root, quality: q, time: 2, duration: 2 },
+          ];
+          const notes = generateWalkingBass(chords, {
+            style: "swing", tempo: 120,
+            granular: resolveBassGranular(50, { bassRegister: reg }),
+          });
+          for (const n of notes) {
+            expect(n.pitch, `${root}${q} reg=${reg}: pitch ${n.pitch} out of [${expectedLow},${expectedHigh}]`)
+              .toBeGreaterThanOrEqual(expectedLow);
+            expect(n.pitch, `${root}${q} reg=${reg}: pitch ${n.pitch} out of [${expectedLow},${expectedHigh}]`)
+              .toBeLessThanOrEqual(expectedHigh);
+          }
+        }
+      }
+    }
   });
 
   it("no granular = backward compatible", () => {
