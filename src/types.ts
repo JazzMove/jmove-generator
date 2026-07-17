@@ -182,6 +182,8 @@ export interface ChordEvent {
   quality: string;
   time: number;
   duration: number;
+  /** Harmonic analysis (populated by analyzeHarmony, undefined if not analyzed) */
+  analysis?: ChordAnalysis;
 }
 
 // ── Piano Comping Types ──
@@ -242,6 +244,51 @@ export interface DrumPatternOptions {
   /** Streaming: persisted drum state for phrase continuity across 1-measure calls */
   drumState?: DrumState;
   granular?: DrumGranular;
+}
+
+// ── Harmonic Analysis Types ──
+
+export type HarmonicFunction = "tonic" | "predominant" | "dominant" | "chromatic";
+export type CadenceType = "authentic" | "half" | "deceptive" | "plagal";
+
+/** Per-chord harmonic analysis - populated by analyzeHarmony(). */
+export interface ChordAnalysis {
+  /** Scale degree relative to local key center, e.g., "I", "ii", "V", "bVII" */
+  degree: string;
+  /** Harmonic function category */
+  function: HarmonicFunction;
+  /** Local key center name (accounts for modulations), e.g., "C", "Bb" */
+  keyCenter: string;
+  /** This chord is a secondary dominant (V/x) */
+  isSecondaryDominant: boolean;
+  /** What this secondary dominant targets (degree string, e.g., "ii", "vi") */
+  secondaryTarget?: string;
+  /** Part of a ii-V-I (or ii-V) progression */
+  isPartOfIiVI: boolean;
+  /** Position within ii-V-I */
+  iiViPosition?: "ii" | "V" | "I";
+  /** Role in a cadence at a phrase boundary */
+  cadenceRole?: "predominant" | "dominant" | "resolution";
+  /** Type of cadence this chord participates in */
+  cadenceType?: CadenceType;
+  /** Whether this chord begins a new key center (modulation) */
+  isModulationPoint: boolean;
+  /** Tension level: 0 = stable/resolved, 1 = maximum tension */
+  tension: number;
+}
+
+/** Full harmonic analysis of a chord progression. */
+export interface HarmonicAnalysisResult {
+  /** Global key center (pitch class name) */
+  keyCenter: string;
+  /** Key center regions (for modulating pieces like Giant Steps) */
+  keyCenters: { key: string; startIndex: number; endIndex: number }[];
+  /** Per-chord analysis (parallel to input ChordEvent[]) */
+  chordAnalyses: ChordAnalysis[];
+  /** Indices of detected ii-V-I progressions */
+  iiViLocations: { ii: number; V: number; I: number }[];
+  /** Average chords per measure */
+  harmonicRhythm: number;
 }
 
 // ── Groove Template Types ──
@@ -330,6 +377,9 @@ export interface BandContext {
   conversation: number;                      // 0-100 from parameters
   airGaps: number;                           // 0-100 from parameters
   harmonicFreedom: number;                   // 0-100 from parameters
+
+  // ── Harmonic Analysis ──
+  harmonicAnalysis?: HarmonicAnalysisResult;
 }
 
 export interface EnsembleOptions {

@@ -3024,11 +3024,23 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
     // BandContext: fill probability scales with energy — sparse sections rarely fill
     // In streaming (measures=1), fillHint from ensemble.ts provides lookahead info
     // since the single-measure loop can't look at m+1/m+2.
+    //
+    // Harmonic-aware: boost fill probability before cadence resolutions.
+    // Real drummers set up cadences with fills to mark the arrival.
     let fillPattern: Pattern | null = null;
     const fillHint = options.fillHint;
+    const isBeforeCadence = (() => {
+      const ha = bandCtx?.harmonicAnalysis;
+      if (!ha) return false;
+      // Check if next measure's chord is a cadence resolution (V-I arrival)
+      const nextMeasureIdx = absoluteM + 1;
+      return nextMeasureIdx < ha.chordAnalyses.length
+        && ha.chordAnalyses[nextMeasureIdx].cadenceRole === "resolution"
+        && ha.chordAnalyses[nextMeasureIdx].cadenceType === "authentic";
+    })();
     if (FILL_STYLES.has(style) && (m > 0 || fillHint)) {
       const isBeforeSectionMarker = fillHint === "section" || sectionMarkers.includes(m + 1);
-      const isBeforeFormMarker = fillHint === "phrase" || formMarkers.includes(m + 1);
+      const isBeforeFormMarker = fillHint === "phrase" || formMarkers.includes(m + 1) || isBeforeCadence;
       const isSetupBar = fillHint === "setup" || sectionMarkers.includes(m + 2);
 
       // Energy multiplier: at energy 0.3 fills are 40% as likely, at 1.0 fully likely

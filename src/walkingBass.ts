@@ -412,6 +412,11 @@ function generateSwingMeasure(
   // Beat 1: root ~65%, 5th ~25%, 3rd ~10% (varies by style).
   // Non-root beat 1 creates motion and avoids the "MIDI bass" plodding feel.
   // Real bassists (Ron Carter, Ray Brown) use non-root tones ~30-40% of time.
+  //
+  // Harmonic-aware adjustment:
+  //   - Tonic resolution (I after V): 85% root for strong arrival
+  //   - Dominant chord: allow more 3rd/7th for tension
+  //   - Default: standard 65/25/10 split
   let beat1: number;
   const beat1Roll = _rng();
   // Place 5th and 3rd close to prevPitch for smooth voice leading
@@ -430,12 +435,23 @@ function generateSwingMeasure(
     }
     thirdPitch = clamp(tp);
   }
+
+  // Harmonic-aware beat 1 thresholds
+  const analysis = chord.analysis;
+  const isResolution = analysis?.cadenceRole === "resolution"
+    || (analysis?.isPartOfIiVI && analysis?.iiViPosition === "I");
+  const isDominantChord = analysis?.function === "dominant";
+  // Tonic resolution: strong root (85%), diminish non-root to 10/5
+  // Dominant chord: allow more variety - root 55%, 5th 25%, 3rd 20%
+  const rootThresh = isResolution ? 0.85 : isDominantChord ? 0.55 : 0.65;
+  const fifthThresh = isResolution ? 0.95 : isDominantChord ? 0.80 : 0.90;
+
   // First chord always root (establish tonality)
   if (!prevPitch) {
     beat1 = rootPitch;
-  } else if (beat1Roll < 0.65) {
+  } else if (beat1Roll < rootThresh) {
     beat1 = rootPitch;
-  } else if (beat1Roll < 0.90) {
+  } else if (beat1Roll < fifthThresh) {
     beat1 = fifthPitch;
   } else if (thirdPitch !== null) {
     // 3rd on beat 1 - smooth voice leading from previous bar's beat 4
@@ -472,7 +488,15 @@ function generateSwingMeasure(
 
     // Jazz idiom: chord's 3rd as approach when half-step below next root
     const third = chordTones.length > 1 ? chordTones[1] : null;
-    if (third !== null && (target - third === 1 || target - third === -11)) {
+    // Harmonic-aware: on dominant chords resolving to tonic (V-I),
+    // use the leading tone (7th of V = half-step below I root) as beat 4.
+    // This creates the strongest possible resolution motion.
+    const isVtoI = analysis?.function === "dominant"
+      && nextChord?.analysis?.cadenceRole === "resolution";
+    if (isVtoI && _rng() < 0.45) {
+      // Leading tone = one semitone below target
+      beat4 = clamp(target - 1);
+    } else if (third !== null && (target - third === 1 || target - third === -11)) {
       beat4 = third;
     } else {
       let fromAbove = beat1 > target;

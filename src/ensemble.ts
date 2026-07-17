@@ -17,9 +17,12 @@
 import { generateDrumPattern } from "./drumPatterns";
 import { generateWalkingBass } from "./walkingBass";
 import { generatePianoComping } from "./pianoComping";
+import { analyzeHarmony } from "./harmonicAnalysis";
 import { createPRNG, randomSeed, deriveStream, STREAM_DRUMS, STREAM_BASS, STREAM_PIANO } from "./prng";
 import type {
   BandContext,
+  ChordEvent,
+  HarmonicAnalysisResult,
   PhraseMap,
   PhraseIntent,
   PhraseArc,
@@ -32,6 +35,25 @@ import type {
   BassNote,
   CompNote,
 } from "./types";
+
+// ── Harmonic Analysis Annotation ──
+
+/**
+ * Run harmonic analysis on chord events and return annotated copies.
+ * Each returned ChordEvent has its `analysis` field populated.
+ */
+function annotateChords(
+  chords: ChordEvent[],
+  keyHint: string | undefined,
+  measureDuration: number,
+): { annotated: ChordEvent[]; analysis: HarmonicAnalysisResult } {
+  const analysis = analyzeHarmony(chords, keyHint, measureDuration);
+  const annotated = chords.map((c, i) => ({
+    ...c,
+    analysis: analysis.chordAnalyses[i],
+  }));
+  return { annotated, analysis };
+}
 
 // ── Phrase Map Computation ──
 
@@ -86,6 +108,7 @@ function planMusicalIntents(
   phraseMap: PhraseMap,
   options: EnsembleOptions,
   rng: () => number,
+  harmonic?: HarmonicAnalysisResult,
 ): PhraseIntent[] {
   const creativity = (options.creativity ?? 35) / 100;       // 0-1
   const conversation = (options.conversation ?? 30) / 100;
@@ -180,9 +203,25 @@ function planMusicalIntents(
     }
 
     // ── Harmonic Anticipation ──
-    // Higher harmonicFreedom → more likely piano plays next chord early
-    const anticipationChance = harmonicFreedom * 0.35; // max 35%
-    const passingChordChance = harmonicFreedom * 0.25; // max 25%
+    // Higher harmonicFreedom → more likely piano plays next chord early.
+    // Boost on predominant phrases (lots of ii chords setting up V),
+    // reduce on tonic-heavy phrases (already resolved, no need to rush).
+    let anticipationChance = harmonicFreedom * 0.35; // max 35%
+    let passingChordChance = harmonicFreedom * 0.25; // max 25%
+    if (harmonic && harmonic.chordAnalyses.length > 0) {
+      // Average tension across chords in this phrase
+      const phraseChordsStart = phraseStart;
+      const phraseChordsEnd = phraseEnd;
+      const phraseAnalyses = harmonic.chordAnalyses.filter((_, idx) =>
+        idx >= phraseChordsStart && idx < phraseChordsEnd);
+      if (phraseAnalyses.length > 0) {
+        const avgTension = phraseAnalyses.reduce((s, a) => s + a.tension, 0) / phraseAnalyses.length;
+        // High-tension phrases: boost anticipation (forward motion)
+        // Low-tension phrases: reduce passing chords (let resolution breathe)
+        anticipationChance *= 0.7 + avgTension * 0.6; // range: 0.7x to 1.3x
+        passingChordChance *= 0.6 + avgTension * 0.8; // range: 0.6x to 1.4x
+      }
+    }
 
     // ── Motif Lock Duration ──
     // How many bars piano/bass hold their pattern before changing.
@@ -412,10 +451,15 @@ export function generateEnsemble(options: EnsembleOptions): EnsembleResult {
   const density = options.density ?? 50;
   const swingAmount = options.swingAmount ?? 100;
 
+  // ── Harmonic Analysis (run once, before any generation) ──
+  const { annotated: annotatedChords, analysis: harmonicAnalysis } =
+    annotateChords(options.chordEvents, undefined, measureDuration);
+
   // Compute phrase structure and musical intent
   const phraseMap = computePhraseMap(options);
-  phraseMap.intents = planMusicalIntents(phraseMap, options, masterRng);
+  phraseMap.intents = planMusicalIntents(phraseMap, options, masterRng, harmonicAnalysis);
   const context = initContext(phraseMap, options);
+  context.harmonicAnalysis = harmonicAnalysis;
 
   // Determine section energy for density scaling.
   // Batch path: compute weighted average energy across all measures so that
@@ -482,7 +526,7 @@ export function generateEnsemble(options: EnsembleOptions): EnsembleResult {
 
   // ── Step 2: Generate Bass (informed by kick pattern) ──
   const scaledBassDensity = scaleDensity(density, energy);
-  const bassNotes = generateWalkingBass(options.chordEvents, {
+  const bassNotes = generateWalkingBass(annotatedChords, {
     style: bassStyle,
     tempo,
     swingAmount,
@@ -508,7 +552,7 @@ export function generateEnsemble(options: EnsembleOptions): EnsembleResult {
     ? Math.round(scaledPianoDensity * 0.8)
     : scaledPianoDensity;
 
-  const pianoNotes = generatePianoComping(options.chordEvents, {
+  const pianoNotes = generatePianoComping(annotatedChords, {
     style: pianoStyle,
     tempo,
     swingAmount,
@@ -557,9 +601,14 @@ export function* generateEnsembleMeasures(options: EnsembleOptions): Generator<M
   const density = options.density ?? 50;
   const swingAmount = options.swingAmount ?? 100;
 
+  // ── Harmonic Analysis (run once, before any generation) ──
+  const { annotated: annotatedChords, analysis: harmonicAnalysis } =
+    annotateChords(options.chordEvents, undefined, measureDuration);
+
   const phraseMap = computePhraseMap(options);
-  phraseMap.intents = planMusicalIntents(phraseMap, options, masterRng);
+  phraseMap.intents = planMusicalIntents(phraseMap, options, masterRng, harmonicAnalysis);
   const context = initContext(phraseMap, options);
+  context.harmonicAnalysis = harmonicAnalysis;
 
   const drumStyle = options.instrumentStyles?.drums ?? options.style;
   const bassStyle = options.instrumentStyles?.bass ?? options.style;
@@ -642,8 +691,8 @@ export function* generateEnsembleMeasures(options: EnsembleOptions): Generator<M
     const hitsPerMeasure = totalDrumHits / measuresGenerated;
     context.drumDensity = Math.min(1, Math.max(0, (hitsPerMeasure - 5) / 40));
 
-    // Generate bass for this measure's chords
-    const measureChords = options.chordEvents.filter(
+    // Generate bass for this measure's chords (use annotated chords with analysis)
+    const measureChords = annotatedChords.filter(
       c => c.time >= measureStart - 0.001 && c.time < measureEnd,
     );
     const bassSlice = measureChords.length > 0

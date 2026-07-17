@@ -76,6 +76,12 @@ export type {
   DrumGranular,
   PianoGranular,
   BassGranular,
+
+  // Harmonic analysis types
+  ChordAnalysis,
+  HarmonicFunction,
+  CadenceType,
+  HarmonicAnalysisResult,
 } from "./types";
 
 // ── Jam Generator ──
@@ -127,6 +133,9 @@ export { irealStyleToPracticeStyle } from "./styleMapping";
 
 // ── Ensemble ──
 export { generateEnsemble, generateEnsembleMeasures } from "./ensemble";
+
+// ── Harmonic Analysis ──
+export { analyzeHarmony } from "./harmonicAnalysis";
 
 // ── Complexity Mapping ──
 export { resolveDrumGranular, resolvePianoGranular, resolveBassGranular } from "./complexityMapping";

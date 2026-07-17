@@ -38,6 +38,7 @@ Deep technical articles about how JMove and the generator work:
 - **Drum Patterns** - 19 styles with humanization, ghost notes, groove templates based on GrooVAE research. Holdsworth preset features Chad Wackerman-inspired drumming: cross-stick interjections, ghost cascades, linear fills, 11/8-specific patterns
 
 **Intelligence**
+- **Harmonic Analysis Engine** - `analyzeHarmony()` detects key centers, assigns Roman numeral degrees, identifies ii-V-I patterns, cadences, secondary dominants, and modulations. Per-chord tension values drive musical decisions across all generators
 - **Musicality Engine** - phrase-level intelligence: dynamic drops, air gaps, harmonic anticipation, passing chords, conversation dynamics, motif memory. Four parameters (creativity, conversation, airGaps, harmonicFreedom) control musical character
 - **Per-Instrument Complexity** - 3 general sliders drive 13 granular sub-controls via piecewise linear mapping. Manual overrides take precedence over derived values
 - **Full Song Form** - multi-section arrangements with dynamic shaping and section-driven dynamics (intro sparse, shout dense)

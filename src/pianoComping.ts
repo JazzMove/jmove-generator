@@ -673,8 +673,8 @@ function buildClusterVoicing(root: string, quality: string): number[] {
     // Sus cluster: 9-4-b7 (span 8)
     intervals = [2, 5, 10];
   } else if (q.startsWith("m") && !q.startsWith("maj")) {
-    // Minor cluster: 9-b3-4-b7 (span 8)
-    intervals = [2, 3, 5, 10];
+    // Minor cluster: b3-4-5-b7 (span 7) — avoids harsh 9-b3 semitone
+    intervals = [3, 5, 7, 10];
   } else if ((q.includes("7") || q.includes("9") || q.includes("13")) && !q.includes("maj")) {
     // Dominant cluster: 9-3-b7 (span 8)
     intervals = [2, 4, 10];
@@ -693,12 +693,13 @@ function buildClusterVoicing(root: string, quality: string): number[] {
   }
   // Fallback: octave 4
   const base = 60 + rootPC;
-  return intervals.map(i => {
+  const clamped = intervals.map(i => {
     let p = base + i;
     while (p > PIANO_HIGH) p -= 12;
     while (p < PIANO_LOW) p += 12;
     return p;
-  }).sort((a, b) => a - b);
+  });
+  return [...new Set(clamped)].sort((a, b) => a - b);
 }
 
 /** Alfa Mist warm inversion voicing — first/second inversion triads with 9th.
@@ -739,12 +740,13 @@ function buildAlfaMistInversionVoicing(root: string, quality: string): number[] 
     }
   }
   const base = 60 + rootPC;
-  return intervals.map(i => {
+  const clamped = intervals.map(i => {
     let p = base + i;
     while (p > PIANO_HIGH) p -= 12;
     while (p < PIANO_LOW) p += 12;
     return p;
-  }).sort((a, b) => a - b);
+  });
+  return [...new Set(clamped)].sort((a, b) => a - b);
 }
 
 /** Build open voicing (wide intervals, open 5ths) for Metheny — translates
@@ -806,12 +808,13 @@ function buildOpenVoicing(root: string, quality: string): number[] {
   }
   // Fallback: octave 4
   const base = 60 + rootPC;
-  return intervals.map(i => {
+  const clamped = intervals.map(i => {
     let p = base + i;
     while (p > PIANO_HIGH) p -= 12;
     while (p < PIANO_LOW) p += 12;
     return p;
-  }).sort((a, b) => a - b);
+  });
+  return [...new Set(clamped)].sort((a, b) => a - b);
 }
 
 /** Build quartal voicing (stacked diatonic 4ths) for modal/ECM styles.
@@ -985,12 +988,13 @@ function buildRootPositionVoicing(root: string, quality: string): number[] {
     intervals = [0, 4, 7]; // major triad
   }
 
-  return intervals.map(i => {
+  const clamped = intervals.map(i => {
     let p = base + i;
     while (p > PIANO_HIGH) p -= 12;
     while (p < PIANO_LOW) p += 12;
     return p;
-  }).sort((a, b) => a - b);
+  });
+  return [...new Set(clamped)].sort((a, b) => a - b);
 }
 
 /** Detect dominant chord quality (not minor, not major 7th, not dim/sus). */
@@ -1500,9 +1504,13 @@ export function generatePianoComping(
 
     // ── ii-V-I Awareness ──
     // On V-I resolutions, bias voicing toward altered tones for tension.
-    // Uses chord index as deterministic selector to avoid PRNG stream shift.
-    const isResolving = !!(nextChord && isDominantQuality(chord.quality)
-      && isResolvingDominant(chord.root, nextChord.root));
+    // Uses harmonic analysis when available, falls back to ad-hoc detection.
+    const isResolving = chord.analysis
+      ? (chord.analysis.isPartOfIiVI && chord.analysis.iiViPosition === "V")
+        || (chord.analysis.function === "dominant" && chord.analysis.cadenceType === "authentic")
+        || chord.analysis.isSecondaryDominant
+      : !!(nextChord && isDominantQuality(chord.quality)
+        && isResolvingDominant(chord.root, nextChord.root));
 
     const pitches = pickVoicing(chord.root, chord.quality, prevPitches, style, useShell, voicingTypeRef, isResolving);
     prevPitches = pitches;
@@ -1560,18 +1568,23 @@ export function generatePianoComping(
       continue;
     }
 
+    // Tension-modulated anticipation: boost when current chord has high tension
+    // (dominant wanting to resolve) and next chord is a resolution
+    const chordTension = chord.analysis?.tension ?? 0.5;
+    const tensionAnticipBoost = chordTension > 0.6 ? 1.0 + (chordTension - 0.6) * 1.5 : 1.0;
+    const effectiveAnticipProb = Math.min(0.6, anticipationProb * tensionAnticipBoost);
+
     for (const [rawBeatOffset, durMult] of rhythm) {
       // ── Harmonic Anticipation ──
       // On beat 3.5+, possibly play NEXT chord's voicing (creates forward pull).
-      // Controlled by harmonicFreedom parameter.
+      // Controlled by harmonicFreedom parameter, boosted by harmonic tension.
       let usePitches = pitches;
       if (rawBeatOffset >= 3.5 && nextChord) {
         // Original behavior + enhanced by harmonicFreedom
         usePitches = pickVoicing(nextChord.root, nextChord.quality, prevPitches, style, useShell, voicingTypeRef);
-      } else if (rawBeatOffset >= 3.0 && rawBeatOffset < 3.5 && nextChord && _rng() < anticipationProb) {
-        // NEW: Early anticipation on beat 3-and (harmonicFreedom-controlled)
-        // Creates forward motion — piano "hears" the next chord before it arrives.
-        // Metheny does this constantly. Holdsworth's keys player does it conversationally.
+      } else if (rawBeatOffset >= 3.0 && rawBeatOffset < 3.5 && nextChord && _rng() < effectiveAnticipProb) {
+        // Early anticipation on beat 3-and (harmonicFreedom + tension-controlled)
+        // Creates forward motion - piano "hears" the next chord before it arrives.
         usePitches = pickVoicing(nextChord.root, nextChord.quality, prevPitches, style, useShell, voicingTypeRef);
       }
 

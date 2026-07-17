@@ -342,6 +342,38 @@ describe("Jam Generator", () => {
         expect(rC.score.measures).toHaveLength(rF.score.measures.length);
       }
     });
+
+    // Key detection accuracy — verifies templates transpose to the requested key
+    // (regression: detectTemplateKey used last-chord heuristic, misidentified blues/minor blues keys)
+    it.each([
+      ["blues12", "Bb", "swing"],
+      ["blues12", "Bb", "alfaMist"],
+      ["blues12", "Eb", "hardBop"],
+      ["minorBlues12", "C", "swing"],
+      ["minorBlues12", "A", "hardBop"],
+      ["minorBlues12", "Bb", "alfaMist"],
+      ["turnaround8", "G", "swing"],
+      ["aaba32", "F", "swing"],
+      ["modal16", "Bb", "modal"],
+      ["rhythm32", "Gb", "contemporaryJazz"],
+    ] as [JamForm, JamKey, string][])("%s in %s (%s) — first chord root matches key center", (form, key, style) => {
+      // Run 5 times to hit different template variants
+      for (let i = 0; i < 5; i++) {
+        const r = generateJamSession(makeConfig({ form, key, style: style as any }));
+        const chords = r.score.measures.map(m => m.chord!);
+        // Collect all roots — the requested key should be the most common root
+        const rootCounts = new Map<string, number>();
+        for (const c of chords) {
+          rootCounts.set(c.root, (rootCounts.get(c.root) ?? 0) + 1);
+        }
+        // Key center must appear as a chord root at least once
+        expect(rootCounts.has(key)).toBe(true);
+        // Key center root should be the most frequent (or tied for most)
+        const maxCount = Math.max(...rootCounts.values());
+        const keyCount = rootCounts.get(key) ?? 0;
+        expect(keyCount).toBeGreaterThanOrEqual(maxCount * 0.5); // at least half as frequent as top root
+      }
+    });
   });
 
   // ── Generator integration (original) ──

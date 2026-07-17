@@ -299,6 +299,25 @@ describe("Piano Comping — voicing quality (no dissonant clusters)", () => {
       }
     }
   });
+
+  // Regression: cluster/inversion/open/rootPosition builders lacked deduplication
+  it.each(["alfaMist", "metheny", "holdsworth", "fusion", "funk"] as const)(
+    "%s voicings have no duplicate pitches",
+    (style) => {
+      for (let run = 0; run < 3; run++) {
+        for (const root of ALL_ROOTS) {
+          for (const quality of MAIN_QUALITIES) {
+            const chords = [makeChord(root, quality, 0, 4)];
+            const notes = generatePianoComping(chords, { style, humanize: false, strum: false });
+            for (const note of notes) {
+              const unique = new Set(note.pitches);
+              expect(unique.size, `${style} ${root}${quality}: duplicate pitches in [${note.pitches}]`).toBe(note.pitches.length);
+            }
+          }
+        }
+      }
+    },
+  );
 });
 
 // ── Edge Cases ──

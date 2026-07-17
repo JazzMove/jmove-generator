@@ -4,6 +4,31 @@ All notable changes to `@jmove/generator` will be documented in this file.
 
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [1.3.0] - 2026-07-17
+
+### Added
+
+- **Harmonic analysis engine** (`harmonicAnalysis.ts`) - analyzes chord progressions for key centers, Roman numeral degrees, harmonic function (tonic/predominant/dominant), ii-V-I patterns, cadences, secondary dominants, modulations, and per-chord tension values
+- New types: `ChordAnalysis`, `HarmonicFunction`, `CadenceType`, `HarmonicAnalysisResult`
+- `ChordEvent.analysis` - optional per-chord harmonic annotation populated by `analyzeHarmony()`
+- `BandContext.harmonicAnalysis` - full analysis result available to all generators
+- `analyzeHarmony()` exported from package for standalone use
+- 61 new tests covering key detection, degree assignment, ii-V-I detection, secondary dominants, cadences, tension values, modulation detection, real jazz progressions, key transposition accuracy, and voicing deduplication across styles
+
+### Fixed
+
+- **Key transposition bug** - `detectTemplateKey()` used last-chord heuristic, causing wrong key for templates ending on non-tonic chords (e.g. "Blues in Bb" produced chords in Ab). Replaced with explicit `TEMPLATE_KEY` map covering all ~60 template variants
+- **Duplicate MIDI notes in voicings** - cluster, inversion, open, and root-position voicing builders lacked pitch deduplication after octave clamping. Added `[...new Set()]` to 4 fallback paths
+- **Harsh minor-2nd clusters in Alfa Mist** - minor cluster intervals `[2,3,5,10]` always placed 9th and b3rd one semitone apart. Changed to `[3,5,7,10]` (b3-4-5-b7)
+
+### Changed
+
+- **Ensemble** runs harmonic analysis once before generation; all three generators receive annotated chords with per-chord function, tension, and cadence data
+- **Piano comping** uses `chord.analysis` for ii-V-I awareness instead of ad-hoc `isDominantQuality`/`isResolvingDominant`; altered voicings now trigger on secondary dominants and authentic cadence dominants, not just V-I root motion; anticipation probability modulated by per-chord tension (high-tension dominants anticipate more)
+- **Walking bass** beat 1 selection is harmonic-aware: 85% root on tonic resolution (strong arrival), 55% root on dominant chords (more variety for tension); leading-tone approach on beat 4 of V-I cadences (45% probability) creates strongest resolution motion
+- **Drum fills** placed before authentic cadence resolutions using harmonic analysis, not just form/phrase markers
+- `planMusicalIntents` uses average phrase tension to modulate anticipation and passing chord probabilities per phrase
+
 ## [1.2.9] - 2026-07-16
 
 ### Added

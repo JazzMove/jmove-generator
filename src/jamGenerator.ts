@@ -910,14 +910,35 @@ function getTemplatePool(form: JamForm, style?: PracticeStyle): Chord[][] {
   }
 }
 
-/** Detect the "home key" of a template for transposition offset. */
+// Explicit key centers for templates NOT in C.
+// All generic, Alfa Mist, and most templates default to C.
+// Modal/quartal/pentatonic templates in D dorian and Metheny
+// templates in their original keys need explicit annotation.
+const TEMPLATE_KEY = new Map<readonly Chord[], JamKey>([
+  // Generic modal/quartal/pentatonic in D
+  [MODAL_16[0], "D"],      // So What (D dorian)
+  [MODAL_16[1], "D"],      // Maiden Voyage
+  [PENTATONIC_8[0], "D"],  // Nefertiti
+  [QUARTAL_16[0], "D"],    // Maiden Voyage shape
+  // Metheny — transcribed in original keys
+  [METHENY_MODAL_16[0], "D"],  // Bright Size Life
+  [METHENY_MODAL_16[1], "D"],  // Missouri Uncompromised
+  [METHENY_MODAL_16[2], "G"],  // Lydian plateau
+  [METHENY_MODAL_16[3], "G"],  // Floating sus
+  [METHENY_TURNAROUND_8[0], "D"],  // Bright Size Life turnaround
+  [METHENY_TURNAROUND_8[1], "G"],  // Sirabhorn
+  [METHENY_TURNAROUND_8[2], "G"],  // Unity Village
+  [METHENY_TURNAROUND_8[3], "D"],  // Midwestern Nights Dream
+  [METHENY_THROUGH_COMPOSED_12[0], "G"],  // Sirabhorn full
+  [METHENY_PENTATONIC_8[0], "D"],  // Lydian vamp
+  [METHENY_PENTATONIC_8[1], "A"],  // Sus pedal vamp
+  [METHENY_PENTATONIC_8[2], "G"],  // Major thirds cycle
+  [METHENY_QUARTAL_16[0], "D"],    // Quartal wash
+]);
+
+/** Get the key center of a template. Defaults to C for unlisted templates. */
 function detectTemplateKey(template: Chord[]): JamKey {
-  // Last chord's root is usually the tonic, or first chord for vamps
-  const last = template[template.length - 1];
-  const first = template[0];
-  // For minor templates, the root is still the key center
-  const root = last.root;
-  return (ALL_KEYS.includes(root as JamKey) ? root : first.root) as JamKey;
+  return TEMPLATE_KEY.get(template) ?? "C";
 }
 
 function generateFreeForm(measures: number, toKey: JamKey): Chord[] {
