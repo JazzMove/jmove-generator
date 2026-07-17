@@ -4,6 +4,12 @@ All notable changes to `@jmove/generator` will be documented in this file.
 
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [1.3.5] - 2026-07-18
+
+### Fixed
+
+- **Node 24 PRNG stability** - shell voicing probability now zero at voicingDensity >= 95, eliminating cross-Node-version test flakiness. Quality interval checks aggregate across all voicings
+
 ## [1.3.4] - 2026-07-18
 
 ### Added

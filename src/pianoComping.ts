@@ -1462,7 +1462,8 @@ export function generatePianoComping(
     : voicingThreshold < 25 ? 0.7
     : voicingThreshold < 50 ? 0.3
     : voicingThreshold < 75 ? 0.1
-    : 0.03;
+    : voicingThreshold < 95 ? 0.03
+    : 0;
   const drumDensityRestBoost = bandCtx && bandCtx.drumDensity > 0.6
     ? 0.08 * bandCtx.drumDensity : 0;
   // Increase rests at fast tempos: uptempo comping should be sparse
