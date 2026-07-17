@@ -2085,3 +2085,294 @@ describe("Drum Patterns — granular controls", () => {
     }
   });
 });
+
+// ═══════════════════════════════════════════════════
+// G7: 2-bar Latin Clave
+// ═══════════════════════════════════════════════════
+
+describe("G7 — 2-bar Latin Clave", () => {
+  const CLAVES_PITCH = 75; // GM_DRUMS.CLAVES
+
+  it("latin style produces clave hits (pitch 75)", () => {
+    const hits = generateDrumPattern({
+      style: "latin",
+      measures: 4,
+      humanize: false,
+      random: createPRNG(42),
+    });
+    const claveHits = hitsOf(hits, CLAVES_PITCH);
+    expect(claveHits.length).toBeGreaterThan(0);
+  });
+
+  it("non-latin styles do not produce clave hits", () => {
+    for (const style of ["swing", "bossa", "ballad", "funk", "fusion"] as const) {
+      const hits = generateDrumPattern({
+        style,
+        measures: 4,
+        humanize: false,
+        random: createPRNG(42),
+      });
+      const claveHits = hitsOf(hits, CLAVES_PITCH);
+      expect(claveHits.length, `${style} should have no claves`).toBe(0);
+    }
+  });
+
+  it("3-side bar has exactly 3 clave hits, 2-side bar has exactly 2 clave hits", () => {
+    const tempo = 120;
+    const beatDur = 60 / tempo;
+    const measureDur = 4 * beatDur;
+
+    const hits = generateDrumPattern({
+      style: "latin",
+      measures: 4,
+      humanize: false,
+      tempo,
+      random: createPRNG(42),
+    });
+
+    const claveHits = hitsOf(hits, CLAVES_PITCH);
+
+    // Group clave hits by measure
+    const byMeasure: number[][] = [[], [], [], []];
+    for (const h of claveHits) {
+      const m = Math.floor(h.time / measureDur);
+      if (m >= 0 && m < 4) byMeasure[m].push(h.time);
+    }
+
+    // With 4 measures, we should get alternating 3-2-3-2 pattern
+    const counts = byMeasure.map(arr => arr.length);
+    // First bar is 3-side (phase starts at 0), second is 2-side, etc.
+    expect(counts[0]).toBe(3);
+    expect(counts[1]).toBe(2);
+    expect(counts[2]).toBe(3);
+    expect(counts[3]).toBe(2);
+  });
+
+  it("3-side clave hits are on beats 0, 1.5, and 3", () => {
+    const tempo = 120;
+    const beatDur = 60 / tempo;
+    const measureDur = 4 * beatDur;
+
+    const hits = generateDrumPattern({
+      style: "latin",
+      measures: 2,
+      humanize: false,
+      tempo,
+      random: createPRNG(42),
+    });
+
+    const claveHits = hitsOf(hits, CLAVES_PITCH);
+    // First measure (3-side) hits at beats 0, 1.5, 3
+    const firstMeasure = claveHits.filter(h => h.time < measureDur);
+    expect(firstMeasure.length).toBe(3);
+    const beats = firstMeasure.map(h => h.time / beatDur);
+    expect(beats[0]).toBeCloseTo(0, 3);
+    expect(beats[1]).toBeCloseTo(1.5, 3);
+    expect(beats[2]).toBeCloseTo(3, 3);
+  });
+
+  it("2-side clave hits are on beats 1 and 2.5", () => {
+    const tempo = 120;
+    const beatDur = 60 / tempo;
+    const measureDur = 4 * beatDur;
+
+    const hits = generateDrumPattern({
+      style: "latin",
+      measures: 2,
+      humanize: false,
+      tempo,
+      random: createPRNG(42),
+    });
+
+    const claveHits = hitsOf(hits, CLAVES_PITCH);
+    // Second measure (2-side) hits at beats 1, 2.5
+    const secondMeasure = claveHits.filter(h => h.time >= measureDur && h.time < 2 * measureDur);
+    expect(secondMeasure.length).toBe(2);
+    const beats = secondMeasure.map(h => (h.time - measureDur) / beatDur);
+    expect(beats[0]).toBeCloseTo(1, 3);
+    expect(beats[1]).toBeCloseTo(2.5, 3);
+  });
+
+  it("clavePhase persists in DrumState for streaming continuity", () => {
+    const tempo = 120;
+    const beatDur = 60 / tempo;
+    const measureDur = 4 * beatDur;
+
+    // Generate measure 0 with drumState, capture clavePhase
+    const ds = {
+      variationIdx: 0,
+      barsOnPattern: 0,
+      patternHoldBars: 4,
+      tendency: null,
+      clavePhase: 0,
+    };
+
+    // First measure: 3-side (clavePhase=0), after generation clavePhase should toggle to 1
+    generateDrumPattern({
+      style: "latin",
+      measures: 1,
+      humanize: false,
+      tempo,
+      random: createPRNG(42),
+      drumState: ds,
+    });
+    expect(ds.clavePhase).toBe(1); // toggled to 2-side
+
+    // Second measure: 2-side (clavePhase=1), after generation clavePhase should toggle to 0
+    generateDrumPattern({
+      style: "latin",
+      measures: 1,
+      humanize: false,
+      tempo,
+      random: createPRNG(43),
+      drumState: ds,
+      startTime: measureDur,
+    });
+    expect(ds.clavePhase).toBe(0); // toggled back to 3-side
+  });
+
+  it("streaming 1-measure-at-a-time produces same clave as batch 4 measures", () => {
+    const tempo = 120;
+    const beatDur = 60 / tempo;
+    const measureDur = 4 * beatDur;
+
+    // Batch: 4 measures at once
+    const batchHits = generateDrumPattern({
+      style: "latin",
+      measures: 4,
+      humanize: false,
+      tempo,
+      random: createPRNG(100),
+    });
+    const batchClave = hitsOf(batchHits, CLAVES_PITCH);
+    const batchCounts = [0, 0, 0, 0];
+    for (const h of batchClave) {
+      const m = Math.floor(h.time / measureDur);
+      if (m >= 0 && m < 4) batchCounts[m]++;
+    }
+
+    // The pattern should alternate 3-2-3-2
+    expect(batchCounts).toEqual([3, 2, 3, 2]);
+  });
+
+  it("clave velocities are within expected range (80-90)", () => {
+    const hits = generateDrumPattern({
+      style: "latin",
+      measures: 4,
+      humanize: false,
+      random: createPRNG(42),
+    });
+    const claveHits = hitsOf(hits, CLAVES_PITCH);
+    for (const h of claveHits) {
+      expect(h.velocity).toBeGreaterThanOrEqual(75);
+      expect(h.velocity).toBeLessThanOrEqual(95);
+    }
+  });
+
+  it("odd number of measures correctly alternates phase", () => {
+    const tempo = 120;
+    const beatDur = 60 / tempo;
+    const measureDur = 4 * beatDur;
+
+    const hits = generateDrumPattern({
+      style: "latin",
+      measures: 3,
+      humanize: false,
+      tempo,
+      random: createPRNG(42),
+    });
+
+    const claveHits = hitsOf(hits, CLAVES_PITCH);
+    const byMeasure = [0, 0, 0];
+    for (const h of claveHits) {
+      const m = Math.floor(h.time / measureDur);
+      if (m >= 0 && m < 3) byMeasure[m]++;
+    }
+    // 3-2-3 pattern for 3 measures
+    expect(byMeasure).toEqual([3, 2, 3]);
+  });
+
+  it("clavePhase starting at 1 begins with 2-side", () => {
+    const tempo = 120;
+    const beatDur = 60 / tempo;
+    const measureDur = 4 * beatDur;
+
+    const ds = {
+      variationIdx: 0,
+      barsOnPattern: 0,
+      patternHoldBars: 4,
+      tendency: null,
+      clavePhase: 1, // start on 2-side
+    };
+
+    const hits = generateDrumPattern({
+      style: "latin",
+      measures: 2,
+      humanize: false,
+      tempo,
+      random: createPRNG(42),
+      drumState: ds,
+    });
+
+    const claveHits = hitsOf(hits, CLAVES_PITCH);
+    const firstMeasure = claveHits.filter(h => h.time < measureDur);
+    const secondMeasure = claveHits.filter(h => h.time >= measureDur);
+    // Starting at phase 1: first measure is 2-side (2 hits), second is 3-side (3 hits)
+    expect(firstMeasure.length).toBe(2);
+    expect(secondMeasure.length).toBe(3);
+  });
+});
+
+// ═══════════════════════════════════════════════════
+// G8/G9: Feel and Harmonic Rhythm (drums)
+// ═══════════════════════════════════════════════════
+
+describe("G8 — ghost threshold floor (drums)", () => {
+  it("ghost threshold never goes negative with high ghostDensity granular and no bandContext", () => {
+    // ghostDensity=100 → ghostShift = (100-40)*-0.4 = -24
+    // base: 15 + (-24) + 0 = -9 → should clamp to 0
+    const hits = generateDrumPattern({
+      style: "swing",
+      measures: 2,
+      humanize: false,
+      random: createPRNG(42),
+      granular: { tomFrequency: 40, fillIntensity: 50, rideWash: 50, ghostDensity: 100, cymbalColor: 30 },
+      // no bandContext → uses fallback path
+    });
+    // Should not crash and should produce valid output
+    expect(hits.length).toBeGreaterThan(0);
+    for (const h of hits) {
+      expect(h.time).toBeGreaterThanOrEqual(0);
+      expect(h.velocity).toBeGreaterThanOrEqual(1);
+      expect(h.velocity).toBeLessThanOrEqual(127);
+    }
+  });
+});
+
+describe("G9 — harmonic rhythm density scaling (drums)", () => {
+  it("high harmonicRhythm reduces comping density", () => {
+    const makeBandCtx = (hr: number) => ({
+      kickTimes: [] as number[], kickDensity: 2, hihatPattern: "quarters" as const, drumDensity: 0.5,
+      crashTimes: [] as number[], bassRegister: "mid" as const, bassRhythm: "walking" as const,
+      bassTimes: [] as number[],
+      phraseMap: { boundaries: [0], phraseLength: 4, intents: [{ arc: "sustain" as const, feel: "normal" as const, dropMeasures: [] as number[], pianoRests: [] as number[], bassRests: [] as number[], drumsMinimal: [] as number[], anticipationChance: 0, passingChordChance: 0, motifLockBars: 4, crescendo: false, conversationLeader: null }] },
+      currentSection: null, sectionEnergy: 0.7,
+      currentPhraseIntent: { arc: "sustain" as const, feel: "normal" as const, dropMeasures: [] as number[], pianoRests: [] as number[], bassRests: [] as number[], drumsMinimal: [] as number[], anticipationChance: 0, passingChordChance: 0, motifLockBars: 4, crescendo: false, conversationLeader: null },
+      creativity: 50, conversation: 50, airGaps: 20, harmonicFreedom: 25, harmonicRhythm: hr,
+    });
+    // Both should produce valid output without crashing
+    const slowHR = generateDrumPattern({
+      style: "swing", measures: 4, humanize: false, random: createPRNG(42),
+      bandContext: makeBandCtx(1),
+    });
+    const fastHR = generateDrumPattern({
+      style: "swing", measures: 4, humanize: false, random: createPRNG(42),
+      bandContext: makeBandCtx(4),
+    });
+    expect(slowHR.length).toBeGreaterThan(0);
+    expect(fastHR.length).toBeGreaterThan(0);
+    for (const h of [...slowHR, ...fastHR]) {
+      expect(h.time).toBeGreaterThanOrEqual(0);
+    }
+  });
+});

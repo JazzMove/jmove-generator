@@ -14,7 +14,7 @@
  */
 
 import { tempoSwingMultiplier, dynamicMultiplier, instrumentSwingFactor } from "./swingUtils";
-import { getGrooveTemplate, applyGroove, drumPitchToElement } from "./grooveTemplates";
+import { getGrooveTemplate, applyGroove, drumPitchToElement, rubatoOffset } from "./grooveTemplates";
 import type { DrumHit, DrumGranular, DrumPatternOptions, PhraseIntent } from "./types";
 
 export type { DrumHit, DrumPatternOptions };
@@ -205,11 +205,16 @@ const LATIN_HIHAT: Pattern = [
   { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 3.5, velocity: 50 },
 ];
 
-const LATIN_CLAVE: Pattern = [
-  // Son clave 3-2 (every 2 bars, but simplified per measure)
+// Son clave 3-2: proper 2-bar alternation.
+// 3-side: 3 hits per bar. 2-side: 2 hits per bar.
+const LATIN_CLAVE_3: Pattern = [
   { drum: GM_DRUMS.CLAVES, beat: 0, velocity: 90 },
   { drum: GM_DRUMS.CLAVES, beat: 1.5, velocity: 80 },
   { drum: GM_DRUMS.CLAVES, beat: 3, velocity: 85 },
+];
+const LATIN_CLAVE_2: Pattern = [
+  { drum: GM_DRUMS.CLAVES, beat: 1, velocity: 85 },
+  { drum: GM_DRUMS.CLAVES, beat: 2.5, velocity: 80 },
 ];
 
 // ── BALLAD ──
@@ -2444,12 +2449,12 @@ function generateStochasticComping(
 
 // ── Helpers ──
 
-export function humanizeTime(time: number, enabled: boolean, style?: string, drumPitch?: number, random?: () => number): number {
+export function humanizeTime(time: number, enabled: boolean, style?: string, drumPitch?: number, random?: () => number, energy?: number, arc?: import("./types").PhraseArc | null): number {
   if (!enabled) return time;
   const template = getGrooveTemplate(style ?? "swing");
   const elementKey = drumPitch !== undefined ? drumPitchToElement(drumPitch) : "ride" as const;
   const element = template[elementKey];
-  return applyGroove(time, element, random);
+  return applyGroove(time, element, random, energy, arc);
 }
 
 export function humanizeVelocity(vel: number, ghost: boolean, enabled: boolean, random?: () => number): number {
@@ -2577,7 +2582,8 @@ function getBossaPatternSet(): StylePatternSet {
 }
 
 function getLatinPatternSet(): StylePatternSet {
-  return { base: [...LATIN_CASCARA, ...LATIN_KICK, ...LATIN_HIHAT, ...LATIN_CLAVE], variations: [[]] };
+  // Clave excluded from base - added per-measure with 2-bar phase alternation
+  return { base: [...LATIN_CASCARA, ...LATIN_KICK, ...LATIN_HIHAT], variations: [[]] };
 }
 
 function getBalladPatternSet(): StylePatternSet {
@@ -2891,6 +2897,10 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
   let barsOnRide = 0;
   let rideHoldBars = rideVariants ? (4 + Math.floor(rng() * 5)) : Infinity;
 
+  // Latin clave 2-bar phase tracking: 0 = 3-side, 1 = 2-side
+  const isLatin = style === "latin";
+  let clavePhase = ds?.clavePhase ?? 0;
+
   const hits: DrumHit[] = [];
 
   for (let m = 0; m < numMeasures; m++) {
@@ -2939,6 +2949,7 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
 
     // BandContext: section energy scales intensity (0.3=sparse intro, 1.0=dense shout)
     const energy = bandCtx?.sectionEnergy ?? 0.7;
+    const feel = bandCtx?.currentPhraseIntent?.feel ?? "normal";
 
     // ── Musicality: Drums Minimal (ride + pedal hat only) ──
     // When phrase intent says this measure should be minimal, strip to timekeeping only.
@@ -2948,20 +2959,21 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
     const phraseIntent = bandCtx?.phraseMap
       ? lookupDrumIntent(absoluteM, bandCtx.phraseMap)
       : bandCtx?.currentPhraseIntent ?? null;
+    const arc = phraseIntent?.arc;
     if (phraseIntent?.drumsMinimal?.includes(absoluteM)) {
       // Minimal drums: just ride quarters and pedal hat on 2&4
       for (let b = 0; b < beatsPerMeasure; b++) {
         const t = measureStart + b * beatDuration;
         hits.push({
           pitch: GM_DRUMS.RIDE,
-          time: humanizeTime(t, humanize, style, GM_DRUMS.RIDE, rng),
+          time: Math.max(0, humanizeTime(t, humanize, style, GM_DRUMS.RIDE, rng, energy, arc)),
           duration: 0.08,
           velocity: humanizeVelocity(b === 0 ? 55 : 45, false, humanize, rng),
         });
         if (b === 1 || b === 3) {
           hits.push({
             pitch: GM_DRUMS.HI_HAT_PEDAL,
-            time: humanizeTime(t, humanize, style, GM_DRUMS.HI_HAT_PEDAL, rng),
+            time: Math.max(0, humanizeTime(t, humanize, style, GM_DRUMS.HI_HAT_PEDAL, rng, energy, arc)),
             duration: 0.05,
             velocity: humanizeVelocity(35, false, humanize, rng),
           });
@@ -2974,7 +2986,6 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
     // ── Phrase Arc Dynamics ──
     // Drums respond to phrase arc: build/climax = busier+louder, release = sparser+softer.
     // Without this, drums play identically regardless of musical narrative.
-    const arc = phraseIntent?.arc;
     const isDrop = phraseIntent?.dropMeasures?.includes(absoluteM) ?? false;
     const arcVelMult = isDrop ? 0.7
       : arc === "climax" ? 1.15
@@ -2989,6 +3000,11 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
       : arc === "release" ? 8
       : arc === "drop" ? 15
       : 0;
+
+    // ── Feel Changes (double-time / half-time) ──
+    // Double-time: boost energy and density. Half-time: sparse, laid back.
+    const feelVelMult = feel === "doubleTime" ? 1.1 : feel === "halfTime" ? 0.85 : 1.0;
+    const feelGhostAdjust = feel === "doubleTime" ? -10 : feel === "halfTime" ? 15 : 0;
 
     // ── Conversation Awareness ──
     // When drums are the leader, play more actively. When listening, pull back.
@@ -3013,7 +3029,7 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
         }
         hits.push({
           pitch: cymbalPitch,
-          time: humanizeTime(measureStart, humanize, style, GM_DRUMS.CRASH, rng),
+          time: Math.max(0, humanizeTime(measureStart, humanize, style, GM_DRUMS.CRASH, rng, energy, arc)),
           duration: isSectionStart ? 0.15 : 0.08,
           velocity: humanizeVelocity(crashVel, false, humanize, rng),
         });
@@ -3075,17 +3091,25 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
     }
 
     // Comping: stochastic per-beat generation for jazz styles, fixed arrays for others
+    // Fast harmonic rhythm: reduce comping density to avoid clutter over rapid changes
+    const hr = bandCtx?.harmonicRhythm ?? 1;
+    const hrDensityScale = hr >= 3 ? 0.6 : hr >= 2 ? 0.8 : 1.0;
+    const effectiveDensity = Math.round(density * hrDensityScale);
     const tomScale = options.granular ? options.granular.tomFrequency / 40 : 1;
     let compHits: PatternHit[];
     if (isStochastic && stochasticTable && tendency) {
-      compHits = generateStochasticComping(stochasticTable, density, tendency, rng, tomScale);
+      compHits = generateStochasticComping(stochasticTable, effectiveDensity, tendency, rng, tomScale);
     } else {
       compHits = patternSet.variations[variationIdx];
     }
 
     // When fill is active, keep comping hits on beats 1-2 only (fill replaces beats 3-4)
     const variationHits = fillPattern ? compHits.filter((h) => h.beat < 2) : compHits;
-    const pattern = [...patternSet.base, ...variationHits, ...(fillPattern ?? [])];
+
+    // Latin clave: 2-bar phase alternation (3-side / 2-side)
+    const claveHits = isLatin ? (clavePhase === 0 ? LATIN_CLAVE_3 : LATIN_CLAVE_2) : [];
+
+    const pattern = [...patternSet.base, ...claveHits, ...variationHits, ...(fillPattern ?? [])];
 
     // BandContext: energy-aware ghost note threshold — low energy strips ghosts earlier
     // Arc adjustment: build/climax keep more ghosts (busier), release/drop strip them (sparser)
@@ -3094,10 +3118,15 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
     // Fast tempo shift: raise threshold to strip ghosts at speed (>220 BPM)
     const tempoGhostShift = tempo > 220 ? Math.min(15, (tempo - 220) * 0.15) : 0;
     const ghostShift = options.granular ? (options.granular.ghostDensity - 40) * -0.4 : 0;
-    const ghostThreshold = bandCtx ? Math.min(40, Math.round(15 + (1 - energy) * 20 + arcGhostAdjust + ghostShift + tempoGhostShift)) : Math.round(15 + ghostShift + tempoGhostShift);
+    const ghostThreshold = bandCtx ? Math.min(40, Math.round(15 + (1 - energy) * 20 + arcGhostAdjust + feelGhostAdjust + ghostShift + tempoGhostShift)) : Math.max(0, Math.round(15 + ghostShift + tempoGhostShift));
 
     for (const hit of pattern) {
       if (hit.beat >= beatsPerMeasure) continue;
+
+      // Half-time: thin pattern by dropping non-essential hits on offbeats
+      if (feel === "halfTime" && hit.beat % 1 !== 0 && hit.drum !== GM_DRUMS.RIDE && hit.drum !== GM_DRUMS.RIDE_BELL) {
+        if (rng() < 0.5) continue; // drop 50% of offbeat non-ride hits
+      }
 
       // Density filtering: ghost notes removed at low density (threshold rises in quiet sections)
       if (hit.ghost && density < ghostThreshold) continue;
@@ -3127,9 +3156,10 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
       const energyVelMult = (bandCtx && !hasSectionDynamics) ? (0.7 + energy * 0.3) : 1.0;
       hits.push({
         pitch: hit.drum,
-        time: humanizeTime(time, humanize, style, hit.drum, rng),
+        time: Math.max(0, humanizeTime(time, humanize, style, hit.drum, rng, energy, arc)
+          + rubatoOffset(style, hit.beat, beatsPerMeasure, arc)),
         duration: 0.08,
-        velocity: humanizeVelocity(Math.round(hit.velocity * dynMult * energyVelMult * arcVelMult * convDrumVelMult), hit.ghost ?? false, humanize, rng),
+        velocity: humanizeVelocity(Math.round(hit.velocity * dynMult * energyVelMult * arcVelMult * feelVelMult * convDrumVelMult), hit.ghost ?? false, humanize, rng),
       });
     }
 
@@ -3137,6 +3167,7 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
 
     barsOnPattern++;
     barsOnRide++;
+    if (isLatin) clavePhase = 1 - clavePhase; // alternate 3-side / 2-side
   }
 
   // Persist state for streaming continuity across 1-measure calls
@@ -3145,6 +3176,7 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
     ds.barsOnPattern = barsOnPattern;
     ds.patternHoldBars = patternHoldBars;
     ds.tendency = tendency;
+    ds.clavePhase = clavePhase;
   }
 
   hits.sort((a, b) => a.time - b.time);

@@ -9,7 +9,7 @@
  * Jitter is half-width of uniform random variation around the bias.
  */
 
-import type { ElementTiming, GrooveTemplate } from "./types";
+import type { ElementTiming, GrooveTemplate, PhraseArc } from "./types";
 
 export type { ElementTiming, GrooveTemplate };
 
@@ -284,18 +284,110 @@ export function getGrooveTemplate(style: string): GrooveTemplate {
 }
 
 /**
+ * Evolve a groove element based on musical context.
+ * Real musicians tighten up during builds, loosen during releases,
+ * and push ahead when energy rises.
+ *
+ * Returns a new ElementTiming with modified bias and jitter.
+ */
+export function evolveElement(element: ElementTiming, energy: number, arc?: PhraseArc | null): ElementTiming {
+  let biasShift = 0;
+  let jitterScale = 1.0;
+
+  // Energy: high energy = tighter (less jitter), low energy = looser
+  // Maps energy [0.3, 1.0] to jitter scale [1.2, 0.8]
+  jitterScale *= 1.2 - 0.4 * Math.max(0.3, Math.min(1.0, energy));
+
+  // Arc-driven evolution
+  switch (arc) {
+    case "build":
+      biasShift = -0.001;    // push ahead 1ms (forward momentum)
+      jitterScale *= 0.85;   // tighten up (focused playing)
+      break;
+    case "climax":
+      biasShift = -0.0005;   // slight push (driving)
+      jitterScale *= 0.75;   // tightest (locked in)
+      break;
+    case "release":
+      biasShift = 0.001;     // lay back 1ms (relaxing)
+      jitterScale *= 1.25;   // loosen (breathing room)
+      break;
+    case "drop":
+      biasShift = 0.002;     // significantly behind (floating)
+      jitterScale *= 1.4;    // loosest (spacious)
+      break;
+    // sustain: no change (neutral playing)
+  }
+
+  return {
+    bias: element.bias + biasShift,
+    jitter: element.jitter * jitterScale,
+  };
+}
+
+/**
  * Apply groove template timing to a time value.
  * Returns time + bias + jitter from template.
  * Uses triangular distribution (peaked at center) instead of uniform -
  * most hits cluster near intended position, with rare larger displacements.
  * This matches real musician timing distributions (GrooVAE research).
+ *
+ * Optional energy/arc params enable dynamic groove evolution (G4) -
+ * groove tightens during builds and loosens during releases.
  */
-export function applyGroove(time: number, element: ElementTiming, random?: () => number): number {
+export function applyGroove(
+  time: number,
+  element: ElementTiming,
+  random?: () => number,
+  energy?: number,
+  arc?: PhraseArc | null,
+): number {
   const rng = random ?? Math.random;
   const u = rng();
   // Triangular distribution: peaked at 0, range [-1, 1]
   const tri = u < 0.5 ? Math.sqrt(2 * u) - 1 : 1 - Math.sqrt(2 * (1 - u));
-  return time + element.bias + tri * element.jitter;
+  // Evolve groove when energy/arc context is available
+  const evolved = energy !== undefined ? evolveElement(element, energy, arc) : element;
+  return time + evolved.bias + tri * evolved.jitter;
+}
+
+/**
+ * Compute rubato (tempo micro-variation) offset for a beat position.
+ * Returns time offset in seconds. Positive = behind, negative = ahead.
+ * Fully deterministic (no RNG) - groove templates handle random jitter.
+ *
+ * Ballads: stretch beat 4, compress beat 1 (breathing rubato).
+ * Builds: slight accelerando (push ahead).
+ * Endings/releases: ritardando (pull back).
+ */
+export function rubatoOffset(
+  style: string,
+  beatInMeasure: number,
+  beatsPerMeasure: number,
+  arc?: PhraseArc | null,
+): number {
+  let offset = 0;
+
+  // Ballad rubato: stretch beat 4 (lingering), compress beat 1 (forward pull)
+  if (style === "ballad" || style === "ecm") {
+    const beatPct = beatsPerMeasure > 0 ? beatInMeasure / beatsPerMeasure : 0;
+    if (beatPct > 0.75) {
+      offset += 0.004; // beat 4: stretch 4ms (tender lingering)
+    } else if (beatPct < 0.25 && beatPct > 0) {
+      offset -= 0.002; // beat 1 area (not beat 0): compress 2ms
+    }
+  }
+
+  // Arc-driven tempo feel
+  if (arc === "build") {
+    offset -= 0.001; // slight accelerando: 1ms ahead
+  } else if (arc === "release") {
+    offset += 0.002; // ritardando: 2ms behind
+  } else if (arc === "drop") {
+    offset += 0.003; // significant slowdown: 3ms behind
+  }
+
+  return offset;
 }
 
 /**

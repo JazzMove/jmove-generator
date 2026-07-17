@@ -32,20 +32,20 @@ describe("tempoSwingMultiplier", () => {
 });
 
 describe("compressDynamicLevel", () => {
-  it("maps floor (0.3) to 0.79", () => {
-    expect(compressDynamicLevel(0.3)).toBeCloseTo(0.79, 2);
+  it("maps floor (0.3) to 0.55", () => {
+    expect(compressDynamicLevel(0.3)).toBeCloseTo(0.55, 2);
   });
 
   it("maps maximum (1.0) to 1.0", () => {
     expect(compressDynamicLevel(1.0)).toBeCloseTo(1.0, 2);
   });
 
-  it("maps typical intro (0.55) to ~0.865", () => {
-    expect(compressDynamicLevel(0.55)).toBeCloseTo(0.865, 3);
+  it("maps typical intro (0.55) to ~0.711", () => {
+    expect(compressDynamicLevel(0.55)).toBeCloseTo(0.711, 2);
   });
 
-  it("maps typical head (0.80) to 0.94", () => {
-    expect(compressDynamicLevel(0.80)).toBeCloseTo(0.94, 2);
+  it("maps typical head (0.80) to ~0.871", () => {
+    expect(compressDynamicLevel(0.80)).toBeCloseTo(0.871, 2);
   });
 
   it("clamps values below floor to floor", () => {
@@ -53,10 +53,10 @@ describe("compressDynamicLevel", () => {
     expect(compressDynamicLevel(-1.0)).toBe(compressDynamicLevel(0.3));
   });
 
-  it("output range is [0.79, 1.0] for input [0.3, 1.0]", () => {
+  it("output range is [0.55, 1.0] for input [0.3, 1.0]", () => {
     for (let level = 0.3; level <= 1.0; level += 0.05) {
       const compressed = compressDynamicLevel(level);
-      expect(compressed).toBeGreaterThanOrEqual(0.79 - 0.001);
+      expect(compressed).toBeGreaterThanOrEqual(0.55 - 0.001);
       expect(compressed).toBeLessThanOrEqual(1.0 + 0.001);
     }
   });
@@ -208,7 +208,7 @@ describe("dynamicMultiplier", () => {
     it("compressed dynamicLevel prevents near-silent output", () => {
       const sections = makeSectionsSimple([0.55, 1.0]);
       const introMid = dynamicMultiplier(8, 32, "holdsworth", sections);
-      expect(introMid).toBeGreaterThan(0.7);
+      expect(introMid).toBeGreaterThan(0.55);
     });
 
     it("shout section still reaches near 1.0", () => {
@@ -217,14 +217,14 @@ describe("dynamicMultiplier", () => {
       expect(shoutPeak).toBeGreaterThanOrEqual(0.95);
     });
 
-    it("ratio between quietest and loudest section stays below 1.5x", () => {
+    it("ratio between quietest and loudest section stays below 2.0x", () => {
       const sections = makeSectionsSimple([0.55, 1.0]);
       const vals: number[] = [];
       for (let m = 0; m < 32; m++) {
         vals.push(dynamicMultiplier(m, 32, "holdsworth", sections));
       }
       const ratio = Math.max(...vals) / Math.min(...vals);
-      expect(ratio).toBeLessThan(1.5);
+      expect(ratio).toBeLessThan(2.0);
     });
 
     it("crossfades at section boundaries (no instant jumps)", () => {
@@ -272,8 +272,8 @@ describe("dynamicMultiplier", () => {
       expect(head).toBeGreaterThan(intro);
       expect(head).toBeGreaterThan(outro);
       // All above minimum useful velocity
-      expect(intro).toBeGreaterThan(0.7);
-      expect(outro).toBeGreaterThan(0.7);
+      expect(intro).toBeGreaterThan(0.55);
+      expect(outro).toBeGreaterThan(0.55);
     });
 
     it("works with styles other than holdsworth", () => {
@@ -286,7 +286,7 @@ describe("dynamicMultiplier", () => {
         // All styles: compressed range, no near-silent
         expect(Math.min(...vals)).toBeGreaterThan(0.4);
         // Ratio reasonable — alfaMist intentionally wider (dramatic style)
-        const maxRatio = style === "alfaMist" ? 2.1 : 1.7;
+        const maxRatio = style === "alfaMist" ? 2.8 : 2.0;
         expect(Math.max(...vals) / Math.min(...vals)).toBeLessThan(maxRatio);
       }
     });
@@ -294,8 +294,8 @@ describe("dynamicMultiplier", () => {
     it("dynamicLevel at floor (0.3) still produces audible output", () => {
       const sections = makeSectionsSimple([0.3]);
       const mid = dynamicMultiplier(8, 16, "swing", sections);
-      // compressed(0.3) = 0.79, micro ~0.95 → 0.75+
-      expect(mid).toBeGreaterThan(0.7);
+      // compressed(0.3) = 0.55, micro ~0.95 → 0.52+
+      expect(mid).toBeGreaterThan(0.5);
     });
 
     it("dynamicLevel at maximum (1.0) reaches full velocity", () => {
@@ -383,9 +383,9 @@ describe("dynamicMultiplier", () => {
         const min = Math.min(...vals);
         const max = Math.max(...vals);
         // No near-silent
-        expect(min).toBeGreaterThan(0.6);
+        expect(min).toBeGreaterThan(0.4);
         // Reasonable dynamic range
-        expect(max / min).toBeLessThan(1.6);
+        expect(max / min).toBeLessThan(2.0);
         // Peak reachable
         expect(max).toBeGreaterThan(0.9);
       }

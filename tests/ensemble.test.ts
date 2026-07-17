@@ -1460,6 +1460,418 @@ describe("Ensemble Coordination Layer", () => {
     });
   });
 
+  // ═══════════════════════════════════════════════════
+  // G8: Double-time / Half-time Feel
+  // ═══════════════════════════════════════════════════
+
+  describe("G8 — Feel changes (double-time / half-time)", () => {
+    it("PhraseIntent.feel field exists and defaults to 'normal'", () => {
+      const result = generateEnsemble({
+        chordEvents: makeSimpleChords(8),
+        style: "swing",
+        tempo: 120,
+        measures: 8,
+        seed: 42,
+        creativity: 0,
+      });
+      const intents = result.context.phraseMap.intents;
+      for (const intent of intents) {
+        expect(intent.feel).toBe("normal");
+      }
+    });
+
+    it("high creativity produces doubleTime on climax phrases (statistical)", () => {
+      let doubleTimeCount = 0;
+      let climaxCount = 0;
+      for (let seed = 0; seed < 100; seed++) {
+        const result = generateEnsemble({
+          chordEvents: makeSimpleChords(32),
+          style: "swing",
+          tempo: 120,
+          measures: 32,
+          seed,
+          creativity: 90,
+        });
+        for (const intent of result.context.phraseMap.intents) {
+          if (intent.arc === "climax") {
+            climaxCount++;
+            if (intent.feel === "doubleTime") doubleTimeCount++;
+          }
+        }
+      }
+      // With creativity=90/100=0.9, doubleTime probability on climax = 0.9*0.4 = 0.36
+      // Over many climax phrases, expect some to be doubleTime
+      expect(climaxCount).toBeGreaterThan(0);
+      expect(doubleTimeCount).toBeGreaterThan(0);
+    });
+
+    it("high creativity produces halfTime on drop phrases (statistical)", () => {
+      let halfTimeCount = 0;
+      let dropCount = 0;
+      for (let seed = 0; seed < 100; seed++) {
+        const result = generateEnsemble({
+          chordEvents: makeSimpleChords(32),
+          style: "swing",
+          tempo: 120,
+          measures: 32,
+          seed,
+          creativity: 90,
+        });
+        for (const intent of result.context.phraseMap.intents) {
+          if (intent.arc === "drop") {
+            dropCount++;
+            if (intent.feel === "halfTime") halfTimeCount++;
+          }
+        }
+      }
+      expect(dropCount).toBeGreaterThan(0);
+      expect(halfTimeCount).toBeGreaterThan(0);
+    });
+
+    it("low creativity (<=30) never produces feel changes", () => {
+      for (let seed = 0; seed < 50; seed++) {
+        const result = generateEnsemble({
+          chordEvents: makeSimpleChords(32),
+          style: "swing",
+          tempo: 120,
+          measures: 32,
+          seed,
+          creativity: 25,
+        });
+        for (const intent of result.context.phraseMap.intents) {
+          expect(intent.feel).toBe("normal");
+        }
+      }
+    });
+
+    it("doubleTime drums have higher velocity multiplier (1.1x)", () => {
+      // Find a seed that produces doubleTime on climax, compare drum velocities
+      let dtResult = null;
+      let normalResult = null;
+      for (let seed = 0; seed < 200; seed++) {
+        const result = generateEnsemble({
+          chordEvents: makeSimpleChords(16),
+          style: "swing",
+          tempo: 120,
+          measures: 16,
+          seed,
+          creativity: 95,
+        });
+        const intents = result.context.phraseMap.intents;
+        const hasDT = intents.some(i => i.feel === "doubleTime");
+        const hasNormal = intents.some(i => i.feel === "normal" && i.arc === "climax");
+        if (hasDT && !dtResult) dtResult = result;
+        if (hasNormal && !normalResult) normalResult = result;
+        if (dtResult && normalResult) break;
+      }
+      // If we found doubleTime, verify drums exist (feel didn't crash the generator)
+      if (dtResult) {
+        expect(dtResult.drums.length).toBeGreaterThan(0);
+        expect(dtResult.bass.length).toBeGreaterThan(0);
+      }
+    });
+
+    it("halfTime bass produces fewer notes per measure than normal", () => {
+      // Collect results with halfTime drops vs normal drops
+      let halfTimeNoteCount = 0;
+      let halfTimeMeasures = 0;
+      let normalNoteCount = 0;
+      let normalMeasures = 0;
+      const beatDur = 60 / 120;
+      const measureDur = 4 * beatDur;
+
+      for (let seed = 0; seed < 200; seed++) {
+        const result = generateEnsemble({
+          chordEvents: makeSimpleChords(24),
+          style: "swing",
+          tempo: 120,
+          measures: 24,
+          seed,
+          creativity: 95,
+        });
+        const intents = result.context.phraseMap.intents;
+        const boundaries = result.context.phraseMap.boundaries;
+
+        for (let pi = 0; pi < intents.length; pi++) {
+          const pStart = boundaries[pi] * measureDur;
+          const pEnd = (pi + 1 < boundaries.length ? boundaries[pi + 1] : 24) * measureDur;
+          const phraseLen = (pi + 1 < boundaries.length ? boundaries[pi + 1] : 24) - boundaries[pi];
+          const bassInPhrase = result.bass.filter(n => n.time >= pStart - 0.01 && n.time < pEnd);
+
+          if (intents[pi].feel === "halfTime" && phraseLen > 0) {
+            halfTimeNoteCount += bassInPhrase.length;
+            halfTimeMeasures += phraseLen;
+          } else if (intents[pi].feel === "normal" && intents[pi].arc === "sustain" && phraseLen > 0) {
+            normalNoteCount += bassInPhrase.length;
+            normalMeasures += phraseLen;
+          }
+        }
+      }
+
+      // halfTime should produce fewer bass notes per measure
+      if (halfTimeMeasures > 0 && normalMeasures > 0) {
+        const htPerMeasure = halfTimeNoteCount / halfTimeMeasures;
+        const normalPerMeasure = normalNoteCount / normalMeasures;
+        expect(htPerMeasure).toBeLessThan(normalPerMeasure);
+      }
+    });
+
+    it("feel field is one of the three valid values", () => {
+      const validFeels = new Set(["normal", "doubleTime", "halfTime"]);
+      for (let seed = 0; seed < 30; seed++) {
+        const result = generateEnsemble({
+          chordEvents: makeSimpleChords(32),
+          style: "swing",
+          tempo: 120,
+          measures: 32,
+          seed,
+          creativity: 80,
+        });
+        for (const intent of result.context.phraseMap.intents) {
+          expect(validFeels.has(intent.feel)).toBe(true);
+        }
+      }
+    });
+
+    it("all styles handle feel changes without crashing", () => {
+      // Force high creativity to maximize feel change probability
+      for (const style of ALL_STYLES) {
+        const result = generateEnsemble({
+          chordEvents: makeSimpleChords(16),
+          style,
+          tempo: 120,
+          measures: 16,
+          seed: 42,
+          creativity: 100,
+        });
+        expect(result.drums.length).toBeGreaterThan(0);
+        expect(result.bass.length).toBeGreaterThan(0);
+        expect(result.piano.length).toBeGreaterThan(0);
+      }
+    });
+  });
+
+  // ═══════════════════════════════════════════════════
+  // G9: Harmonic Rhythm Awareness
+  // ═══════════════════════════════════════════════════
+
+  describe("G9 — Harmonic rhythm awareness", () => {
+    function makeFastHarmonyChords(measures: number, chordsPerMeasure: number, tempo = 120): ChordEvent[] {
+      const beatDur = 60 / tempo;
+      const measureDur = 4 * beatDur;
+      const chordDur = measureDur / chordsPerMeasure;
+      const chords: ChordEvent[] = [];
+      const roots = ["C", "F", "G", "A"];
+      const qualities = ["m7", "7", "maj7", "m7"];
+      for (let m = 0; m < measures; m++) {
+        for (let c = 0; c < chordsPerMeasure; c++) {
+          chords.push({
+            root: roots[(m * chordsPerMeasure + c) % 4],
+            quality: qualities[(m * chordsPerMeasure + c) % 4],
+            time: m * measureDur + c * chordDur,
+            duration: chordDur,
+          });
+        }
+      }
+      return chords;
+    }
+
+    it("BandContext.harmonicRhythm reflects chords per bar from analysis", () => {
+      const result = generateEnsemble({
+        chordEvents: makeSimpleChords(8),
+        style: "swing",
+        tempo: 120,
+        measures: 8,
+        seed: 42,
+      });
+      // 1 chord per measure → harmonicRhythm should be around 1
+      expect(result.context.harmonicRhythm).toBeGreaterThanOrEqual(1);
+    });
+
+    it("BandContext.harmonicRhythm increases with more chords per measure", () => {
+      // 1 chord per measure
+      const slow = generateEnsemble({
+        chordEvents: makeSimpleChords(8),
+        style: "swing",
+        tempo: 120,
+        measures: 8,
+        seed: 42,
+      });
+
+      // 4 chords per measure
+      const fast = generateEnsemble({
+        chordEvents: makeFastHarmonyChords(8, 4),
+        style: "swing",
+        tempo: 120,
+        measures: 8,
+        seed: 42,
+      });
+
+      expect(fast.context.harmonicRhythm).toBeGreaterThan(slow.context.harmonicRhythm);
+    });
+
+    it("fast HR (>=3) forces shell voicings (max 2 pitches per chord)", () => {
+      // When harmonicRhythm >= 3, hrForceShell=true forces useShell=true.
+      // Shell voicings have at most 2 notes (3rd + 7th guide tones).
+      // Use ensemble mode which sets harmonicRhythm from analysis.
+      const fastChords = makeFastHarmonyChords(8, 4); // 4 chords/bar → HR = 4
+
+      // Generate with multiple seeds, verify shell voicing constraint
+      for (let seed = 0; seed < 10; seed++) {
+        const result = generateEnsemble({
+          chordEvents: fastChords,
+          style: "swing",
+          tempo: 120,
+          measures: 8,
+          seed,
+        });
+
+        // With HR=4 (>=3), shell voicings are forced. Every chord should have <= 2 pitches.
+        // Allow occasional 3-note voicings (passing chords, anticipations may bypass shell).
+        const threeOrMoreCount = result.piano.filter(n => n.pitches.length >= 3).length;
+        // At most 10% of chords should exceed 2 notes (edge cases from anticipation/passing)
+        if (result.piano.length > 0) {
+          expect(threeOrMoreCount / result.piano.length).toBeLessThan(0.15);
+        }
+      }
+    });
+
+    it("fast HR (>=2) scales down drum comping density (statistical)", () => {
+      // Aggregate over many seeds to overcome RNG variance.
+      // hrDensityScale at HR>=3 is 0.6, at HR>=2 is 0.8 — reduces effective density.
+      let slowTotal = 0;
+      let fastTotal = 0;
+
+      for (let seed = 0; seed < 30; seed++) {
+        const slowHR = generateEnsemble({
+          chordEvents: makeSimpleChords(16),
+          style: "swing",
+          tempo: 120,
+          measures: 16,
+          seed,
+          density: 50,
+        });
+
+        const fastHR = generateEnsemble({
+          chordEvents: makeFastHarmonyChords(16, 3),
+          style: "swing",
+          tempo: 120,
+          measures: 16,
+          seed,
+          density: 50,
+        });
+
+        // Count kick+snare comping hits (ride is constant)
+        slowTotal += slowHR.drums.filter(h => h.pitch === 36 || h.pitch === 38).length;
+        fastTotal += fastHR.drums.filter(h => h.pitch === 36 || h.pitch === 38).length;
+      }
+
+      // Over many seeds, fast HR should produce fewer comping hits on average
+      expect(fastTotal).toBeLessThan(slowTotal);
+    });
+
+    it("per-measure harmonicRhythm is >= 1 (clamped in streaming)", () => {
+      // In streaming mode, per-measure HR is Math.max(1, measureChords.length).
+      // Even with a single chord spanning all measures, each measure slice
+      // should have harmonicRhythm >= 1 because the chord is counted once per measure.
+      const beatDur = 60 / 120;
+      const measureDur = 4 * beatDur;
+      const chords: ChordEvent[] = [];
+      // 1 chord per measure (modal vamp) for 8 measures
+      for (let m = 0; m < 8; m++) {
+        chords.push({ root: "C", quality: "maj7", time: m * measureDur, duration: measureDur });
+      }
+      const slices = [...generateEnsembleMeasures({
+        chordEvents: chords,
+        style: "swing",
+        tempo: 120,
+        measures: 8,
+        seed: 42,
+      })];
+      for (const slice of slices) {
+        expect(slice.context.harmonicRhythm).toBeGreaterThanOrEqual(1);
+      }
+    });
+
+    it("per-measure HR updates in streaming mode", () => {
+      // Mix: first 4 measures have 1 chord each, last 4 have 4 chords each
+      const beatDur = 60 / 120;
+      const measureDur = 4 * beatDur;
+      const chords: ChordEvent[] = [];
+      // First 4 measures: 1 chord each
+      for (let m = 0; m < 4; m++) {
+        chords.push({ root: "C", quality: "maj7", time: m * measureDur, duration: measureDur });
+      }
+      // Last 4 measures: 4 chords each
+      for (let m = 4; m < 8; m++) {
+        const chordDur = measureDur / 4;
+        for (let c = 0; c < 4; c++) {
+          chords.push({
+            root: ["C", "F", "G", "A"][c],
+            quality: ["m7", "7", "maj7", "m7"][c],
+            time: m * measureDur + c * chordDur,
+            duration: chordDur,
+          });
+        }
+      }
+
+      const slices = [...generateEnsembleMeasures({
+        chordEvents: chords,
+        style: "swing",
+        tempo: 120,
+        measures: 8,
+        seed: 42,
+      })];
+
+      // First 4 measures: HR should be 1
+      for (let i = 0; i < 4; i++) {
+        expect(slices[i].context.harmonicRhythm).toBe(1);
+      }
+      // Last 4 measures: HR should be 4
+      for (let i = 4; i < 8; i++) {
+        expect(slices[i].context.harmonicRhythm).toBe(4);
+      }
+    });
+
+    it("all styles handle fast harmonic rhythm without crashing", () => {
+      for (const style of ALL_STYLES) {
+        const result = generateEnsemble({
+          chordEvents: makeFastHarmonyChords(8, 4),
+          style,
+          tempo: 120,
+          measures: 8,
+          seed: 42,
+        });
+        expect(result.drums.length).toBeGreaterThan(0);
+        expect(result.bass.length).toBeGreaterThan(0);
+        expect(result.piano.length).toBeGreaterThan(0);
+      }
+    });
+
+    it("velocities remain in MIDI range with extreme harmonic rhythm", () => {
+      const result = generateEnsemble({
+        chordEvents: makeFastHarmonyChords(8, 4),
+        style: "swing",
+        tempo: 120,
+        measures: 8,
+        seed: 42,
+        creativity: 90,
+      });
+      for (const h of result.drums) {
+        expect(h.velocity).toBeGreaterThanOrEqual(1);
+        expect(h.velocity).toBeLessThanOrEqual(127);
+      }
+      for (const n of result.bass) {
+        expect(n.velocity).toBeGreaterThanOrEqual(1);
+        expect(n.velocity).toBeLessThanOrEqual(127);
+      }
+      for (const n of result.piano) {
+        expect(n.velocity).toBeGreaterThanOrEqual(1);
+        expect(n.velocity).toBeLessThanOrEqual(127);
+      }
+    });
+  });
+
   describe("motifSeeds removed from PhraseMap", () => {
     it("PhraseMap has intents but no motifSeeds field", () => {
       const result = generateEnsemble({

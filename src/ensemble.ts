@@ -238,6 +238,18 @@ function planMusicalIntents(
     // ── Crescendo ──
     const crescendo = arc === "build" || (arc === "climax" && rng() < 0.7);
 
+    // ── Feel Changes (double-time / half-time) ──
+    // Double-time on climax creates one of jazz's most exciting moments.
+    // Half-time on drop creates breathing room. Gated by creativity.
+    let feel: "normal" | "doubleTime" | "halfTime" = "normal";
+    if (creativity > 0.3) {
+      if (arc === "climax" && rng() < creativity * 0.4) {
+        feel = "doubleTime";
+      } else if (arc === "drop" && rng() < creativity * 0.3) {
+        feel = "halfTime";
+      }
+    }
+
     // ── Conversation Leader ──
     // Who "speaks" this phrase — others should listen/support.
     // High conversation = more instrument trading. Low = parallel playing.
@@ -256,6 +268,7 @@ function planMusicalIntents(
 
     intents.push({
       arc,
+      feel,
       dropMeasures,
       pianoRests,
       bassRests,
@@ -291,6 +304,7 @@ function initContext(phraseMap: PhraseMap, options: EnsembleOptions): BandContex
     conversation: options.conversation ?? 30,
     airGaps: options.airGaps ?? 20,
     harmonicFreedom: options.harmonicFreedom ?? 25,
+    harmonicRhythm: 1,
   };
 }
 
@@ -460,6 +474,7 @@ export function generateEnsemble(options: EnsembleOptions): EnsembleResult {
   phraseMap.intents = planMusicalIntents(phraseMap, options, masterRng, harmonicAnalysis);
   const context = initContext(phraseMap, options);
   context.harmonicAnalysis = harmonicAnalysis;
+  context.harmonicRhythm = Math.max(1, harmonicAnalysis.harmonicRhythm);
 
   // Determine section energy for density scaling.
   // Batch path: compute weighted average energy across all measures so that
@@ -695,6 +710,8 @@ export function* generateEnsembleMeasures(options: EnsembleOptions): Generator<M
     const measureChords = annotatedChords.filter(
       c => c.time >= measureStart - 0.001 && c.time < measureEnd,
     );
+    // Per-measure harmonic rhythm (chords in this bar)
+    context.harmonicRhythm = Math.max(1, measureChords.length);
     const bassSlice = measureChords.length > 0
       ? generateWalkingBass(measureChords, {
           style: bassStyle,

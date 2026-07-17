@@ -12,7 +12,7 @@
  */
 
 import { tempoSwingMultiplier, dynamicMultiplier, instrumentSwingFactor } from "./swingUtils";
-import { getGrooveTemplate, applyGroove } from "./grooveTemplates";
+import { getGrooveTemplate, applyGroove, rubatoOffset } from "./grooveTemplates";
 import type { BassNote, BassGranular, WalkingBassOptions, ChordEvent, PhraseIntent, PhraseArc } from "./types";
 
 export type { BassNote, WalkingBassOptions, ChordEvent };
@@ -22,6 +22,7 @@ export type { BassNote, WalkingBassOptions, ChordEvent };
 // Safe: JS is single-threaded and generation is synchronous.
 let _rng: () => number = Math.random;
 let _bassGranular: BassGranular | undefined;
+let _harmonicRhythm: number = 1; // chords per bar (1=modal, 2+=fast changes)
 
 // ── Approach tone history for anti-repetition ──
 type ApproachRecord = { fromAbove: boolean; interval: number };
@@ -234,10 +235,13 @@ function approachTone(target: number, fromAbove: boolean, scaleTones?: number[],
   const base = APPROACH_VOCAB[style ?? ""] ?? { chromatic: 0.80, diatonic: 0.12, doubleChrm: 0.08 };
   // chromaticApproach (0-100): bias toward chromatic (high) or diatonic (low)
   // At 50 = neutral (use style defaults). Scale chromatic weight by chromaticApproach/50.
+  // Harmonic rhythm: fast changes (>=2 chords/bar) reduce chromatic, favor chord tones
   let weights = base;
   if (_bassGranular) {
     const bias = _bassGranular.chromaticApproach / 50; // 0-2 range, 1=neutral
-    const chrm = Math.min(0.95, base.chromatic * bias);
+    // Fast harmonic rhythm: reduce chromatic by 30% per extra chord/bar
+    const hrScale = _harmonicRhythm >= 2 ? Math.max(0.4, 1 - (_harmonicRhythm - 1) * 0.3) : 1;
+    const chrm = Math.min(0.95, base.chromatic * bias * hrScale);
     const remaining = 1 - chrm;
     const diaRatio = base.diatonic / (base.diatonic + base.doubleChrm) || 0.5;
     weights = { chromatic: chrm, diatonic: remaining * diaRatio, doubleChrm: remaining * (1 - diaRatio) };
@@ -1861,13 +1865,15 @@ export function generateWalkingBass(
   const prevRng = _rng;
   const prevGranular = _bassGranular;
   const prevHistory = _approachHistory;
+  const prevHR = _harmonicRhythm;
   _rng = options.random ?? Math.random;
   _bassGranular = options.granular;
+  _harmonicRhythm = options.bandContext?.harmonicRhythm ?? 1;
   _approachHistory = [];
 
   const style = options.style ?? "swing";
   const tempo = options.tempo ?? 120;
-  if (tempo <= 0) { _rng = prevRng; _bassGranular = prevGranular; throw new RangeError(`tempo must be > 0, got ${tempo}`); }
+  if (tempo <= 0) { _rng = prevRng; _bassGranular = prevGranular; _harmonicRhythm = prevHR; _approachHistory = prevHistory; throw new RangeError(`tempo must be > 0, got ${tempo}`); }
   const humanize = options.humanize ?? false;
   const beatDuration = 60 / tempo;
 
@@ -2017,11 +2023,18 @@ export function generateWalkingBass(
     // Style-biased humanization via groove templates
     if (humanize) {
       const template = getGrooveTemplate(style ?? "swing");
+      const grooveEnergy = bandCtx?.sectionEnergy;
+      const grooveArc = phraseIntent?.arc as import("./types").PhraseArc | undefined;
+      const bpb = chord.duration / beatDuration;
       for (let ni = 0; ni < measureNotes.length; ni++) {
         const n = measureNotes[ni];
         const isOffbeat = ni % 2 !== 0;
         const element = isOffbeat ? template.bassOffbeat : template.bass;
-        n.time = applyGroove(n.time, element, _rng);
+        n.time = applyGroove(n.time, element, _rng, grooveEnergy, grooveArc);
+        // Rubato: per-beat micro-tempo variation
+        n.time += rubatoOffset(style ?? "swing", ni, bpb, grooveArc);
+        // Clamp to non-negative (groove + rubato can push beat 0 before t=0)
+        if (n.time < 0) n.time = 0;
         n.velocity = Math.max(40, Math.min(127, n.velocity + Math.floor((_rng() - 0.5) * 10)));
       }
     }
@@ -2051,17 +2064,31 @@ export function generateWalkingBass(
       : bassArc === "release" ? 0.9
       : bassArc === "drop" ? 0.78
       : 1.0;
+    // Feel changes: double-time = louder, half-time = softer with longer notes
+    const bassFeel = phraseIntent?.feel ?? "normal";
+    const feelMult = bassFeel === "doubleTime" ? 1.1 : bassFeel === "halfTime" ? 0.85 : 1.0;
+    if (bassFeel === "halfTime" && measureNotes.length > 2) {
+      // Half-time: keep only beat 1 and beat 3 notes (half-note feel)
+      const thinned = measureNotes.filter((_, idx) => idx % 2 === 0);
+      // Extend durations to fill gaps
+      for (let ti = 0; ti < thinned.length - 1; ti++) {
+        thinned[ti].duration = thinned[ti + 1].time - thinned[ti].time - 0.01;
+      }
+      if (thinned.length > 0) thinned[thinned.length - 1].duration = beatDuration * 1.8;
+      measureNotes.length = 0;
+      measureNotes.push(...thinned);
+    }
     if (options.measureInfo) {
       const mIdx = Math.floor(chord.time / (options.measureInfo.measureDuration || 1));
       const dynMult = dynamicMultiplier(mIdx, options.measureInfo.totalMeasures, style, options.measureInfo.sections);
       const hasSectionDynamics = options.measureInfo.sections && options.measureInfo.sections.length > 0;
       const energyMult = (options.bandContext && !hasSectionDynamics) ? (0.75 + options.bandContext.sectionEnergy * 0.25) : 1.0;
       for (const n of measureNotes) {
-        n.velocity = Math.min(127, Math.max(40, Math.round(n.velocity * dynMult * energyMult * convMult * arcMult)));
+        n.velocity = Math.min(127, Math.max(40, Math.round(n.velocity * dynMult * energyMult * convMult * arcMult * feelMult)));
       }
-    } else if (convMult !== 1.0 || arcMult !== 1.0) {
+    } else if (convMult !== 1.0 || arcMult !== 1.0 || feelMult !== 1.0) {
       for (const n of measureNotes) {
-        n.velocity = Math.min(127, Math.max(40, Math.round(n.velocity * convMult * arcMult)));
+        n.velocity = Math.min(127, Math.max(40, Math.round(n.velocity * convMult * arcMult * feelMult)));
       }
     }
 
@@ -2113,6 +2140,7 @@ export function generateWalkingBass(
 
   _rng = prevRng;
   _bassGranular = prevGranular;
+  _harmonicRhythm = prevHR;
   _approachHistory = prevHistory;
   return notes;
 }

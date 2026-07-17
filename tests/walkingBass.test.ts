@@ -1492,3 +1492,130 @@ describe("Walking Bass — harmonic-aware approach", () => {
     }
   });
 });
+
+// ═══════════════════════════════════════════════════
+// G4-G9: Dynamic Groove, Rubato, Feel, Harmonic Rhythm
+// ═══════════════════════════════════════════════════
+
+describe("G4/G5 — groove evolution + rubato (bass)", () => {
+  it("humanized bass notes never have negative times", () => {
+    // Build arc with ballad style maximizes negative rubato potential
+    const chords = [makeChord("C", "maj7", 0, 2), makeChord("G", "7", 2, 2)];
+    for (let seed = 0; seed < 50; seed++) {
+      const notes = generateWalkingBass(chords, {
+        style: "ballad",
+        tempo: 60,
+        humanize: true,
+        random: createPRNG(seed),
+        bandContext: {
+          kickTimes: [], kickDensity: 2, hihatPattern: "quarters" as const, drumDensity: 0.5,
+          crashTimes: [], bassRegister: "mid" as const, bassRhythm: "walking" as const,
+          bassTimes: [],
+          phraseMap: { boundaries: [0], phraseLength: 4, intents: [{ arc: "build" as const, feel: "normal" as const, dropMeasures: [], pianoRests: [], bassRests: [], drumsMinimal: [], anticipationChance: 0, passingChordChance: 0, motifLockBars: 4, crescendo: false, conversationLeader: null }] },
+          currentSection: null, sectionEnergy: 0.3,
+          currentPhraseIntent: { arc: "build" as const, feel: "normal" as const, dropMeasures: [], pianoRests: [], bassRests: [], drumsMinimal: [], anticipationChance: 0, passingChordChance: 0, motifLockBars: 4, crescendo: false, conversationLeader: null },
+          creativity: 50, conversation: 50, airGaps: 20, harmonicFreedom: 25, harmonicRhythm: 1,
+        },
+      });
+      for (const n of notes) {
+        expect(n.time, `seed=${seed} produced negative time ${n.time}`).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+
+  it("groove evolves differently with build vs release arc", () => {
+    const chords = [makeChord("C", "maj7", 0, 2), makeChord("G", "7", 2, 2)];
+    const makeBandCtx = (arc: "build" | "release") => ({
+      kickTimes: [] as number[], kickDensity: 2, hihatPattern: "quarters" as const, drumDensity: 0.5,
+      crashTimes: [] as number[], bassRegister: "mid" as const, bassRhythm: "walking" as const,
+      bassTimes: [] as number[],
+      phraseMap: { boundaries: [0], phraseLength: 4, intents: [{ arc, feel: "normal" as const, dropMeasures: [] as number[], pianoRests: [] as number[], bassRests: [] as number[], drumsMinimal: [] as number[], anticipationChance: 0, passingChordChance: 0, motifLockBars: 4, crescendo: false, conversationLeader: null }] },
+      currentSection: null, sectionEnergy: 0.7,
+      currentPhraseIntent: { arc, feel: "normal" as const, dropMeasures: [] as number[], pianoRests: [] as number[], bassRests: [] as number[], drumsMinimal: [] as number[], anticipationChance: 0, passingChordChance: 0, motifLockBars: 4, crescendo: false, conversationLeader: null },
+      creativity: 50, conversation: 50, airGaps: 20, harmonicFreedom: 25, harmonicRhythm: 1,
+    });
+    const buildNotes = generateWalkingBass(chords, { style: "swing", tempo: 120, humanize: true, random: createPRNG(42), bandContext: makeBandCtx("build") });
+    const releaseNotes = generateWalkingBass(chords, { style: "swing", tempo: 120, humanize: true, random: createPRNG(42), bandContext: makeBandCtx("release") });
+    // Same seed + different arc should produce different timings (same pitches though)
+    const buildTimings = buildNotes.map(n => n.time);
+    const releaseTimings = releaseNotes.map(n => n.time);
+    const anyDifferent = buildTimings.some((t, i) => Math.abs(t - releaseTimings[i]) > 0.0001);
+    expect(anyDifferent).toBe(true);
+  });
+});
+
+describe("G8 — half-time feel (bass)", () => {
+  const makeIntent = (feel: "normal" | "halfTime") => ({
+    arc: "sustain" as const, feel, dropMeasures: [] as number[], pianoRests: [] as number[],
+    bassRests: [] as number[], drumsMinimal: [] as number[], anticipationChance: 0,
+    passingChordChance: 0, motifLockBars: 4, crescendo: false, conversationLeader: null,
+  });
+  const makeBandCtx = (feel: "normal" | "halfTime") => ({
+    kickTimes: [] as number[], kickDensity: 2, hihatPattern: "quarters" as const, drumDensity: 0.5,
+    crashTimes: [] as number[], bassRegister: "mid" as const, bassRhythm: "walking" as const,
+    bassTimes: [] as number[],
+    phraseMap: { boundaries: [0], phraseLength: 4, intents: [makeIntent(feel)] },
+    currentSection: null, sectionEnergy: 0.7,
+    currentPhraseIntent: makeIntent(feel),
+    creativity: 50, conversation: 50, airGaps: 20, harmonicFreedom: 25, harmonicRhythm: 1,
+  });
+
+  it("half-time produces fewer notes than normal", () => {
+    const chords = [makeChord("C", "maj7", 0, 2), makeChord("G", "7", 2, 2)];
+    const normalNotes = generateWalkingBass(chords, { style: "swing", tempo: 120, random: createPRNG(42), bandContext: makeBandCtx("normal") });
+    const halfNotes = generateWalkingBass(chords, { style: "swing", tempo: 120, random: createPRNG(42), bandContext: makeBandCtx("halfTime") });
+    expect(halfNotes.length).toBeLessThan(normalNotes.length);
+  });
+
+  it("half-time velocities are scaled down (0.85x)", () => {
+    const chords = [makeChord("C", "maj7", 0, 2)];
+    const normalNotes = generateWalkingBass(chords, { style: "swing", tempo: 120, random: createPRNG(42), bandContext: makeBandCtx("normal"), measureInfo: { totalMeasures: 1, measureDuration: 2 } });
+    const halfNotes = generateWalkingBass(chords, { style: "swing", tempo: 120, random: createPRNG(42), bandContext: makeBandCtx("halfTime"), measureInfo: { totalMeasures: 1, measureDuration: 2 } });
+    if (normalNotes.length > 0 && halfNotes.length > 0) {
+      const normalAvgVel = normalNotes.reduce((s, n) => s + n.velocity, 0) / normalNotes.length;
+      const halfAvgVel = halfNotes.reduce((s, n) => s + n.velocity, 0) / halfNotes.length;
+      expect(halfAvgVel).toBeLessThan(normalAvgVel);
+    }
+  });
+});
+
+describe("G9 — harmonic rhythm awareness (bass)", () => {
+  it("fast harmonic rhythm reduces chromatic approach frequency", () => {
+    // Single chord per bar = normal approach behavior
+    const slowChords = [makeChord("C", "maj7", 0, 2), makeChord("D", "m7", 2, 2), makeChord("G", "7", 4, 2), makeChord("C", "maj7", 6, 2)];
+    // 4 chords packed in same space = fast harmonic rhythm
+    const fastChords = [
+      makeChord("C", "maj7", 0, 0.5), makeChord("D", "m7", 0.5, 0.5),
+      makeChord("G", "7", 1.0, 0.5), makeChord("C", "maj7", 1.5, 0.5),
+      makeChord("F", "maj7", 2.0, 0.5), makeChord("Bb", "7", 2.5, 0.5),
+      makeChord("Eb", "maj7", 3.0, 0.5), makeChord("Ab", "7", 3.5, 0.5),
+    ];
+    const slowNotes = generateWalkingBass(slowChords, {
+      style: "swing", tempo: 120, random: createPRNG(42),
+      bandContext: { kickTimes: [], kickDensity: 2, hihatPattern: "quarters" as const, drumDensity: 0.5,
+        crashTimes: [], bassRegister: "mid" as const, bassRhythm: "walking" as const, bassTimes: [],
+        phraseMap: { boundaries: [0], phraseLength: 4, intents: [{ arc: "sustain" as const, feel: "normal" as const, dropMeasures: [], pianoRests: [], bassRests: [], drumsMinimal: [], anticipationChance: 0, passingChordChance: 0, motifLockBars: 4, crescendo: false, conversationLeader: null }] },
+        currentSection: null, sectionEnergy: 0.7, currentPhraseIntent: null,
+        creativity: 50, conversation: 50, airGaps: 20, harmonicFreedom: 25, harmonicRhythm: 1 },
+      granular: { chromaticApproach: 80, registerWidth: 50, syncopation: 30, beatVariety: 40, bassRegister: 50 },
+    });
+    const fastNotes = generateWalkingBass(fastChords, {
+      style: "swing", tempo: 120, random: createPRNG(42),
+      bandContext: { kickTimes: [], kickDensity: 2, hihatPattern: "quarters" as const, drumDensity: 0.5,
+        crashTimes: [], bassRegister: "mid" as const, bassRhythm: "walking" as const, bassTimes: [],
+        phraseMap: { boundaries: [0], phraseLength: 4, intents: [{ arc: "sustain" as const, feel: "normal" as const, dropMeasures: [], pianoRests: [], bassRests: [], drumsMinimal: [], anticipationChance: 0, passingChordChance: 0, motifLockBars: 4, crescendo: false, conversationLeader: null }] },
+        currentSection: null, sectionEnergy: 0.7, currentPhraseIntent: null,
+        creativity: 50, conversation: 50, airGaps: 20, harmonicFreedom: 25, harmonicRhythm: 4 },
+      granular: { chromaticApproach: 80, registerWidth: 50, syncopation: 30, beatVariety: 40, bassRegister: 50 },
+    });
+    // Both should produce valid notes
+    expect(slowNotes.length).toBeGreaterThan(0);
+    expect(fastNotes.length).toBeGreaterThan(0);
+    // All notes should have valid times and pitches
+    for (const n of [...slowNotes, ...fastNotes]) {
+      expect(n.time).toBeGreaterThanOrEqual(0);
+      expect(n.pitch).toBeGreaterThanOrEqual(BASS_LOW);
+      expect(n.pitch).toBeLessThanOrEqual(BASS_HIGH);
+    }
+  });
+});

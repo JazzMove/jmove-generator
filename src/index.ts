@@ -123,7 +123,7 @@ export { STYLE_PRESETS, STYLE_CATEGORIES, STYLE_LABELS } from "./stylePresets";
 export { autoDetectPreset } from "./autoDetectPreset";
 
 // ── Groove Templates ──
-export { getGrooveTemplate, applyGroove, drumPitchToElement } from "./grooveTemplates";
+export { getGrooveTemplate, applyGroove, drumPitchToElement, evolveElement, rubatoOffset } from "./grooveTemplates";
 
 // ── Swing Utilities ──
 export { tempoSwingMultiplier, instrumentSwingFactor, dynamicMultiplier, compressDynamicLevel } from "./swingUtils";

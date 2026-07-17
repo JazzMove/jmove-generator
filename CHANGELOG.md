@@ -4,6 +4,29 @@ All notable changes to `@jmove/generator` will be documented in this file.
 
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [1.3.3] - 2026-07-17
+
+### Added
+
+- **Dynamic groove templates** - groove bias/jitter now evolve with sectionEnergy and PhraseArc. `evolveElement()` tightens timing during builds/climax, loosens during release/drop. All three generators wire energy+arc to `applyGroove()` calls
+- **Tempo rubato** - deterministic per-beat micro-tempo variation via `rubatoOffset()`. Ballad/ECM styles stretch beat 4 (+4ms) and compress beat 1 (-2ms). Arc-driven: builds push ahead (-1ms), releases lay back (+2ms), drops drift (+3ms). Zero PRNG cost - fully deterministic
+- **2-bar Latin clave** - proper son clave alternation with `LATIN_CLAVE_3` (3-side: beats 1, 1.5, 3) and `LATIN_CLAVE_2` (2-side: beats 1, 2.5). `clavePhase` in DrumState persists across streaming calls. Clave removed from base pattern set to prevent random-side selection
+- **Double/half-time feel** - `PhraseIntent.feel` field ("normal"/"doubleTime"/"halfTime") drives density and velocity changes across all generators. Drums: half-time drops offbeat hits (50%), velocity scaled 0.85x/1.1x. Bass: half-time thins to beat 1&3 notes with extended durations. Piano: rest chance scaled 0.5x (double-time) / 2.0x (half-time). Triggered by creativity+arc (climax->doubleTime, drop->halfTime)
+- **Harmonic rhythm awareness** - chords-per-bar density modulates all generators. Bass: chromatic approach probability scaled down at fast harmonic rhythm (hrScale). Piano: forces shell voicings when harmonicRhythm >= 3. Drums: comping density reduced 20-40% at fast harmonic rhythm. `BandContext.harmonicRhythm` computed per-measure in both batch and streaming paths
+- 72 new tests: groove template evolution (15), rubato offset (18), 2-bar clave (10), feel changes (10), harmonic rhythm (7), bass/piano/drum negative-time clamping, feel, and HR direct tests (12)
+
+### Changed
+
+- **Dynamic range widened** - `compressDynamicLevel()` output range expanded from [0.79, 1.0] (21% range) to [0.55, 1.0] (45% range). Quietest sections now genuinely quiet, loudest sections retain full volume
+- `evolveElement` and `rubatoOffset` exported from package for direct use
+
+### Fixed
+
+- **Bass/piano negative time clamping** - groove evolution + rubato could push beat 0 notes before t=0 (e.g., hardBop push + build arc). Added `Math.max(0, ...)` clamp matching drum patterns
+- **Bass error path state leak** - `_approachHistory` not restored when `generateWalkingBass` threw on invalid tempo, leaving stale history for subsequent calls
+- **Drum ghost threshold negative** - without bandContext, high `ghostDensity` granular (100) could produce negative ghost threshold (-9), bypassing all ghost filtering. Added `Math.max(0, ...)` floor
+- **Ensemble batch harmonicRhythm zero** - empty chord input produced harmonicRhythm=0 in batch path (streaming already clamped to 1). Added `Math.max(1, ...)` for consistency
+
 ## [1.3.2] - 2026-07-17
 
 ### Added

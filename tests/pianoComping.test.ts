@@ -1337,3 +1337,127 @@ describe("Piano Comping — granular controls", () => {
     }
   });
 });
+
+// ═══════════════════════════════════════════════════
+// G4-G9: Dynamic Groove, Rubato, Feel, Harmonic Rhythm
+// ═══════════════════════════════════════════════════
+
+describe("G4/G5 — groove evolution + rubato (piano)", () => {
+  it("humanized piano notes never have negative times", () => {
+    const chords = [makeChord("C", "maj7", 0, 2), makeChord("G", "7", 2, 2)];
+    for (let seed = 0; seed < 50; seed++) {
+      const notes = generatePianoComping(chords, {
+        style: "ballad",
+        tempo: 60,
+        humanize: true,
+        strum: false,
+        random: createPRNG(seed),
+        bandContext: {
+          kickTimes: [] as number[], kickDensity: 2, hihatPattern: "quarters" as const, drumDensity: 0.5,
+          crashTimes: [] as number[], bassRegister: "mid" as const, bassRhythm: "walking" as const,
+          bassTimes: [] as number[],
+          phraseMap: { boundaries: [0], phraseLength: 4, intents: [{ arc: "build" as const, feel: "normal" as const, dropMeasures: [] as number[], pianoRests: [] as number[], bassRests: [] as number[], drumsMinimal: [] as number[], anticipationChance: 0, passingChordChance: 0, motifLockBars: 4, crescendo: false, conversationLeader: null }] },
+          currentSection: null, sectionEnergy: 0.3,
+          currentPhraseIntent: { arc: "build" as const, feel: "normal" as const, dropMeasures: [] as number[], pianoRests: [] as number[], bassRests: [] as number[], drumsMinimal: [] as number[], anticipationChance: 0, passingChordChance: 0, motifLockBars: 4, crescendo: false, conversationLeader: null },
+          creativity: 50, conversation: 50, airGaps: 20, harmonicFreedom: 25, harmonicRhythm: 1,
+        },
+      });
+      for (const n of notes) {
+        expect(n.time, `seed=${seed} produced negative time ${n.time}`).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+
+  it("groove evolves differently with build vs release arc", () => {
+    const chords = [makeChord("C", "maj7", 0, 2), makeChord("G", "7", 2, 2)];
+    const makeBandCtx = (arc: "build" | "release") => ({
+      kickTimes: [] as number[], kickDensity: 2, hihatPattern: "quarters" as const, drumDensity: 0.5,
+      crashTimes: [] as number[], bassRegister: "mid" as const, bassRhythm: "walking" as const,
+      bassTimes: [] as number[],
+      phraseMap: { boundaries: [0], phraseLength: 4, intents: [{ arc, feel: "normal" as const, dropMeasures: [] as number[], pianoRests: [] as number[], bassRests: [] as number[], drumsMinimal: [] as number[], anticipationChance: 0, passingChordChance: 0, motifLockBars: 4, crescendo: false, conversationLeader: null }] },
+      currentSection: null, sectionEnergy: 0.7,
+      currentPhraseIntent: { arc, feel: "normal" as const, dropMeasures: [] as number[], pianoRests: [] as number[], bassRests: [] as number[], drumsMinimal: [] as number[], anticipationChance: 0, passingChordChance: 0, motifLockBars: 4, crescendo: false, conversationLeader: null },
+      creativity: 50, conversation: 50, airGaps: 20, harmonicFreedom: 25, harmonicRhythm: 1,
+    });
+    const buildNotes = generatePianoComping(chords, { style: "swing", tempo: 120, humanize: true, strum: false, random: createPRNG(42), bandContext: makeBandCtx("build") });
+    const releaseNotes = generatePianoComping(chords, { style: "swing", tempo: 120, humanize: true, strum: false, random: createPRNG(42), bandContext: makeBandCtx("release") });
+    const buildTimings = buildNotes.map(n => n.time);
+    const releaseTimings = releaseNotes.map(n => n.time);
+    const anyDifferent = buildTimings.some((t, i) => releaseTimings[i] !== undefined && Math.abs(t - releaseTimings[i]) > 0.0001);
+    expect(anyDifferent).toBe(true);
+  });
+});
+
+describe("G8 — feel changes (piano)", () => {
+  const makeIntent = (feel: "normal" | "halfTime" | "doubleTime") => ({
+    arc: "sustain" as const, feel, dropMeasures: [] as number[], pianoRests: [] as number[],
+    bassRests: [] as number[], drumsMinimal: [] as number[], anticipationChance: 0,
+    passingChordChance: 0, motifLockBars: 4, crescendo: false, conversationLeader: null,
+  });
+  const makeBandCtx = (feel: "normal" | "halfTime" | "doubleTime") => ({
+    kickTimes: [] as number[], kickDensity: 2, hihatPattern: "quarters" as const, drumDensity: 0.5,
+    crashTimes: [] as number[], bassRegister: "mid" as const, bassRhythm: "walking" as const,
+    bassTimes: [] as number[],
+    phraseMap: { boundaries: [0], phraseLength: 8, intents: [makeIntent(feel)] },
+    currentSection: null, sectionEnergy: 0.7,
+    currentPhraseIntent: makeIntent(feel),
+    creativity: 50, conversation: 50, airGaps: 20, harmonicFreedom: 25, harmonicRhythm: 1,
+  });
+
+  it("halfTime piano produces fewer notes (higher rest chance)", () => {
+    const chords = Array.from({ length: 8 }, (_, i) => makeChord("C", "maj7", i * 2, 2));
+    let normalTotal = 0;
+    let halfTotal = 0;
+    for (let seed = 0; seed < 20; seed++) {
+      const normalNotes = generatePianoComping(chords, { style: "swing", tempo: 120, strum: false, random: createPRNG(seed), bandContext: makeBandCtx("normal") });
+      const halfNotes = generatePianoComping(chords, { style: "swing", tempo: 120, strum: false, random: createPRNG(seed), bandContext: makeBandCtx("halfTime") });
+      normalTotal += normalNotes.length;
+      halfTotal += halfNotes.length;
+    }
+    expect(halfTotal).toBeLessThan(normalTotal);
+  });
+
+  it("doubleTime piano produces more notes (lower rest chance)", () => {
+    const chords = Array.from({ length: 8 }, (_, i) => makeChord("C", "maj7", i * 2, 2));
+    let normalTotal = 0;
+    let doubleTotal = 0;
+    for (let seed = 0; seed < 20; seed++) {
+      const normalNotes = generatePianoComping(chords, { style: "swing", tempo: 120, strum: false, random: createPRNG(seed), bandContext: makeBandCtx("normal") });
+      const doubleNotes = generatePianoComping(chords, { style: "swing", tempo: 120, strum: false, random: createPRNG(seed), bandContext: makeBandCtx("doubleTime") });
+      normalTotal += normalNotes.length;
+      doubleTotal += doubleNotes.length;
+    }
+    expect(doubleTotal).toBeGreaterThan(normalTotal);
+  });
+});
+
+describe("G9 — harmonic rhythm awareness (piano)", () => {
+  it("fast harmonic rhythm forces shell voicings (fewer pitches per chord)", () => {
+    const slowChords = [makeChord("C", "maj7", 0, 4)];
+    const fastChords = [
+      makeChord("C", "maj7", 0, 1), makeChord("D", "m7", 1, 1),
+      makeChord("G", "7", 2, 1), makeChord("C", "maj7", 3, 1),
+    ];
+    const makeBandCtx = (hr: number) => ({
+      kickTimes: [] as number[], kickDensity: 2, hihatPattern: "quarters" as const, drumDensity: 0.5,
+      crashTimes: [] as number[], bassRegister: "mid" as const, bassRhythm: "walking" as const,
+      bassTimes: [] as number[],
+      phraseMap: { boundaries: [0], phraseLength: 4, intents: [{ arc: "sustain" as const, feel: "normal" as const, dropMeasures: [] as number[], pianoRests: [] as number[], bassRests: [] as number[], drumsMinimal: [] as number[], anticipationChance: 0, passingChordChance: 0, motifLockBars: 4, crescendo: false, conversationLeader: null }] },
+      currentSection: null, sectionEnergy: 0.7, currentPhraseIntent: null,
+      creativity: 20, conversation: 20, airGaps: 10, harmonicFreedom: 10, harmonicRhythm: hr,
+    });
+    let slowPitchCount = 0, slowNoteCount = 0;
+    let fastPitchCount = 0, fastNoteCount = 0;
+    for (let seed = 0; seed < 20; seed++) {
+      const slowNotes = generatePianoComping(slowChords, { style: "swing", tempo: 120, humanize: false, strum: false, random: createPRNG(seed), bandContext: makeBandCtx(1) });
+      for (const n of slowNotes) { slowPitchCount += n.pitches.length; slowNoteCount++; }
+      const fastNotes = generatePianoComping(fastChords, { style: "swing", tempo: 120, humanize: false, strum: false, random: createPRNG(seed), bandContext: makeBandCtx(4) });
+      for (const n of fastNotes) { fastPitchCount += n.pitches.length; fastNoteCount++; }
+    }
+    if (slowNoteCount > 0 && fastNoteCount > 0) {
+      const slowAvg = slowPitchCount / slowNoteCount;
+      const fastAvg = fastPitchCount / fastNoteCount;
+      expect(fastAvg).toBeLessThanOrEqual(slowAvg);
+    }
+  });
+});

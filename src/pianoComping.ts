@@ -11,7 +11,7 @@
  */
 
 import { tempoSwingMultiplier, dynamicMultiplier, instrumentSwingFactor } from "./swingUtils";
-import { getGrooveTemplate, applyGroove } from "./grooveTemplates";
+import { getGrooveTemplate, applyGroove, rubatoOffset } from "./grooveTemplates";
 import type { CompNote, PianoStyle, PianoCompingOptions, ChordEvent, PianoGranular } from "./types";
 
 export type { CompNote, PianoStyle, PianoCompingOptions, ChordEvent };
@@ -19,6 +19,8 @@ export type { CompNote, PianoStyle, PianoCompingOptions, ChordEvent };
 // ── Module-level PRNG ──
 let _rng: () => number = Math.random;
 let _pianoGranular: PianoGranular | undefined;
+let _pianoEnergy: number = 0.7;
+let _pianoArc: import("./types").PhraseArc | null = null;
 
 // ── Register Constants ──
 // Base range: G3 (55) to C6 (84). pianoRegister (0-100) shifts center ±7 semitones.
@@ -1209,7 +1211,7 @@ function humanizeTime(time: number, enabled: boolean, style?: string, beatOffset
   const template = getGrooveTemplate(style ?? "swing");
   const isAnticipation = beatOffset !== undefined && beatOffset >= 3.5;
   const element = isAnticipation ? template.pianoAnticipation : template.piano;
-  return applyGroove(time, element, _rng);
+  return applyGroove(time, element, _rng, _pianoEnergy, _pianoArc);
 }
 
 function humanizeVelocity(vel: number, enabled: boolean): number {
@@ -1377,12 +1379,14 @@ export function generatePianoComping(
   if (chords.length === 0) return [];
   const prevRng = _rng;
   const prevGranular = _pianoGranular;
+  const prevEnergy = _pianoEnergy;
+  const prevArc = _pianoArc;
   _rng = options.random ?? Math.random;
   _pianoGranular = options.granular;
 
   const style = options.style ?? "swing";
   const tempo = options.tempo ?? 120;
-  if (tempo <= 0) { _rng = prevRng; _pianoGranular = prevGranular; throw new RangeError(`tempo must be > 0, got ${tempo}`); }
+  if (tempo <= 0) { _rng = prevRng; _pianoGranular = prevGranular; _pianoEnergy = prevEnergy; _pianoArc = prevArc; throw new RangeError(`tempo must be > 0, got ${tempo}`); }
   const humanize = options.humanize ?? true;
   const density = options.density;
   const swingAmount = options.swingAmount ?? 100;
@@ -1405,8 +1409,10 @@ export function generatePianoComping(
   const pianoGranular = options.granular;
   // voicingDensity: low → shell voicings (2-note), high → full voicings (4-note)
   // At fast tempos (>220), force shell voicings - dense chords blur at speed
+  // Fast harmonic rhythm (>=3 chords/bar): force shells - too many dense voicings = clutter
   const voicingThreshold = pianoGranular ? pianoGranular.voicingDensity : 50;
-  const useShell = tempo > 220 || voicingThreshold < 35 || (density !== undefined && density < 35);
+  const hrForceShell = (bandCtx?.harmonicRhythm ?? 1) >= 3;
+  const useShell = tempo > 220 || voicingThreshold < 35 || (density !== undefined && density < 35) || hrForceShell;
   const drumDensityRestBoost = bandCtx && bandCtx.drumDensity > 0.6
     ? 0.08 * bandCtx.drumDensity : 0;
   // Increase rests at fast tempos: uptempo comping should be sparse
@@ -1482,6 +1488,10 @@ export function generatePianoComping(
       ? getPhraseIntentForMeasure(measureIdx, bandCtx.phraseMap)
       : intent;
 
+    // Update module-level groove evolution state for humanizeTime
+    _pianoEnergy = bandCtx?.sectionEnergy ?? 0.7;
+    _pianoArc = (phraseIntent?.arc as import("./types").PhraseArc) ?? null;
+
     // Intent-driven rest: if this measure is in pianoRests, skip it
     if (phraseIntent?.pianoRests?.includes(measureIdx)) {
       wasRest = true;
@@ -1510,7 +1520,11 @@ export function generatePianoComping(
     // Crescendo boost within phrase
     const crescendoMult = phraseIntent?.crescendo ? (0.85 + formPct * 0.2) : 1.0;
 
-    const restChance = (baseRestChance / formDensityMult) / conversationDensityMult;
+    // Feel changes: double-time = fewer rests (busier), half-time = more rests (spacious)
+    const pianoFeel = phraseIntent?.feel ?? "normal";
+    const feelRestMult = pianoFeel === "doubleTime" ? 0.5 : pianoFeel === "halfTime" ? 2.0 : 1.0;
+
+    const restChance = (baseRestChance / formDensityMult) / conversationDensityMult * feelRestMult;
 
     // Rest bar: skip chord (never first, never last, never consecutive)
     const isLast = ci === chords.length - 1;
@@ -1671,7 +1685,7 @@ export function generatePianoComping(
       }
       const n: CompNote = {
         pitches: [...finalPitches],
-        time: humanizeTime(time, humanize, style, rawBeatOffset),
+        time: Math.max(0, humanizeTime(time, humanize, style, rawBeatOffset) + rubatoOffset(style ?? "swing", rawBeatOffset, beatsPerBar, _pianoArc)),
         duration: duration * 0.95,
         velocity: humanizeVelocity(baseVel, humanize),
       };
@@ -1695,11 +1709,13 @@ export function generatePianoComping(
   const result = doStrum ? strumSpread(graced, strumMs) : graced;
   _rng = prevRng;
   _pianoGranular = prevGranular;
+  _pianoEnergy = prevEnergy;
+  _pianoArc = prevArc;
   return result;
 }
 
 // ── Phrase Intent Lookup (piano-side) ──
-function getPhraseIntentForMeasure(measure: number, phraseMap: { boundaries: number[]; intents?: Array<{ pianoRests: number[]; dropMeasures: number[]; conversationLeader: string | null; crescendo: boolean; anticipationChance: number; passingChordChance: number; motifLockBars: number; arc: string }> }): { pianoRests: number[]; dropMeasures: number[]; conversationLeader: string | null; crescendo: boolean; anticipationChance: number; passingChordChance: number; motifLockBars: number; arc: string } | null {
+function getPhraseIntentForMeasure(measure: number, phraseMap: { boundaries: number[]; intents?: Array<{ pianoRests: number[]; dropMeasures: number[]; conversationLeader: string | null; crescendo: boolean; anticipationChance: number; passingChordChance: number; motifLockBars: number; arc: string; feel?: string }> }): { pianoRests: number[]; dropMeasures: number[]; conversationLeader: string | null; crescendo: boolean; anticipationChance: number; passingChordChance: number; motifLockBars: number; arc: string; feel?: string } | null {
   if (!phraseMap.intents || phraseMap.intents.length === 0) return null;
   for (let i = phraseMap.boundaries.length - 1; i >= 0; i--) {
     if (measure >= phraseMap.boundaries[i]) {

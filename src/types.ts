@@ -225,6 +225,7 @@ export interface DrumState {
   barsOnPattern: number;
   patternHoldBars: number;
   tendency: unknown;  // CompingTendency | null, kept opaque for type boundary
+  clavePhase?: number;  // 0 = 3-side, 1 = 2-side (son clave alternation for Latin)
 }
 
 export interface DrumPatternOptions {
@@ -336,6 +337,7 @@ export type PhraseArc = "build" | "sustain" | "release" | "drop" | "climax";
 
 export interface PhraseIntent {
   arc: PhraseArc;                         // overall energy trajectory for this phrase
+  feel: "normal" | "doubleTime" | "halfTime"; // rhythmic feel change
   dropMeasures: number[];                 // measure indices where dynamic drops occur (ride-only / pedal bass)
   pianoRests: number[];                   // measures where piano deliberately rests
   bassRests: number[];                    // measures where bass deliberately rests (rare — usually pedal instead)
@@ -382,6 +384,8 @@ export interface BandContext {
 
   // ── Harmonic Analysis ──
   harmonicAnalysis?: HarmonicAnalysisResult;
+  /** Chords per bar in current measure/phrase (1=modal vamp, 4=fast bebop changes) */
+  harmonicRhythm: number;
 }
 
 export interface EnsembleOptions {

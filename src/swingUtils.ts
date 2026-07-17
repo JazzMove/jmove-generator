@@ -39,12 +39,14 @@ const DYNAMIC_FLOOR = 0.3;
 const SECTION_CROSSFADE_MEASURES = 2;
 
 /**
- * Compress section dynamic level to a narrower velocity range.
+ * Compress section dynamic level to a usable velocity range.
  * Raw multiplication (micro 0.60 × level 0.55 = 0.33) created near-silent intros.
- * Maps [0.3, 1.0] → [0.79, 1.0] — perceptible dynamics without extremes.
+ * Maps [0.3, 1.0] → [0.55, 1.0] — 45% dynamic range for expressive arcs.
+ * Previously mapped to [0.79, 1.0] (21%) which was over-compressed.
  */
 export function compressDynamicLevel(level: number): number {
-  return 0.7 + 0.3 * Math.max(DYNAMIC_FLOOR, level);
+  const clamped = Math.max(DYNAMIC_FLOOR, level);
+  return 0.55 + 0.45 * (clamped - DYNAMIC_FLOOR) / (1.0 - DYNAMIC_FLOOR);
 }
 
 /**
