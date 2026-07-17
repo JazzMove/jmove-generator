@@ -4,6 +4,17 @@ All notable changes to `@jmove/generator` will be documented in this file.
 
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [1.3.1] - 2026-07-17
+
+### Changed
+
+- **Bass approach tones context-aware** - approach tone selection now tracks history across bars to prevent formulaic repetition (same direction 3+ times triggers 60% flip bias, consecutive half-steps boost diatonic/double-chromatic probability)
+- **Arc-driven approach direction** - phrase arc (build/climax) biases ascending approaches, release/drop biases descending, creating musical contour across phrases
+- **ii-V approach awareness** - when on ii chord approaching V, 35% chance of chromatic-from-below or b7 common-tone approach (strong voice leading into dominant)
+- **HardBop approach variety** - was hardcoded `clamp(target-1)` (always chromatic from below), now uses full approach vocabulary 40% of the time while maintaining aggressive character
+- **CoolJazz diatonic approaches** - was hardcoded chromatic, now uses style's diatonic-heavy vocabulary (55% chromatic, 35% diatonic, 10% double-chromatic)
+- 7 new approach tone tests: direction variety, interval variety, hardBop/coolJazz variety, ii-V-I harmonic awareness, range safety
+
 ## [1.3.0] - 2026-07-17
 
 ### Added

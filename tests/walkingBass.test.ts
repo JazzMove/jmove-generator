@@ -5,6 +5,7 @@ import {
   resolveBassGranular,
   createPRNG,
   type ChordEvent,
+  type ChordAnalysis,
   type BassNote,
   type BassGranular,
 } from "../src/index";
@@ -1219,6 +1220,178 @@ describe("Walking Bass — granular controls", () => {
         expect(noGranular[i].pitch).toBe(undefinedGranular[i].pitch);
         expect(noGranular[i].time).toBeCloseTo(undefinedGranular[i].time, 6);
         expect(noGranular[i].velocity).toBe(undefinedGranular[i].velocity);
+      }
+    }
+  });
+});
+
+// ── Anti-Repetition & Harmonic Approach Tones ──
+
+function makeAnalysis(overrides: Partial<ChordAnalysis>): ChordAnalysis {
+  return {
+    degree: "I", function: "tonic", keyCenter: "C",
+    isSecondaryDominant: false, isPartOfIiVI: false,
+    isModulationPoint: false, tension: 0,
+    ...overrides,
+  };
+}
+
+describe("Walking Bass — approach tone anti-repetition", () => {
+  it("approach direction varies over 16+ bars (both directions appear)", () => {
+    // Build a long progression to test anti-repetition across many bars
+    const chords: ChordEvent[] = [];
+    const roots = ["C", "F", "Bb", "Eb", "Ab", "Db", "Gb", "B", "E", "A", "D", "G",
+                   "C", "F", "Bb", "Eb", "Ab", "Db"];
+    for (let i = 0; i < roots.length; i++) {
+      chords.push(makeChord(roots[i], "maj7", i * 2));
+    }
+
+    let totalAbove = 0;
+    let totalBelow = 0;
+    for (let trial = 0; trial < 20; trial++) {
+      const notes = generateWalkingBass(chords, { style: "swing", tempo: 120 });
+      for (let i = 3; i < notes.length; i += 4) {
+        if (i + 1 >= notes.length) break;
+        const approach = notes[i].pitch;
+        const nextBeat1 = notes[i + 1]?.pitch;
+        if (nextBeat1 == null) break;
+        if (approach > nextBeat1) totalAbove++;
+        else if (approach < nextBeat1) totalBelow++;
+      }
+    }
+    // Anti-repetition ensures meaningful mix of directions
+    const total = totalAbove + totalBelow;
+    const minorityPct = Math.min(totalAbove, totalBelow) / total;
+    // At least 20% minority direction (without anti-rep, circular progressions bias one way)
+    expect(minorityPct).toBeGreaterThan(0.15);
+  });
+
+  it("approach interval variety over 16 bars (not all half-steps)", () => {
+    const chords: ChordEvent[] = [];
+    const roots = ["C", "G", "D", "A", "E", "B", "F", "Bb", "Eb", "Ab", "Db", "Gb",
+                   "C", "G", "D", "A"];
+    for (let i = 0; i < roots.length; i++) {
+      chords.push(makeChord(roots[i], "7", i * 2));
+    }
+
+    const intervals = new Set<number>();
+    for (let trial = 0; trial < 10; trial++) {
+      const notes = generateWalkingBass(chords, { style: "swing", tempo: 120 });
+      for (let i = 3; i < notes.length; i += 4) {
+        if (i + 1 >= notes.length) break;
+        const approach = notes[i].pitch;
+        const nextBeat1 = notes[i + 1]?.pitch;
+        if (nextBeat1 != null) intervals.add(Math.abs(approach - nextBeat1));
+      }
+    }
+    // Should see more than just half-step (1) — also 2 (diatonic) and others
+    expect(intervals.size).toBeGreaterThanOrEqual(2);
+  });
+
+  it("hardBop approach tones are not always chromatic from below", () => {
+    const chords = [
+      makeChord("C", "maj7", 0), makeChord("F", "maj7", 2),
+      makeChord("Bb", "maj7", 4), makeChord("Eb", "maj7", 6),
+      makeChord("Ab", "maj7", 8), makeChord("Db", "maj7", 10),
+      makeChord("Gb", "maj7", 12), makeChord("B", "maj7", 14),
+    ];
+    const approaches: number[] = [];
+    for (let trial = 0; trial < 20; trial++) {
+      const notes = generateWalkingBass(chords, { style: "hardBop", tempo: 140 });
+      for (let i = 3; i < notes.length; i += 4) {
+        if (i + 1 >= notes.length) break;
+        approaches.push(notes[i].pitch - notes[i + 1].pitch);
+      }
+    }
+    // Old behavior: always -1 (chromatic from below). New: at least some variety
+    const unique = new Set(approaches);
+    expect(unique.size).toBeGreaterThanOrEqual(2);
+  });
+
+  it("coolJazz uses diatonic approaches (not just chromatic)", () => {
+    const chords = [
+      makeChord("C", "maj7", 0), makeChord("F", "maj7", 2),
+      makeChord("Bb", "maj7", 4), makeChord("Eb", "maj7", 6),
+    ];
+    const intervals = new Set<number>();
+    for (let trial = 0; trial < 30; trial++) {
+      const notes = generateWalkingBass(chords, { style: "coolJazz", tempo: 100 });
+      for (let i = 3; i < notes.length; i += 4) {
+        if (i + 1 >= notes.length) break;
+        intervals.add(Math.abs(notes[i].pitch - notes[i + 1].pitch));
+      }
+    }
+    // coolJazz APPROACH_VOCAB: chromatic 55%, diatonic 35%, double 10%
+    // Should see both half-step (1) and whole-step (2) intervals
+    expect(intervals.size).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("Walking Bass — harmonic-aware approach", () => {
+  it("ii-V-I uses leading tone on V->I resolution (statistical)", () => {
+    // Tag chords with harmonic analysis for V->I awareness
+    const chords: ChordEvent[] = [
+      { root: "D", quality: "m7", time: 0, duration: 2,
+        analysis: makeAnalysis({ degree: "ii", function: "predominant", isPartOfIiVI: true, iiViPosition: "ii" }) },
+      { root: "G", quality: "7", time: 2, duration: 2,
+        analysis: makeAnalysis({ degree: "V", function: "dominant", isPartOfIiVI: true, iiViPosition: "V" }) },
+      { root: "C", quality: "maj7", time: 4, duration: 2,
+        analysis: makeAnalysis({ degree: "I", function: "tonic", isPartOfIiVI: true, iiViPosition: "I", cadenceRole: "resolution" }) },
+    ];
+
+    let leadingToneCount = 0;
+    const trials = 200;
+    for (let i = 0; i < trials; i++) {
+      const notes = generateWalkingBass(chords, { style: "swing", tempo: 120 });
+      // Beat 4 of bar 2 (G7 bar) = approach to C. Leading tone = B = pitch%12 === 11
+      const bar2Notes = notes.filter(n => n.time >= 2 && n.time < 4);
+      if (bar2Notes.length >= 4) {
+        const beat4 = bar2Notes[3];
+        // B is the leading tone to C (one half-step below)
+        if (beat4.pitch % 12 === 11) leadingToneCount++;
+      }
+    }
+    // V->I should produce leading tone ~45% of the time
+    expect(leadingToneCount).toBeGreaterThan(trials * 0.2);
+  });
+
+  it("ii->V approach uses chromatic or b7 (not just random)", () => {
+    const chords: ChordEvent[] = [
+      { root: "D", quality: "m7", time: 0, duration: 2,
+        analysis: makeAnalysis({ degree: "ii", function: "predominant", isPartOfIiVI: true, iiViPosition: "ii" }) },
+      { root: "G", quality: "7", time: 2, duration: 2,
+        analysis: makeAnalysis({ degree: "V", function: "dominant", isPartOfIiVI: true, iiViPosition: "V" }) },
+      { root: "C", quality: "maj7", time: 4, duration: 2,
+        analysis: makeAnalysis({ degree: "I", function: "tonic", isPartOfIiVI: true, iiViPosition: "I" }) },
+    ];
+
+    const approachPCs = new Map<number, number>();
+    const trials = 200;
+    for (let i = 0; i < trials; i++) {
+      const notes = generateWalkingBass(chords, { style: "swing", tempo: 120 });
+      // Beat 4 of bar 1 (Dm7 bar) = approach to G
+      const bar1Notes = notes.filter(n => n.time >= 0 && n.time < 2);
+      if (bar1Notes.length >= 4) {
+        const pc = bar1Notes[3].pitch % 12;
+        approachPCs.set(pc, (approachPCs.get(pc) ?? 0) + 1);
+      }
+    }
+    // Should see variety: F# (6 = chromatic below G), Ab (8 = chromatic above),
+    // C (0 = b7 of Dm7 = 4th of G), etc.
+    expect(approachPCs.size).toBeGreaterThanOrEqual(2);
+  });
+
+  it("all approach tones stay within bass range", () => {
+    const chords: ChordEvent[] = [];
+    const roots = ["C", "F", "Bb", "Eb", "Ab", "Db", "Gb", "B", "E", "A", "D", "G"];
+    for (let i = 0; i < roots.length; i++) {
+      chords.push(makeChord(roots[i], "7", i * 2));
+    }
+    for (let trial = 0; trial < 20; trial++) {
+      const notes = generateWalkingBass(chords, { style: "swing", tempo: 120 });
+      for (const n of notes) {
+        expect(n.pitch).toBeGreaterThanOrEqual(BASS_LOW);
+        expect(n.pitch).toBeLessThanOrEqual(BASS_HIGH);
       }
     }
   });

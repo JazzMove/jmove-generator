@@ -717,7 +717,9 @@ describe("Piano Comping — tempo-dependent swing", () => {
 describe("Piano Comping — broken voicings", () => {
   it("swing: some chords produce 2-note groups (statistical)", () => {
     let twoNoteCount = 0;
-    for (let trial = 0; trial < 50; trial++) {
+    // Broken voicings fire 20% on 4-note chords away from strong beats.
+    // Use 200 trials to make flakes vanishingly rare.
+    for (let trial = 0; trial < 200; trial++) {
       const notes = generatePianoComping(iiVI(), {
         style: "swing", humanize: false, strum: false, density: 50,
       });

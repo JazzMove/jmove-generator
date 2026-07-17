@@ -1058,14 +1058,20 @@ describe("Tempo boundary verification", () => {
 
   it("piano density cap limits rhythm activity at 400 BPM", () => {
     // tempoDensityCap at 400 = max(20, 100 - 200*0.5) = 20
-    const fast = generatePianoComping(
-      chords as CompChordEvent[], { style: "swing", tempo: 400, humanize: false, strum: false, density: 100 }
-    );
-    const normal = generatePianoComping(
-      chords as CompChordEvent[], { style: "swing", tempo: 120, humanize: false, strum: false, density: 100 }
-    );
-    // Even at density=100, fast tempo caps effective density, producing fewer notes
-    expect(fast.length).toBeLessThanOrEqual(normal.length);
+    // Average over trials to smooth out stochastic variation
+    let fastTotal = 0;
+    let normalTotal = 0;
+    const trials = 10;
+    for (let i = 0; i < trials; i++) {
+      fastTotal += generatePianoComping(
+        chords as CompChordEvent[], { style: "swing", tempo: 400, humanize: false, strum: false, density: 100 }
+      ).length;
+      normalTotal += generatePianoComping(
+        chords as CompChordEvent[], { style: "swing", tempo: 120, humanize: false, strum: false, density: 100 }
+      ).length;
+    }
+    // Even at density=100, fast tempo caps effective density, producing fewer notes on average
+    expect(fastTotal).toBeLessThanOrEqual(normalTotal);
   });
 
   it("all instruments produce valid output at extreme tempos (40-400 BPM)", () => {

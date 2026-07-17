@@ -13,7 +13,7 @@
 
 import { tempoSwingMultiplier, dynamicMultiplier, instrumentSwingFactor } from "./swingUtils";
 import { getGrooveTemplate, applyGroove } from "./grooveTemplates";
-import type { BassNote, BassGranular, WalkingBassOptions, ChordEvent, PhraseIntent } from "./types";
+import type { BassNote, BassGranular, WalkingBassOptions, ChordEvent, PhraseIntent, PhraseArc } from "./types";
 
 export type { BassNote, WalkingBassOptions, ChordEvent };
 
@@ -22,6 +22,10 @@ export type { BassNote, WalkingBassOptions, ChordEvent };
 // Safe: JS is single-threaded and generation is synchronous.
 let _rng: () => number = Math.random;
 let _bassGranular: BassGranular | undefined;
+
+// ── Approach tone history for anti-repetition ──
+type ApproachRecord = { fromAbove: boolean; interval: number };
+let _approachHistory: ApproachRecord[] = [];
 
 // ── Constants ──
 
@@ -210,8 +214,15 @@ const APPROACH_VOCAB: Record<string, ApproachWeights> = {
   contemporaryJazz:  { chromatic: 0.50, diatonic: 0.20, doubleChrm: 0.30 },
 };
 
-/** Approach tone to target with per-style vocabulary. */
-function approachTone(target: number, fromAbove: boolean, scaleTones?: number[], style?: string): number {
+/** Record approach in history and return the pitch. */
+function recordAndReturn(pitch: number, target: number): number {
+  _approachHistory.push({ fromAbove: pitch > target, interval: Math.abs(pitch - target) });
+  if (_approachHistory.length > 4) _approachHistory.shift();
+  return pitch;
+}
+
+/** Approach tone to target with per-style vocabulary, anti-repetition, and arc awareness. */
+function approachTone(target: number, fromAbove: boolean, scaleTones?: number[], style?: string, arc?: PhraseArc): number {
   const base = APPROACH_VOCAB[style ?? ""] ?? { chromatic: 0.80, diatonic: 0.12, doubleChrm: 0.08 };
   // chromaticApproach (0-100): bias toward chromatic (high) or diatonic (low)
   // At 50 = neutral (use style defaults). Scale chromatic weight by chromaticApproach/50.
@@ -223,12 +234,42 @@ function approachTone(target: number, fromAbove: boolean, scaleTones?: number[],
     const diaRatio = base.diatonic / (base.diatonic + base.doubleChrm) || 0.5;
     weights = { chromatic: chrm, diatonic: remaining * diaRatio, doubleChrm: remaining * (1 - diaRatio) };
   }
+
+  // Anti-repetition: if last 2 approaches from same direction, bias opposite (60%)
+  if (_approachHistory.length >= 2) {
+    const last2 = _approachHistory.slice(-2);
+    if (last2.every(r => r.fromAbove === fromAbove) && _rng() < 0.6) {
+      fromAbove = !fromAbove;
+    }
+  }
+
+  // Anti-repetition: if last 2 approaches same interval (e.g., all half-steps), boost variety
+  if (_approachHistory.length >= 2) {
+    const last2 = _approachHistory.slice(-2);
+    if (last2.every(r => r.interval === 1)) {
+      // Shift weight away from chromatic toward diatonic + double-chromatic
+      const chrm = weights.chromatic * 0.35;
+      const extra = weights.chromatic - chrm;
+      weights = {
+        chromatic: chrm,
+        diatonic: weights.diatonic + extra * 0.6,
+        doubleChrm: weights.doubleChrm + extra * 0.4,
+      };
+    }
+  }
+
+  // Arc-driven direction bias: build/climax prefer ascending, release/drop prefer descending
+  if (arc && _rng() < 0.4) {
+    if (arc === "build" || arc === "climax") fromAbove = false;    // ascending
+    else if (arc === "release" || arc === "drop") fromAbove = true; // descending
+  }
+
   const roll = _rng();
 
   // Double chromatic: two half-steps from same direction (e.g., Eb-D approaching C from above)
   if (roll < weights.doubleChrm) {
     const step1 = fromAbove ? target + 2 : target - 2;
-    if (step1 >= getBassLow() && step1 <= getBassHigh()) return step1;
+    if (step1 >= getBassLow() && step1 <= getBassHigh()) return recordAndReturn(step1, target);
   }
 
   // Diatonic: nearest scale tone above/below target
@@ -242,7 +283,7 @@ function approachTone(target: number, fromAbove: boolean, scaleTones?: number[],
         candidates.sort((a, b) => Math.abs(a - target) - Math.abs(b - target));
         const diatonic = candidates[0];
         if (diatonic >= getBassLow() && diatonic <= getBassHigh()) {
-          return diatonic;
+          return recordAndReturn(diatonic, target);
         }
       }
     }
@@ -250,8 +291,8 @@ function approachTone(target: number, fromAbove: boolean, scaleTones?: number[],
 
   // Chromatic half-step (default/most common)
   const approach = fromAbove ? target + 1 : target - 1;
-  if (approach >= getBassLow() && approach <= getBassHigh()) return approach;
-  return fromAbove ? target - 1 : target + 1;
+  if (approach >= getBassLow() && approach <= getBassHigh()) return recordAndReturn(approach, target);
+  return recordAndReturn(fromAbove ? target - 1 : target + 1, target);
 }
 
 /** Find a passing tone between two pitches, preferring scale tones. */
@@ -395,6 +436,7 @@ function generateSwingMeasure(
   tempo?: number,
   style?: string,
   prevDirection?: "up" | "down" | null,
+  arc?: PhraseArc,
 ): BassNote[] {
   // Place root in register close to previous note (smooth bar transitions)
   let rootPitch = rootToMidi(chord.root);
@@ -488,21 +530,30 @@ function generateSwingMeasure(
 
     // Jazz idiom: chord's 3rd as approach when half-step below next root
     const third = chordTones.length > 1 ? chordTones[1] : null;
-    // Harmonic-aware: on dominant chords resolving to tonic (V-I),
-    // use the leading tone (7th of V = half-step below I root) as beat 4.
-    // This creates the strongest possible resolution motion.
+    // Harmonic-aware approach selection:
+    //   V→I: leading tone (half-step below I root) - strongest resolution
+    //   ii→V: 5th of V from below or b7 of ii as common tone - sets up dominant
     const isVtoI = analysis?.function === "dominant"
       && nextChord?.analysis?.cadenceRole === "resolution";
+    const isIiToV = analysis?.isPartOfIiVI && analysis?.iiViPosition === "ii"
+      && nextChord?.analysis?.iiViPosition === "V";
     if (isVtoI && _rng() < 0.45) {
       // Leading tone = one semitone below target
       beat4 = clamp(target - 1);
+      recordAndReturn(beat4, target);
+    } else if (isIiToV && _rng() < 0.35) {
+      // ii→V: approach from a half-step below V root (ascending chromatic)
+      // or use the b7 of ii (= 4th of V) for strong voice leading
+      beat4 = _rng() < 0.6 ? clamp(target - 1) : clamp(target + 5);
+      recordAndReturn(beat4, target);
     } else if (third !== null && (target - third === 1 || target - third === -11)) {
       beat4 = third;
+      recordAndReturn(beat4, target);
     } else {
       let fromAbove = beat1 > target;
       if (_rng() < 0.3) fromAbove = !fromAbove;
       const nextScale = nextChord ? getScaleTones(nextChord.root, nextChord.quality) : scaleTones;
-      beat4 = approachTone(target, fromAbove, nextScale, style);
+      beat4 = approachTone(target, fromAbove, nextScale, style, arc);
     }
   }
 
@@ -828,8 +879,14 @@ function generateHardBopMeasure(
     .sort((a, b) => Math.abs(a - prevP) - Math.abs(b - prevP));
   pitches.push(nearScale.length > 0 ? nearScale[0] : clamp(prevP + (ascending ? 2 : -2)));
 
-  // Beat 4: chromatic approach (from below for driving feel)
-  pitches.push(clamp(target - 1));
+  // Beat 4: approach tone (was hardcoded chromatic from below — now uses full vocabulary)
+  const nextScale = nextChord ? getScaleTones(nextChord.root, nextChord.quality) : scaleTones;
+  // HardBop still favors aggressive chromatic from below (60%), but allows variety
+  if (_rng() < 0.6) {
+    pitches.push(recordAndReturn(clamp(target - 1), target));
+  } else {
+    pitches.push(approachTone(target, ascending, nextScale, "hardBop"));
+  }
 
   return pitches.map((p, i) => ({
     pitch: p,
@@ -879,8 +936,9 @@ function generateCoolJazzMeasure(
     pitches.push(clamp(startPitch + (ascending ? 4 : -4)));
   }
 
-  // Beat 4: gentle chromatic approach
-  pitches.push(clamp(target - 1));
+  // Beat 4: gentle approach (was hardcoded chromatic — now uses diatonic-heavy vocabulary)
+  const nextScale = nextChord ? getScaleTones(nextChord.root, nextChord.quality) : scaleTones;
+  pitches.push(approachTone(target, !ascending, nextScale, "coolJazz"));
 
   return pitches.map((p, i) => ({
     pitch: p,
@@ -1794,8 +1852,10 @@ export function generateWalkingBass(
   if (chords.length === 0) return [];
   const prevRng = _rng;
   const prevGranular = _bassGranular;
+  const prevHistory = _approachHistory;
   _rng = options.random ?? Math.random;
   _bassGranular = options.granular;
+  _approachHistory = [];
 
   const style = options.style ?? "swing";
   const tempo = options.tempo ?? 120;
@@ -1921,7 +1981,7 @@ export function generateWalkingBass(
         break;
       case "swing":
       default:
-        measureNotes = generateSwingMeasure(chord, nextChord, beatDuration, prevPitch, options.swingAmount, tempo, style, prevDirection);
+        measureNotes = generateSwingMeasure(chord, nextChord, beatDuration, prevPitch, options.swingAmount, tempo, style, prevDirection, phraseIntent?.arc);
         break;
     }
 
@@ -2045,6 +2105,7 @@ export function generateWalkingBass(
 
   _rng = prevRng;
   _bassGranular = prevGranular;
+  _approachHistory = prevHistory;
   return notes;
 }
 
