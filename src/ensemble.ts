@@ -19,6 +19,7 @@ import { generateWalkingBass } from "./walkingBass";
 import { generatePianoComping } from "./pianoComping";
 import { analyzeHarmony } from "./harmonicAnalysis";
 import { createPRNG, randomSeed, deriveStream, STREAM_DRUMS, STREAM_BASS, STREAM_PIANO } from "./prng";
+import { anticipationProb, passingChordProb } from "./probabilityMapping";
 import type {
   BandContext,
   ChordEvent,
@@ -113,7 +114,6 @@ function planMusicalIntents(
   const creativity = (options.creativity ?? 35) / 100;       // 0-1
   const conversation = (options.conversation ?? 30) / 100;
   const airGaps = (options.airGaps ?? 20) / 100;
-  const harmonicFreedom = (options.harmonicFreedom ?? 25) / 100;
   const totalPhrases = phraseMap.boundaries.length;
   const intents: PhraseIntent[] = [];
   const leaders: Array<"piano" | "bass" | "drums"> = ["piano", "bass", "drums"];
@@ -126,26 +126,49 @@ function planMusicalIntents(
 
     // ── Arc Selection ──
     // Natural arc with contrast: adjacent phrases should differ.
-    // Real music: build → climax → release → sustain → build (narrative, not random)
+    // Real music: intro → build → climax → release → sustain → build (narrative)
+    // Extended vocabulary: intro/outro for bookends, shout for peak intensity,
+    // vamp for repeated grooves, solo/interlude for structural variety,
+    // breakdown for stripped-back moments.
     const prevArc = pi > 0 ? intents[pi - 1].arc : null;
+
+    // Section type awareness: match arc to section when available
+    const sectionAtPhrase = options.sections?.find(
+      s => phraseStart >= s.startMeasure && phraseStart < s.endMeasure
+    );
+
     let arc: PhraseArc;
     if (pi === 0) {
-      // Opening: set the stage
-      arc = rng() < 0.6 ? "sustain" : "build";
+      // Opening: intro arc for first phrase, or sustain/build
+      arc = totalPhrases > 4 && rng() < 0.4 ? "intro" : rng() < 0.6 ? "sustain" : "build";
     } else if (pi === totalPhrases - 1) {
-      // Final: resolve
-      arc = rng() < 0.7 ? "release" : "sustain";
-    } else if (prevArc === "climax") {
-      // After climax: always release or drop (never sustain at peak)
-      arc = rng() < 0.6 ? "release" : "drop";
+      // Final: outro for long forms, otherwise release
+      arc = totalPhrases > 4 && rng() < 0.35 ? "outro" : rng() < 0.7 ? "release" : "sustain";
+    } else if (sectionAtPhrase?.type === "shout") {
+      arc = "shout";
+    } else if (sectionAtPhrase?.type === "solo" && rng() < 0.5) {
+      arc = "solo";
+    } else if (sectionAtPhrase?.type === "interlude" && rng() < 0.6) {
+      arc = "interlude";
+    } else if (prevArc === "climax" || prevArc === "shout") {
+      // After peak: release, drop, or breakdown for contrast
+      const r = rng();
+      arc = r < 0.45 ? "release" : r < 0.70 ? "drop" : creativity > 0.4 ? "breakdown" : "release";
     } else if (prevArc === "build" && pct > 0.4) {
       // Build earned a climax (if past early section)
-      arc = rng() < 0.5 + creativity * 0.3 ? "climax" : "sustain";
-    } else if (prevArc === "drop") {
-      // After drop: rebuild energy
-      arc = rng() < 0.7 ? "build" : "sustain";
+      const r = rng();
+      arc = r < 0.4 + creativity * 0.3 ? "climax" : r < 0.5 + creativity * 0.2 ? "shout" : "sustain";
+    } else if (prevArc === "drop" || prevArc === "breakdown") {
+      // After drop/breakdown: rebuild energy or vamp
+      arc = rng() < 0.5 ? "build" : rng() < 0.6 ? "vamp" : "sustain";
+    } else if (prevArc === "vamp") {
+      // Vamp resolves to build or sustain (vamps don't chain)
+      arc = rng() < 0.6 ? "build" : "sustain";
     } else if (pct > 0.5 && pct < 0.8 && rng() < creativity * 0.6) {
-      arc = "climax";
+      arc = rng() < 0.8 ? "climax" : "shout";
+    } else if (creativity > 0.4 && rng() < creativity * 0.2) {
+      // Creative vamp: repeat a 2-bar groove
+      arc = "vamp";
     } else if (rng() < creativity * 0.35) {
       arc = "drop";
     } else if (pct < 0.5) {
@@ -157,8 +180,8 @@ function planMusicalIntents(
     // ── Dynamic Drop Measures ──
     // Within a phrase, specific measures where everyone gets quiet
     const dropMeasures: number[] = [];
-    if (arc === "drop") {
-      // Drop arc: first 1-2 measures of phrase are quiet
+    if (arc === "drop" || arc === "breakdown") {
+      // Drop/breakdown arc: first 1-2 measures of phrase are quiet
       dropMeasures.push(phraseStart);
       if (phraseLen > 2 && rng() < 0.5) dropMeasures.push(phraseStart + 1);
     } else if (creativity > 0.4 && rng() < creativity * 0.3) {
@@ -174,27 +197,40 @@ function planMusicalIntents(
     const bassRests: number[] = [];
     const drumsMinimal: number[] = [];
 
-    // Piano rests: controlled by airGaps parameter
+    // Piano rests: controlled by airGaps parameter.
+    // ECM/metheny: much higher rest probability (structural silence defines the aesthetic).
+    const isSpaceStyle = options.style === "ecm" || options.style === "metheny";
+    const pianoRestProb = isSpaceStyle ? airGaps * 0.50 : airGaps * 0.25;
     for (let m = phraseStart; m < phraseEnd; m++) {
-      if (m === phraseStart && pi === 0) continue; // never rest on very first measure
-      if (m === phraseEnd - 1 && pi === totalPhrases - 1) continue; // never rest on very last
-      if (dropMeasures.includes(m)) continue; // drops handled separately
+      if (m === phraseStart && pi === 0) continue;
+      if (m === phraseEnd - 1 && pi === totalPhrases - 1) continue;
+      if (dropMeasures.includes(m)) continue;
 
-      if (rng() < airGaps * 0.25) {
+      if (rng() < pianoRestProb) {
         pianoRests.push(m);
+        // ECM: consecutive rests for extended silence (2-4 bars ring-out)
+        if (isSpaceStyle && m + 1 < phraseEnd && rng() < 0.5) {
+          pianoRests.push(m + 1);
+        }
       }
     }
 
-    // Bass rests: very rare (bass is the anchor), only at high airGaps + creativity
-    if (airGaps > 0.5 && creativity > 0.5 && phraseLen > 3) {
+    // Bass rests: rare for most styles, more frequent for ECM
+    const bassRestThreshold = isSpaceStyle ? 0.3 : 0.5;
+    if (airGaps > bassRestThreshold && creativity > 0.3 && phraseLen > 3) {
+      const bassRestProb = isSpaceStyle ? airGaps * 0.20 : airGaps * 0.08;
       for (let m = phraseStart + 1; m < phraseEnd - 1; m++) {
-        if (rng() < airGaps * 0.08) bassRests.push(m);
+        if (rng() < bassRestProb) bassRests.push(m);
       }
     }
 
-    // Drums minimal: ride + pedal hat only (creates space)
-    if (arc === "drop") {
+    // Drums minimal: ride + pedal hat only (creates space).
+    // ECM: drums can tacet entire phrases (defining characteristic).
+    if (arc === "drop" || arc === "breakdown") {
       for (const dm of dropMeasures) drumsMinimal.push(dm);
+    } else if (isSpaceStyle && rng() < airGaps * 0.4) {
+      // ECM: entire phrase drums-minimal for spacious feel
+      for (let m = phraseStart; m < phraseEnd; m++) drumsMinimal.push(m);
     } else if (creativity > 0.3 && rng() < creativity * 0.2) {
       if (phraseLen > 2) {
         const minIdx = phraseStart + 1 + Math.floor(rng() * (phraseLen - 2));
@@ -206,8 +242,8 @@ function planMusicalIntents(
     // Higher harmonicFreedom → more likely piano plays next chord early.
     // Boost on predominant phrases (lots of ii chords setting up V),
     // reduce on tonic-heavy phrases (already resolved, no need to rush).
-    let anticipationChance = harmonicFreedom * 0.35; // max 35%
-    let passingChordChance = harmonicFreedom * 0.25; // max 25%
+    let anticipationChance = anticipationProb(options.harmonicFreedom ?? 25);
+    let passingChordChance = passingChordProb(options.harmonicFreedom ?? 25);
     if (harmonic && harmonic.chordAnalyses.length > 0) {
       // Average tension across chords in this phrase
       const phraseChordsStart = phraseStart;
@@ -236,16 +272,16 @@ function planMusicalIntents(
     const motifLockBars = Math.max(1, baseLock + lockVariation - Math.floor(creativity * 2));
 
     // ── Crescendo ──
-    const crescendo = arc === "build" || (arc === "climax" && rng() < 0.7);
+    const crescendo = arc === "build" || (arc === "climax" && rng() < 0.7) || arc === "shout";
 
     // ── Feel Changes (double-time / half-time) ──
-    // Double-time on climax creates one of jazz's most exciting moments.
-    // Half-time on drop creates breathing room. Gated by creativity.
+    // Double-time on climax/shout creates one of jazz's most exciting moments.
+    // Half-time on drop/breakdown creates breathing room. Gated by creativity.
     let feel: "normal" | "doubleTime" | "halfTime" = "normal";
     if (creativity > 0.3) {
-      if (arc === "climax" && rng() < creativity * 0.4) {
+      if ((arc === "climax" || arc === "shout") && rng() < creativity * 0.4) {
         feel = "doubleTime";
-      } else if (arc === "drop" && rng() < creativity * 0.3) {
+      } else if ((arc === "drop" || arc === "breakdown") && rng() < creativity * 0.3) {
         feel = "halfTime";
       }
     }
@@ -266,6 +302,24 @@ function planMusicalIntents(
       }
     }
 
+    // ── Bass Register Arc ──
+    // Plan macro register movement: start low, climb through middle phrases,
+    // peak at climax, descend for resolution. Creates narrative bass contour.
+    // MIDI pitch centers: low=36 (C2), mid=42 (F#2), high=50 (D3)
+    let bassTargetPitch: number;
+    if (arc === "intro" || arc === "drop") {
+      bassTargetPitch = 36; // low register for opening/drops
+    } else if (arc === "climax" || arc === "shout") {
+      bassTargetPitch = 50; // high register for intensity peaks
+    } else if (arc === "outro" || arc === "release") {
+      bassTargetPitch = 38; // descend for resolution
+    } else if (arc === "build") {
+      bassTargetPitch = 42 + Math.round(pct * 8); // climb through build phrases
+    } else {
+      // sustain/solo/vamp/interlude/breakdown: follow natural position curve
+      bassTargetPitch = 36 + Math.round(pct * 14); // 36-50 linear with form position
+    }
+
     intents.push({
       arc,
       feel,
@@ -278,6 +332,7 @@ function planMusicalIntents(
       motifLockBars,
       crescendo,
       conversationLeader,
+      bassTargetPitch,
     });
   }
 
@@ -400,9 +455,27 @@ function scaleDensity(baseDensity: number, sectionEnergy: number): number {
   return Math.round(Math.min(100, Math.max(0, baseDensity * scale)));
 }
 
+// ── Drum Trade/Solo Helpers ──
+
+/** Remove notes that fall within a section's time range (in-place). */
+function filterNotesInSection(notes: Array<{ time: number }>, sec: SongSection, measureDur: number): void {
+  const start = sec.startMeasure * measureDur;
+  const end = sec.endMeasure * measureDur;
+  filterNotesInRange(notes, start, end);
+}
+
+/** Remove notes within a time range (in-place, mutates array). */
+function filterNotesInRange(notes: Array<{ time: number }>, start: number, end: number): void {
+  for (let i = notes.length - 1; i >= 0; i--) {
+    if (notes[i].time >= start && notes[i].time < end) {
+      notes.splice(i, 1);
+    }
+  }
+}
+
 // ── Built-in Alignment (replaces post-hoc snapping) ──
 
-function alignBassToKicks(bassNotes: BassNote[], kickTimes: number[]): void {
+function alignBassToKicks(bassNotes: BassNote[], kickTimes: number[], threshold = 0.015): void {
   if (kickTimes.length === 0) return;
   for (let i = 0; i < bassNotes.length; i++) {
     // Only align downbeat notes (beat 1 and 3 positions)
@@ -415,11 +488,11 @@ function alignBassToKicks(bassNotes: BassNote[], kickTimes: number[]): void {
       if (dist < bestDist) { bestDist = dist; bestKick = kt; }
       if (kt > n.time + 0.02) break;
     }
-    if (bestDist < 0.015) n.time = bestKick;
+    if (bestDist < threshold) n.time = bestKick;
   }
 }
 
-function alignPianoToBass(pianoNotes: CompNote[], bassTimes: number[]): void {
+function alignPianoToBass(pianoNotes: CompNote[], bassTimes: number[], threshold = 0.015): void {
   if (bassTimes.length === 0) return;
   for (const pn of pianoNotes) {
     let closest = bassTimes[0];
@@ -427,11 +500,27 @@ function alignPianoToBass(pianoNotes: CompNote[], bassTimes: number[]): void {
     for (const bt of bassTimes) {
       const dist = Math.abs(pn.time - bt);
       if (dist < minDist) { closest = bt; minDist = dist; }
-      if (bt > pn.time + 0.015) break;
+      if (bt > pn.time + threshold) break;
     }
-    // Snap within 15ms, but preserve intentional anticipations (>40ms before bass)
-    if (minDist < 0.015 && !(pn.time < closest - 0.04)) {
+    // Snap within threshold, but preserve intentional anticipations (>40ms before bass)
+    if (minDist < threshold && !(pn.time < closest - 0.04)) {
       pn.time = closest;
+    }
+  }
+}
+
+/** Sync piano attacks at phrase boundaries with crash cymbals.
+ *  When a crash occurs within 20ms of a piano note, align them for tight ensemble hit. */
+function alignPianoCrashes(pianoNotes: CompNote[], crashTimes: number[]): void {
+  if (crashTimes.length === 0) return;
+  for (const pn of pianoNotes) {
+    for (const ct of crashTimes) {
+      const dist = Math.abs(pn.time - ct);
+      if (dist < 0.020) {
+        pn.time = ct; // sync to crash
+        break;
+      }
+      if (ct > pn.time + 0.030) break;
     }
   }
 }
@@ -579,8 +668,34 @@ export function generateEnsemble(options: EnsembleOptions): EnsembleResult {
     granular: options.pianoGranular,
   });
 
-  // Built-in alignment: snap piano to nearest bass note
+  // Built-in alignment: snap piano to nearest bass note + crash cymbal sync
   alignPianoToBass(pianoNotes, context.bassTimes);
+  alignPianoCrashes(pianoNotes, context.crashTimes);
+
+  // ── Drum Solo / Drum Trade Sections ──
+  // During drumSolo: bass/piano tacet entirely.
+  // During drumTrade: alternate between full ensemble and drum-only every 4 bars.
+  if (options.sections) {
+    for (const sec of options.sections) {
+      if (sec.type === "drumSolo") {
+        // Remove all bass/piano notes in this section
+        filterNotesInSection(bassNotes, sec, measureDuration);
+        filterNotesInSection(pianoNotes, sec, measureDuration);
+      } else if (sec.type === "drumTrade") {
+        // Keep bass/piano only on even 4-bar groups (ensemble bars), drop on odd (drum-only bars)
+        for (let m = sec.startMeasure; m < sec.endMeasure; m++) {
+          const relativeM = m - sec.startMeasure;
+          const isEnsembleBar = Math.floor(relativeM / 4) % 2 === 0;
+          if (!isEnsembleBar) {
+            const mStart = m * measureDuration;
+            const mEnd = (m + 1) * measureDuration;
+            filterNotesInRange(bassNotes, mStart, mEnd);
+            filterNotesInRange(pianoNotes, mStart, mEnd);
+          }
+        }
+      }
+    }
+  }
 
   return {
     drums: drumHits,
@@ -640,6 +755,8 @@ export function* generateEnsembleMeasures(options: EnsembleOptions): Generator<M
     barsOnPattern: 0,
     patternHoldBars: -1,
     tendency: null,
+    clavePhase: 0,
+    lastFillIdx: -1,
   };
 
   for (let m = 0; m < options.measures; m++) {
@@ -705,6 +822,14 @@ export function* generateEnsembleMeasures(options: EnsembleOptions): Generator<M
     const measuresGenerated = m + 1;
     const hitsPerMeasure = totalDrumHits / measuresGenerated;
     context.drumDensity = Math.min(1, Math.max(0, (hitsPerMeasure - 5) / 40));
+    // Update kick density and hi-hat pattern (parity with batch extractDrumContext)
+    context.kickDensity = measuresGenerated > 0 ? context.kickTimes.length / measuresGenerated : 0;
+    const hihatHits = drumSlice.filter(h => h.pitch === 42 || h.pitch === 44 || h.pitch === 46);
+    const hhThisMeasure = hihatHits.length;
+    if (hhThisMeasure >= 12) context.hihatPattern = "16ths";
+    else if (hhThisMeasure >= 6) context.hihatPattern = "8ths";
+    else if (hhThisMeasure >= 3) context.hihatPattern = "quarters";
+    else context.hihatPattern = "sparse";
 
     // Generate bass for this measure's chords (use annotated chords with analysis)
     const measureChords = annotatedChords.filter(
@@ -736,6 +861,13 @@ export function* generateEnsembleMeasures(options: EnsembleOptions): Generator<M
     if (bassSlice.length > 0) {
       const avgPitch = bassSlice.reduce((sum, n) => sum + n.pitch, 0) / bassSlice.length;
       context.bassRegister = avgPitch < 36 ? "low" : avgPitch > 45 ? "high" : "mid";
+      // Update bass rhythm classification (parity with batch extractBassContext)
+      const notesPerMeasure = bassSlice.length;
+      if (notesPerMeasure >= 3.5) context.bassRhythm = "walking";
+      else if (notesPerMeasure >= 2) context.bassRhythm = "half";
+      else context.bassRhythm = "pedal";
+    } else {
+      context.bassRhythm = "pedal";
     }
 
     // Generate piano for this measure's chords
@@ -757,8 +889,29 @@ export function* generateEnsembleMeasures(options: EnsembleOptions): Generator<M
         })
       : [];
 
-    // Align piano to bass
+    // Align piano to bass + crash cymbal sync
     alignPianoToBass(pianoSlice, newBassTimes);
+    const measureCrashes = drumSlice.filter(h => h.pitch === 49).map(h => h.time);
+    context.crashTimes.push(...measureCrashes);
+    alignPianoCrashes(pianoSlice, measureCrashes);
+
+    // Drum solo/trade filtering for this measure
+    if (options.sections) {
+      for (const sec of options.sections) {
+        if (m < sec.startMeasure || m >= (sec.endMeasure ?? options.measures)) continue;
+        if (sec.type === "drumSolo") {
+          bassSlice.length = 0;
+          pianoSlice.length = 0;
+        } else if (sec.type === "drumTrade") {
+          const relativeM = m - sec.startMeasure;
+          const isEnsembleBar = Math.floor(relativeM / 4) % 2 === 0;
+          if (!isEnsembleBar) {
+            bassSlice.length = 0;
+            pianoSlice.length = 0;
+          }
+        }
+      }
+    }
 
     yield {
       measure: m,

@@ -4,6 +4,51 @@ All notable changes to `@jmove/generator` will be documented in this file.
 
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [1.3.4] - 2026-07-18
+
+### Added
+
+- **Contextual fill selection** - fills scored by energy match (dense fills for high energy), history penalty (0.15x for repeats), arc bonus (climax favors big fills, drop favors sparse). Replaces uniform random selection
+- **Brush drumming** - ballad, coolJazz, and ECM styles annotate `DrumHit.brush` with "sweep", "tap", or "swirl" articulations. Snare beats 2/4 = tap, other snare = sweep, ghosts = swirl, ride = sweep
+- **Piano motif evolution depth** - `evolveMotif()` expanded from 4 to 10 mutations: adds displacement (shift by 8th/16th), fragmentation (first half only), extension (repeat last hit), density-split (long note into two), density-merge (two short into one). Weighted by creativity
+- **Bass register planning** - `bassTargetPitch` per phrase drives soft octave selection bias. Arc-driven: intro/drop = low (36), climax/shout = high (50), build = gradual climb (42-50). 50% octave shift probability when >5 semitones from target
+- **Bass-piano collision avoidance** - enhanced register handling: "mid" register shifts piano voicings +12 when lowest pitch < 55, preventing muddy doubling
+- **Conversation leader depth** - leader density multiplier 0.20 (was velocity-only). Listening bass drops to half-note feel (40% * conversation probability)
+- **Probability mapping module** - centralized `probabilityMapping.ts` with 11 functions deriving probabilities from style parameters (0-100 to 0-1): anticipationProb, passingChordProb, brokenVoicingProb, graceNoteProb, bassRootProb, enclosureProb, chromaticPassingProb, kickHihatInterlockProb, fillProbScale, alignmentThreshold, airGapDropProb
+- **Energy-aware swing** - `tempoSwingMultiplier` accepts optional energy parameter. Low energy (0.3) adds +5% (relaxed triplet feel), high energy (1.0) subtracts -5% (straighter). Applied per-beat across all generators
+- **Drum trades** - `SongSectionType` adds "drumSolo" and "drumTrade". Post-generation filtering removes bass/piano during drum solos, alternates 4-bar ensemble/drum-only during trades
+- **Style-aware passing tones** - bass `passingTone()` dissonance filtering now uses `chromaticApproach` granular: <40 filters tritone/b2, >=40 allows all chromatic tension
+- **Enharmonic awareness** - `SHARP_KEYS` set selects sharp vs flat spelling tables. `transposeRoot()` and `transposeProgression()` produce correct enharmonic spellings by key context
+- **ECM space and silence** - piano rest probability 0.25 to 0.50 with consecutive rests, bass rest threshold 0.5 to 0.3, whole-phrase drums-minimal
+- **Expanded phrase arcs** - `PhraseArc` expanded from 5 to 12 types: adds intro, outro, breakdown, shout, vamp, solo, interlude. Section-type-aware arc selection in `planMusicalIntents`. All generators handle new types with appropriate velocity, ghost, density, register, and timing behavior
+- **Piano crash alignment** - `alignPianoCrashes()` syncs piano note onsets within 20ms of crash cymbal times
+- 41 new tests across 8 test files (probabilityMapping.test.ts new)
+
+### Fixed
+
+- **Streaming path parity** - crash alignment (`alignPianoCrashes`), drum solo/trade filtering, and fill history (`lastFillIdx` in `DrumState`) now applied in streaming path (`generateEnsembleMeasures`), matching batch behavior
+- **Bass register planning coverage** - `nudgeTowardTarget` extracted and applied to all 19 bass styles (was swing-only). Bossa, latin, and all `closestOctave` styles now respond to `bassTargetPitch`
+- **Fill history persistence** - `lastFillIdx` added to `DrumState` and persisted across streaming calls. Contextual fill selection history penalty now survives measure boundaries
+- **Enclosure probability wiring** - `enclosureProb` from probability mapping now drives bass enclosure likelihood (exact match at defaults, no PRNG shift)
+- **Fill probability scale wiring** - `fillProbScale` from probability mapping now modulates fill chance based on `fillIntensity` granular
+- **Streaming context parity (round 2)** - `bassRhythm`, `hihatPattern`, and `kickDensity` now updated per-measure in streaming path (were stuck at init defaults)
+- **Module state safety** - `generatePianoComping` and `generateWalkingBass` now use try-finally to guarantee module state restoration on exceptions
+- **evolveMotif duration floor** - duration mutation branch now clamps to minimum 0.05 beats, preventing near-zero cascades
+- **nudgeTowardTarget** - now tries both +12 and -12 octave variants, picks best valid one (was one-direction only)
+- **Explicit drumState init** - streaming path explicitly initializes `clavePhase` and `lastFillIdx` in drumState
+- **Velocity collapse** - multiplicative cascade of 5 velocity factors could reduce piano to floor velocity 40 across entire voicings. Added baseVel floor at 48, lowered humanize/strum floor from 40 to 30 for natural pp dynamics
+- **Voicing monotony** - shell voicing selection was binary (all-or-nothing at density < 35). Now probabilistic: voicingDensity controls shell chance (10% at vd=50, 30% at vd=40, 70% at vd=20). Produces natural mix of 2/3/4-note voicings
+- **Shuffle blues shell voicings** - root-position shell now extracts 3rd+7th guide tones (was root+5th)
+- **Shell decision consistency** - shell/full pre-rolled once per chord. Anticipation and passing chords use same density as main voicing
+- **evolveMotif too conservative** - mutation gate adjusted from `rng() > creativity * 0.5` to `rng() > 0.3 + creativity * 0.5`, reducing skip rate to ~52%. Gate at creativity < 0.05
+- **Duplicate pitches after register shift** - octave wrapping deduplication via `Set`
+
+### Changed
+
+- **S-curve complexity mapping** - piecewise linear interpolation replaced with Hermite smoothstep (`3t^2 - 2t^3`) for perceptually natural response curves. Flat near extremes, steep in mid-range
+- **Non-uniform strum** - `strumSpread()` uses power curve `Math.pow(i/(n-1), exponent) * totalSec` with randomized exponent 1.3-1.7 for finger-shaped rolls
+- **Rubato updated** - climax arc now returns small non-zero offset (-0.0005) instead of exactly 0
+
 ## [1.3.3] - 2026-07-17
 
 ### Added

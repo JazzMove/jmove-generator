@@ -301,20 +301,33 @@ export function evolveElement(element: ElementTiming, energy: number, arc?: Phra
   // Arc-driven evolution
   switch (arc) {
     case "build":
+    case "solo":
       biasShift = -0.001;    // push ahead 1ms (forward momentum)
       jitterScale *= 0.85;   // tighten up (focused playing)
       break;
     case "climax":
+    case "shout":
       biasShift = -0.0005;   // slight push (driving)
-      jitterScale *= 0.75;   // tightest (locked in)
+      jitterScale *= 0.75;   // tightest (locked in, max intensity)
       break;
     case "release":
+    case "outro":
+    case "interlude":
       biasShift = 0.001;     // lay back 1ms (relaxing)
       jitterScale *= 1.25;   // loosen (breathing room)
       break;
     case "drop":
+    case "breakdown":
       biasShift = 0.002;     // significantly behind (floating)
-      jitterScale *= 1.4;    // loosest (spacious)
+      jitterScale *= 1.4;    // loosest (spacious, stripped back)
+      break;
+    case "intro":
+      biasShift = 0.0005;    // slightly behind (settling in)
+      jitterScale *= 1.15;   // gentle looseness
+      break;
+    case "vamp":
+      biasShift = 0;          // neutral (locked groove)
+      jitterScale *= 0.9;    // tight repetition
       break;
     // sustain: no change (neutral playing)
   }
@@ -379,12 +392,16 @@ export function rubatoOffset(
   }
 
   // Arc-driven tempo feel
-  if (arc === "build") {
+  if (arc === "build" || arc === "solo") {
     offset -= 0.001; // slight accelerando: 1ms ahead
-  } else if (arc === "release") {
+  } else if (arc === "climax" || arc === "shout") {
+    offset -= 0.0005; // driving: half ms ahead (tight, intense)
+  } else if (arc === "release" || arc === "outro" || arc === "interlude") {
     offset += 0.002; // ritardando: 2ms behind
-  } else if (arc === "drop") {
+  } else if (arc === "drop" || arc === "breakdown") {
     offset += 0.003; // significant slowdown: 3ms behind
+  } else if (arc === "intro") {
+    offset += 0.001; // gentle settling in: 1ms behind
   }
 
   return offset;

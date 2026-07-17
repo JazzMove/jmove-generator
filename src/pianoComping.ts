@@ -1128,7 +1128,13 @@ function pickVoicing(
 
   // Shuffle Blues: root-position triads + 7ths (blues piano is NOT rootless)
   if (style === "shuffleBlues") {
-    return buildRootPositionVoicing(root, quality);
+    const voicing = buildRootPositionVoicing(root, quality);
+    if (shell && voicing.length >= 4) {
+      // Root-position shell = 3rd + 7th (guide tones), skip root + 5th
+      const sorted = [...voicing].sort((a, b) => a - b);
+      return [sorted[1], sorted[3] ?? sorted[sorted.length - 1]];
+    }
+    return shell ? toShellVoicing(voicing) : voicing;
   }
 
   return buildStandardVoicing(root, quality, prevPitches, shell, resolving);
@@ -1215,38 +1221,40 @@ function humanizeTime(time: number, enabled: boolean, style?: string, beatOffset
 }
 
 function humanizeVelocity(vel: number, enabled: boolean): number {
-  if (!enabled) return Math.max(40, Math.min(127, vel));
-  return Math.max(40, Math.min(127, vel + Math.floor((_rng() - 0.5) * 10)));
+  if (!enabled) return Math.max(30, Math.min(127, vel));
+  return Math.max(30, Math.min(127, vel + Math.floor((_rng() - 0.5) * 10)));
 }
 
 /** Expand multi-pitch CompNotes into staggered single-pitch notes.
- *  Simulates natural pianist finger roll — bottom note first, ~20-25ms gap per note.
- *  Slight velocity taper: upper notes softer (-3 each). */
+ *  Simulates natural pianist finger roll - bottom note first.
+ *  Non-uniform spacing: accelerating roll (faster at start, slower at end) mimics
+ *  real finger mechanics. Exponent randomized slightly per chord for natural feel.
+ *  Slight velocity taper: upper notes softer. */
 function strumSpread(notes: CompNote[], totalMs: number): CompNote[] {
   const result: CompNote[] = [];
   for (const note of notes) {
     if (note.pitches.length <= 2) {
-      // Don't strum single notes or dyads (broken voicing pairs).
-      // Real pianists only roll 3+ note chords.
       result.push(note);
       continue;
     }
-    // Sort low→high (natural hand roll from bottom)
     const sorted = [...note.pitches].sort((a, b) => a - b);
-    const gapSec = (totalMs / 1000) / (sorted.length - 1);
+    const n = sorted.length;
+    const totalSec = totalMs / 1000;
+    // Randomize exponent: 1.3-1.7 (accelerating roll, faster start, slower finish)
+    const exponent = 1.3 + _rng() * 0.4;
     // Proportional velocity decay: cap total drop at ~15% of base velocity.
-    // Prevents floor-stacking where multiple notes cluster at identical velocity.
     const maxTotalDrop = Math.max(4, Math.round(note.velocity * 0.15));
-    const maxPerStep = Math.max(1, Math.round(maxTotalDrop / Math.max(1, sorted.length - 1)));
+    const maxPerStep = Math.max(1, Math.round(maxTotalDrop / Math.max(1, n - 1)));
     let velDrop = 0;
-    for (let i = 0; i < sorted.length; i++) {
+    for (let i = 0; i < n; i++) {
+      const t = i === 0 ? 0 : Math.pow(i / (n - 1), exponent) * totalSec;
       result.push({
         pitches: [sorted[i]],
-        time: note.time + i * gapSec,
-        duration: note.duration - i * gapSec, // all release at ~same time
-        velocity: Math.max(40, note.velocity - velDrop),
+        time: note.time + t,
+        duration: note.duration - t,
+        velocity: Math.max(30, note.velocity - velDrop),
       });
-      velDrop += 1 + Math.round(_rng() * (maxPerStep - 1)); // proportional to base velocity
+      velDrop += 1 + Math.round(_rng() * (maxPerStep - 1));
     }
   }
   return result;
@@ -1265,6 +1273,7 @@ function applyBrokenVoicings(
   notes: CompNote[],
   style: string,
   beatDuration: number = 0.5,
+  brokenProb: number = 0.20,
 ): CompNote[] {
   if (!BROKEN_VOICING_STYLES.has(style)) return notes;
 
@@ -1279,7 +1288,7 @@ function applyBrokenVoicings(
       : (beatDuration > 0 ? (note.time / beatDuration) % 4 : 0);
     const nearStrongBeat = beatInMeasure <= 0.5 || beatInMeasure >= 3.5
       || Math.abs(beatInMeasure - 2) <= 0.5;
-    if (note.pitches.length !== 4 || _rng() >= 0.20 || nearStrongBeat) {
+    if (note.pitches.length !== 4 || _rng() >= brokenProb || nearStrongBeat) {
       result.push(note);
       continue;
     }
@@ -1329,38 +1338,72 @@ function inferCompTimeSig(measureDuration: number, beatDuration: number): [numbe
 
 // ── Motif Evolution ──
 
-/** Slightly modify a rhythm pattern on repeat bars instead of exact copy.
- *  A human pianist evolves motifs — shifts a hit, drops a note, extends a duration.
- *  `barsLeft` controls how much evolution: early repeats stay close, later ones drift. */
+/** Evolve a rhythm pattern on repeat bars. Real pianists don't copy patterns exactly -
+ *  they displace, fragment, merge, and reshape motifs. Creativity parameter weights
+ *  conservative mutations (drop/extend) vs adventurous ones (displacement/fragmentation).
+ *  `barsLeft` controls drift magnitude: early repeats stay close, later ones diverge. */
 function evolveMotif(
   base: RhythmHit[],
   barsLeft: number,
   creativity: number,
   rng: () => number,
 ): RhythmHit[] {
-  // Low creativity or first repeat bar: keep original
-  if (creativity < 0.2 || rng() > creativity * 0.5) return base;
+  if (creativity < 0.05 || rng() > 0.3 + creativity * 0.5) return base;
 
   const evolved = base.map(([beat, dur]) => [beat, dur] as RhythmHit);
   const idx = Math.floor(rng() * evolved.length);
+  // More mutations accumulate as bars progress (barsLeft decreases)
+  const driftFactor = Math.max(0.5, 1.0 - barsLeft * 0.15);
 
   const mutation = rng();
-  if (mutation < 0.35 && evolved.length > 1) {
+  if (mutation < 0.15 && evolved.length > 1) {
     // Drop a hit (creates space)
     evolved.splice(idx, 1);
-  } else if (mutation < 0.6) {
-    // Shift timing slightly (±0.25 beats)
-    const shift = (rng() - 0.5) * 0.5;
+  } else if (mutation < 0.30) {
+    // Shift timing slightly (±0.25 beats, scaled by drift)
+    const shift = (rng() - 0.5) * 0.5 * driftFactor;
     evolved[idx] = [Math.max(0, Math.min(3.75, evolved[idx][0] + shift)), evolved[idx][1]];
-  } else if (mutation < 0.8) {
+  } else if (mutation < 0.40) {
     // Extend or shorten duration
-    const scale = 0.7 + rng() * 0.6; // 0.7x to 1.3x
-    evolved[idx] = [evolved[idx][0], evolved[idx][1] * scale];
-  } else if (evolved.length < 3) {
-    // Add a ghost hit (quiet, short)
+    const scale = 0.7 + rng() * 0.6;
+    evolved[idx] = [evolved[idx][0], Math.max(0.05, evolved[idx][1] * scale)];
+  } else if (mutation < 0.50 && evolved.length < 4) {
+    // Add a ghost hit
     const ghostBeat = rng() * 3.5;
     evolved.push([ghostBeat, 0.4]);
     evolved.sort((a, b) => a[0] - b[0]);
+  } else if (mutation < 0.60 && creativity > 0.3) {
+    // Rhythmic displacement: shift entire pattern by 8th or 16th note
+    const displace = rng() < 0.5 ? 0.5 : 0.25;
+    const dir = rng() < 0.5 ? 1 : -1;
+    for (let i = 0; i < evolved.length; i++) {
+      const newBeat = evolved[i][0] + displace * dir;
+      if (newBeat >= 0 && newBeat <= 3.75) {
+        evolved[i] = [newBeat, evolved[i][1]];
+      }
+    }
+  } else if (mutation < 0.70 && creativity > 0.35 && evolved.length >= 3) {
+    // Fragmentation: use only first half of pattern (truncate)
+    const halfLen = Math.max(1, Math.ceil(evolved.length / 2));
+    evolved.splice(halfLen);
+  } else if (mutation < 0.80 && creativity > 0.3 && evolved.length >= 2) {
+    // Extension: repeat last hit with slight offset
+    const last = evolved[evolved.length - 1];
+    const ext: RhythmHit = [Math.min(3.75, last[0] + 0.5 + rng() * 0.25), last[1] * 0.8];
+    evolved.push(ext);
+  } else if (mutation < 0.90 && creativity > 0.4 && evolved.length >= 2) {
+    // Density mutation: split one long note into two short ones
+    if (evolved[idx][1] > 0.6) {
+      const halfDur = evolved[idx][1] * 0.45;
+      const beat2 = Math.min(3.75, evolved[idx][0] + halfDur + 0.1);
+      evolved[idx] = [evolved[idx][0], halfDur];
+      evolved.splice(idx + 1, 0, [beat2, halfDur]);
+    }
+  } else if (evolved.length >= 3) {
+    // Density mutation: merge two adjacent short notes into one longer note
+    const mergeIdx = Math.min(idx, evolved.length - 2);
+    const merged: RhythmHit = [evolved[mergeIdx][0], evolved[mergeIdx][1] + evolved[mergeIdx + 1][1]];
+    evolved.splice(mergeIdx, 2, merged);
   }
 
   return evolved;
@@ -1387,6 +1430,7 @@ export function generatePianoComping(
   const style = options.style ?? "swing";
   const tempo = options.tempo ?? 120;
   if (tempo <= 0) { _rng = prevRng; _pianoGranular = prevGranular; _pianoEnergy = prevEnergy; _pianoArc = prevArc; throw new RangeError(`tempo must be > 0, got ${tempo}`); }
+  try {
   const humanize = options.humanize ?? true;
   const density = options.density;
   const swingAmount = options.swingAmount ?? 100;
@@ -1412,7 +1456,13 @@ export function generatePianoComping(
   // Fast harmonic rhythm (>=3 chords/bar): force shells - too many dense voicings = clutter
   const voicingThreshold = pianoGranular ? pianoGranular.voicingDensity : 50;
   const hrForceShell = (bandCtx?.harmonicRhythm ?? 1) >= 3;
-  const useShell = tempo > 220 || voicingThreshold < 35 || (density !== undefined && density < 35) || hrForceShell;
+  const forceShell = tempo > 220 || hrForceShell;
+  // Probabilistic shell: lower voicingDensity = more shell voicings
+  const shellChance = forceShell ? 1.0
+    : voicingThreshold < 25 ? 0.7
+    : voicingThreshold < 50 ? 0.3
+    : voicingThreshold < 75 ? 0.1
+    : 0.03;
   const drumDensityRestBoost = bandCtx && bandCtx.drumDensity > 0.6
     ? 0.08 * bandCtx.drumDensity : 0;
   // Increase rests at fast tempos: uptempo comping should be sparse
@@ -1544,7 +1594,9 @@ export function generatePianoComping(
       : !!(nextChord && isDominantQuality(chord.quality)
         && isResolvingDominant(chord.root, nextChord.root));
 
-    const pitches = pickVoicing(chord.root, chord.quality, prevPitches, style, useShell, voicingTypeRef, isResolving);
+    // Pre-roll shell decision once per chord - anticipation/passing use same density
+    const chordShell = _rng() < shellChance;
+    const pitches = pickVoicing(chord.root, chord.quality, prevPitches, style, chordShell, voicingTypeRef, isResolving);
     prevPitches = pitches;
 
     // ── Register Drift ──
@@ -1553,9 +1605,9 @@ export function generatePianoComping(
     const maxRegShift = pianoGranular ? Math.round(pianoGranular.registerRange / 100 * 24) : 24;
     const regDriftProb = pianoGranular ? 0.1 + (pianoGranular.registerRange / 100) * 0.3 : 0.3;
     const arc = phraseIntent?.arc;
-    if (arc === "build" || arc === "climax") {
+    if (arc === "build" || arc === "climax" || arc === "shout" || arc === "solo") {
       if (registerShift < maxRegShift) registerShift += (_rng() < regDriftProb ? 12 : 0);
-    } else if (arc === "release" || arc === "drop") {
+    } else if (arc === "release" || arc === "drop" || arc === "outro" || arc === "breakdown") {
       if (registerShift > -maxRegShift) registerShift -= (_rng() < regDriftProb ? 12 : 0);
     } else {
       // Sustain: drift back toward center
@@ -1613,11 +1665,11 @@ export function generatePianoComping(
       let usePitches = pitches;
       if (rawBeatOffset >= 3.5 && nextChord) {
         // Original behavior + enhanced by harmonicFreedom
-        usePitches = pickVoicing(nextChord.root, nextChord.quality, prevPitches, style, useShell, voicingTypeRef);
+        usePitches = pickVoicing(nextChord.root, nextChord.quality, prevPitches, style, chordShell, voicingTypeRef);
       } else if (rawBeatOffset >= 3.0 && rawBeatOffset < 3.5 && nextChord && _rng() < effectiveAnticipProb) {
         // Early anticipation on beat 3-and (harmonicFreedom + tension-controlled)
         // Creates forward motion - piano "hears" the next chord before it arrives.
-        usePitches = pickVoicing(nextChord.root, nextChord.quality, prevPitches, style, useShell, voicingTypeRef);
+        usePitches = pickVoicing(nextChord.root, nextChord.quality, prevPitches, style, chordShell, voicingTypeRef);
       }
 
       // ── Passing Chord Insertion ──
@@ -1626,7 +1678,7 @@ export function generatePianoComping(
       if (rawBeatOffset >= 2.5 && rawBeatOffset < 3.0 && nextChord && _rng() < passingChordProb) {
         // Chromatic approach: voice the chord a half-step above next root
         const passingRoot = chromaticApproachRoot(nextChord.root, _rng() < 0.5);
-        const passingPitches = pickVoicing(passingRoot, nextChord.quality, prevPitches, style, useShell, voicingTypeRef);
+        const passingPitches = pickVoicing(passingRoot, nextChord.quality, prevPitches, style, chordShell, voicingTypeRef);
         const passingTime = chord.time + rawBeatOffset * beatDuration;
         if (passingTime < chord.time + chord.duration) {
           const pn: CompNote = {
@@ -1645,7 +1697,7 @@ export function generatePianoComping(
       let beatOffset = rawBeatOffset;
       const frac = beatOffset % 1;
       if (Math.abs(frac - 0.5) < 0.01) {
-        const effectiveSwing = swingAmount * tempoSwingMultiplier(tempo) * instrumentSwingFactor("piano");
+        const effectiveSwing = swingAmount * tempoSwingMultiplier(tempo, bandCtx?.sectionEnergy) * instrumentSwingFactor("piano");
         const swingOffset = (effectiveSwing / 100) * (2 / 3 - 0.5);
         beatOffset = Math.floor(beatOffset) + 0.5 + swingOffset;
       }
@@ -1666,20 +1718,28 @@ export function generatePianoComping(
       // Conversation velocity adjustment
       const convVelMult = isListening ? 1 - 0.3 * conversation : isLeader ? 1 + 0.1 * conversation : 1.0;
       const contourVel = velContour(rawBeatOffset, beatsPerBar);
-      const baseVel = Math.round(contourVel * velScale * dynMult * energyMult * convVelMult * crescendoMult);
+      const baseVel = Math.max(48, Math.round(contourVel * velScale * dynMult * energyMult * convVelMult * crescendoMult));
 
       // Apply register drift + bass collision avoidance
       let finalPitches = registerShift !== 0
-        ? usePitches.map(p => {
+        ? [...new Set(usePitches.map(p => {
             let shifted = p + registerShift;
             while (shifted > getPianoHigh()) shifted -= 12;
             while (shifted < getPianoLow()) shifted += 12;
             return shifted;
-          })
+          }))]
         : usePitches;
+      // Bass-piano collision avoidance: shift piano voicing away from bass register.
+      // When bass is high, push piano up. When bass is mid, prefer upper register.
+      // Prevents frequency masking where bass and piano double in same octave.
       if (bandCtx?.bassRegister === "high") {
         const lowestPitch = Math.min(...finalPitches);
-        if (lowestPitch < 60) {
+        if (lowestPitch < 62) {
+          finalPitches = finalPitches.map(p => p + 12);
+        }
+      } else if (bandCtx?.bassRegister === "mid") {
+        const lowestPitch = Math.min(...finalPitches);
+        if (lowestPitch < 55 && lowestPitch + 12 <= getPianoHigh()) {
           finalPitches = finalPitches.map(p => p + 12);
         }
       }
@@ -1706,12 +1766,13 @@ export function generatePianoComping(
   const graced = graceProb > 0 ? applyGraceNotes(broken, graceProb) : broken;
 
   graced.sort((a, b) => a.time - b.time);
-  const result = doStrum ? strumSpread(graced, strumMs) : graced;
-  _rng = prevRng;
-  _pianoGranular = prevGranular;
-  _pianoEnergy = prevEnergy;
-  _pianoArc = prevArc;
-  return result;
+  return doStrum ? strumSpread(graced, strumMs) : graced;
+  } finally {
+    _rng = prevRng;
+    _pianoGranular = prevGranular;
+    _pianoEnergy = prevEnergy;
+    _pianoArc = prevArc;
+  }
 }
 
 // ── Phrase Intent Lookup (piano-side) ──

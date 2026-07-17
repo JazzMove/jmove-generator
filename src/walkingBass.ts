@@ -13,6 +13,7 @@
 
 import { tempoSwingMultiplier, dynamicMultiplier, instrumentSwingFactor } from "./swingUtils";
 import { getGrooveTemplate, applyGroove, rubatoOffset } from "./grooveTemplates";
+import { enclosureProb as enclosureProbFn } from "./probabilityMapping";
 import type { BassNote, BassGranular, WalkingBassOptions, ChordEvent, PhraseIntent, PhraseArc } from "./types";
 
 export type { BassNote, WalkingBassOptions, ChordEvent };
@@ -23,6 +24,8 @@ export type { BassNote, WalkingBassOptions, ChordEvent };
 let _rng: () => number = Math.random;
 let _bassGranular: BassGranular | undefined;
 let _harmonicRhythm: number = 1; // chords per bar (1=modal, 2+=fast changes)
+let _bassEnergy: number = 0.7; // section energy for swing modulation
+let _bassTargetPitch: number | undefined; // macro register target from phrase plan
 
 // ── Approach tone history for anti-repetition ──
 type ApproachRecord = { fromAbove: boolean; interval: number };
@@ -270,10 +273,10 @@ function approachTone(target: number, fromAbove: boolean, scaleTones?: number[],
     }
   }
 
-  // Arc-driven direction bias: build/climax prefer ascending, release/drop prefer descending
+  // Arc-driven direction bias: build/climax/shout prefer ascending, release/drop/outro descending
   if (arc && _rng() < 0.4) {
-    if (arc === "build" || arc === "climax") fromAbove = false;    // ascending
-    else if (arc === "release" || arc === "drop") fromAbove = true; // descending
+    if (arc === "build" || arc === "climax" || arc === "shout" || arc === "solo") fromAbove = false;
+    else if (arc === "release" || arc === "drop" || arc === "outro" || arc === "breakdown") fromAbove = true;
   }
 
   const roll = _rng();
@@ -330,12 +333,19 @@ function passingTone(from: number, to: number, scaleTones: number[], chordTones:
   });
 
   if (candidates.length > 0) {
-    // Filter out tritone/b2 from root region, then sort by proximity to midpoint
+    // Style-aware dissonance filtering: chromaticApproach (0-100) controls tolerance.
+    // High values (bebop/hardBop) allow tritone and b2 passing tones - that's their
+    // musical function. Low values (bossa/ballad) filter conservatively.
+    // Threshold: chromaticApproach < 40 = filter tritone/b2, >= 40 = allow all chromatic.
+    const chromatic = _bassGranular?.chromaticApproach ?? 50;
+    const filterDissonant = chromatic < 40;
     const rootPC = from % 12;
-    const safe = candidates.filter(p => {
-      const interval = ((p % 12) - rootPC + 12) % 12;
-      return interval !== 6 && interval !== 1;
-    });
+    const safe = filterDissonant
+      ? candidates.filter(p => {
+          const interval = ((p % 12) - rootPC + 12) % 12;
+          return interval !== 6 && interval !== 1;
+        })
+      : candidates;
     const pool = safe.length > 0 ? safe : candidates;
     const mid = (from + to) / 2;
     pool.sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid));
@@ -439,6 +449,26 @@ function scaleDegreeToMidi(rootPitch: number, degreeIdx: number, scaleTones: num
   return clamp(scaleTones[scaleTones.length - 1] + 2);
 }
 
+/** Nudge pitch toward _bassTargetPitch by trying both octave variants (50% chance). */
+function nudgeTowardTarget(pitch: number): number {
+  if (_bassTargetPitch == null || Math.abs(pitch - _bassTargetPitch) <= 5) return pitch;
+  // Try both +12 and -12, pick the valid one closest to target
+  const up = pitch + 12;
+  const down = pitch - 12;
+  const upValid = up >= getBassLow() && up <= getBassHigh();
+  const downValid = down >= getBassLow() && down <= getBassHigh();
+  let best = pitch;
+  let bestDist = Math.abs(pitch - _bassTargetPitch);
+  if (upValid && Math.abs(up - _bassTargetPitch) < bestDist) {
+    best = up; bestDist = Math.abs(up - _bassTargetPitch);
+  }
+  if (downValid && Math.abs(down - _bassTargetPitch) < bestDist) {
+    best = down; bestDist = Math.abs(down - _bassTargetPitch);
+  }
+  if (best !== pitch && _rng() < 0.5) return best;
+  return pitch;
+}
+
 function generateSwingMeasure(
   chord: ChordEvent,
   nextChord: ChordEvent | null,
@@ -450,12 +480,14 @@ function generateSwingMeasure(
   prevDirection?: "up" | "down" | null,
   arc?: PhraseArc,
 ): BassNote[] {
-  // Place root in register close to previous note (smooth bar transitions)
+  // Place root in register close to previous note (smooth bar transitions).
+  // When a bassTargetPitch is planned, blend between voice-leading proximity
+  // and macro register target (soft constraint, 30% weight).
   let rootPitch = rootToMidi(chord.root);
   if (prevPitch !== null) {
     while (rootPitch < prevPitch - 6) rootPitch += 12;
     while (rootPitch > prevPitch + 6) rootPitch -= 12;
-    rootPitch = clamp(rootPitch);
+    rootPitch = nudgeTowardTarget(clamp(rootPitch));
   }
   const scaleTones = getScaleTones(chord.root, chord.quality);
   const chordTones = getChordTones(chord.root, chord.quality);
@@ -626,7 +658,7 @@ function generateSwingMeasure(
   // Reduce at fast tempos: full probability up to 180, linear decay to 0 at 300
   const t = tempo ?? 120;
   const tempoEnclosureScale = t <= 180 ? 1.0 : Math.max(0, 1.0 - (t - 180) / 120);
-  const enclosureProb = (_bassGranular ? _bassGranular.syncopation / 100 * 0.40 : 0.15) * tempoEnclosureScale;
+  const enclosureProb = enclosureProbFn(_bassGranular?.syncopation ?? 37.5) * tempoEnclosureScale;
   const nearBoundary = pitches[3] <= getBassLow() + 2 || pitches[3] >= getBassHigh() - 2;
   const doEnclosure = !isLastChord && !nearBoundary && _rng() < enclosureProb;
 
@@ -639,7 +671,7 @@ function generateSwingMeasure(
 
       const beat4Time = chord.time + beatDuration * 3;
       const eighthDur = beatDuration * 0.5;
-      const effSwing = (swingAmount ?? 100) * tempoSwingMultiplier(tempo ?? 120) * instrumentSwingFactor("bass");
+      const effSwing = (swingAmount ?? 100) * tempoSwingMultiplier(tempo ?? 120, _bassEnergy) * instrumentSwingFactor("bass");
       const swingOffset = (effSwing / 100) * (2 / 3 - 0.5);
 
       const baseNotes: BassNote[] = pitches.slice(0, 3).map((pitch, i) => ({
@@ -672,7 +704,7 @@ function generateBossaMeasure(
   prevPitch?: number | null,
 ): BassNote[] {
   const root = rootToMidi(chord.root);
-  const rootPitch = prevPitch != null ? closestOctave(root, prevPitch) : root;
+  const rootPitch = nudgeTowardTarget(prevPitch != null ? closestOctave(root, prevPitch) : root);
   const chordTones = getChordTones(chord.root, chord.quality);
   const fifth = clamp(rootPitch + 7);
   const third = chordTones.length > 1 ? clamp(rootPitch + (chordTones[1] - chordTones[0])) : fifth;
@@ -709,7 +741,7 @@ function generateLatinMeasure(
   prevPitch?: number | null,
 ): BassNote[] {
   const root = rootToMidi(chord.root);
-  const rootPitch = prevPitch != null ? closestOctave(root, prevPitch) : root;
+  const rootPitch = nudgeTowardTarget(prevPitch != null ? closestOctave(root, prevPitch) : root);
   const chordTones = getChordTones(chord.root, chord.quality);
   const fifth = clamp(rootPitch + 7);
   const third = chordTones.length > 1 ? clamp(rootPitch + (chordTones[1] - chordTones[0])) : fifth;
@@ -762,7 +794,7 @@ function generateFusionMeasure(
 ): BassNote[] {
   const rootMidi = rootToMidi(chord.root);
   const chordTones = getChordTones(chord.root, chord.quality);
-  const startPitch = prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi;
+  const startPitch = nudgeTowardTarget(prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi);
   const ct = chordTones.length > 1 ? clamp(startPitch + (chordTones[1] - chordTones[0])) : clamp(startPitch + 5);
   const fifth = clamp(startPitch + 7);
   const octave = clamp(startPitch + 12);
@@ -861,7 +893,7 @@ function generateHardBopMeasure(
   const chordTones = getChordTones(chord.root, chord.quality);
   const scaleTones = getScaleTones(chord.root, chord.quality);
 
-  const startPitch = prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi;
+  const startPitch = nudgeTowardTarget(prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi);
   const pitches: number[] = [_rng() < 0.8 ? startPitch : clamp(startPitch + 7)];
 
   // Determine direction based on next root, biased by two-bar phrasing
@@ -921,7 +953,7 @@ function generateCoolJazzMeasure(
   const rootMidi = rootToMidi(chord.root);
   const scaleTones = getScaleTones(chord.root, chord.quality);
 
-  const startPitch = prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi;
+  const startPitch = nudgeTowardTarget(prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi);
   const pitches: number[] = [startPitch];
 
   // Determine direction based on target, biased by two-bar phrasing
@@ -1011,7 +1043,7 @@ function generateJazzWaltzMeasure(
 ): BassNote[] {
   const rootMidi = rootToMidi(chord.root);
   const scaleTones = getScaleTones(chord.root, chord.quality);
-  const startPitch = prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi;
+  const startPitch = nudgeTowardTarget(prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi);
 
   // 3 notes per bar: root, scale tone, approach to next root
   const pitches: number[] = [startPitch];
@@ -1052,7 +1084,7 @@ function generateShuffleBluesMeasure(
 ): BassNote[] {
   const rootMidi = rootToMidi(chord.root);
   const chordTones = getChordTones(chord.root, chord.quality);
-  const startPitch = prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi;
+  const startPitch = nudgeTowardTarget(prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi);
 
   const thirdInterval = chordTones.length > 1 ? chordTones[1] - chordTones[0] : 4;
   const third = clamp(startPitch + thirdInterval);
@@ -1130,7 +1162,7 @@ function generateNeoSoulMeasure(
 ): BassNote[] {
   const rootMidi = rootToMidi(chord.root);
   const chordTones = getChordTones(chord.root, chord.quality);
-  const startPitch = prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi;
+  const startPitch = nudgeTowardTarget(prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi);
   const ct = chordTones.length > 1 ? clamp(startPitch + (chordTones[1] - chordTones[0])) : clamp(startPitch + 5);
 
   // Marcus Miller-style: root + staccato 16th fills, chromatic approaches
@@ -1181,7 +1213,7 @@ function generateContemporaryJazzMeasure(
 ): BassNote[] {
   const rootMidi = rootToMidi(chord.root);
   const chordTones = getChordTones(chord.root, chord.quality);
-  const startPitch = prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi;
+  const startPitch = nudgeTowardTarget(prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi);
   const thirdInt = chordTones.length > 1 ? chordTones[1] - chordTones[0] : 4;
 
   // Avishai Cohen style: melodic walking with wider intervals and 8th-note runs
@@ -1227,7 +1259,7 @@ function generateMathRockMeasure(
   prevPitch: number | null,
 ): BassNote[] {
   const rootMidi = rootToMidi(chord.root);
-  const startPitch = prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi;
+  const startPitch = nudgeTowardTarget(prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi);
   const octUp = clamp(startPitch + 12);
   const fifth = clamp(startPitch + 7);
 
@@ -1320,7 +1352,7 @@ function generateHoldsworthMeasure(
   const rootMidi = rootToMidi(chord.root);
   const chordTones = getChordTones(chord.root, chord.quality);
   const _scaleTones = getScaleTones(chord.root, chord.quality);
-  const startPitch = prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi;
+  const startPitch = nudgeTowardTarget(prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi);
 
   const third = chordTones.length > 1
     ? clamp(startPitch + (chordTones[1] - chordTones[0]))
@@ -1409,7 +1441,7 @@ function generateAlfaMistMeasure(
 ): BassNote[] {
   const rootMidi = rootToMidi(chord.root);
   const chordTones = getChordTones(chord.root, chord.quality);
-  const startPitch = prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi;
+  const startPitch = nudgeTowardTarget(prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi);
   // Electric patterns use higher register (MIDI 43-48 center vs upright 36-43)
   // Kaya Thomas-Dyke's electric bass sits higher than her upright work.
   const electricPitch = startPitch < 43 ? clamp(startPitch + 12) : startPitch;
@@ -1513,7 +1545,7 @@ function generateMethenyMeasure(
   const rootMidi = rootToMidi(chord.root);
   const chordTones = getChordTones(chord.root, chord.quality);
   const _scaleTones = getScaleTones(chord.root, chord.quality);
-  const startPitch = prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi;
+  const startPitch = nudgeTowardTarget(prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi);
   const fifth = chordTones.length > 2
     ? clamp(startPitch + (chordTones[2] - chordTones[0]))
     : clamp(startPitch + 7);
@@ -1607,7 +1639,7 @@ function generate5_4Measure(
 ): BassNote[] {
   const rootMidi = rootToMidi(chord.root);
   const scaleTones = getScaleTones(chord.root, chord.quality);
-  const startPitch = prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi;
+  const startPitch = nudgeTowardTarget(prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi);
   const nextRoot = nextChord ? rootToMidi(nextChord.root) : rootMidi;
   const target = closestOctave(nextRoot, startPitch);
   const ascending = target >= startPitch;
@@ -1655,7 +1687,7 @@ function generate7_8Measure(
   prevPitch: number | null,
 ): BassNote[] {
   const rootMidi = rootToMidi(chord.root);
-  const startPitch = prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi;
+  const startPitch = nudgeTowardTarget(prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi);
   const fifth = clamp(startPitch + 7);
   const nextRoot = nextChord ? rootToMidi(nextChord.root) : rootMidi;
   const target = closestOctave(nextRoot, startPitch);
@@ -1696,7 +1728,7 @@ function generate9_8Measure(
   prevPitch: number | null,
 ): BassNote[] {
   const rootMidi = rootToMidi(chord.root);
-  const startPitch = prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi;
+  const startPitch = nudgeTowardTarget(prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi);
   const fifth = clamp(startPitch + 7);
   const nextRoot = nextChord ? rootToMidi(nextChord.root) : rootMidi;
   const target = closestOctave(nextRoot, startPitch);
@@ -1720,7 +1752,7 @@ function generate6_4Measure(
 ): BassNote[] {
   const rootMidi = rootToMidi(chord.root);
   const scaleTones = getScaleTones(chord.root, chord.quality);
-  const startPitch = prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi;
+  const startPitch = nudgeTowardTarget(prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi);
   const nextRoot = nextChord ? rootToMidi(nextChord.root) : rootMidi;
   const target = closestOctave(nextRoot, startPitch);
   const ascending = target >= startPitch;
@@ -1756,7 +1788,7 @@ function generate7_4Measure(
 ): BassNote[] {
   const rootMidi = rootToMidi(chord.root);
   const scaleTones = getScaleTones(chord.root, chord.quality);
-  const startPitch = prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi;
+  const startPitch = nudgeTowardTarget(prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi);
   const nextRoot = nextChord ? rootToMidi(nextChord.root) : rootMidi;
   const target = closestOctave(nextRoot, startPitch);
   const ascending = target >= startPitch;
@@ -1793,7 +1825,7 @@ function generate11_8Measure(
   const rootMidi = rootToMidi(chord.root);
   const chordTones = getChordTones(chord.root, chord.quality);
   const scaleTones = getScaleTones(chord.root, chord.quality);
-  const startPitch = prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi;
+  const startPitch = nudgeTowardTarget(prevPitch !== null ? closestOctave(rootMidi, prevPitch) : rootMidi);
   const nextRoot = nextChord ? rootToMidi(nextChord.root) : rootMidi;
   const target = closestOctave(nextRoot, startPitch);
 
@@ -1866,14 +1898,19 @@ export function generateWalkingBass(
   const prevGranular = _bassGranular;
   const prevHistory = _approachHistory;
   const prevHR = _harmonicRhythm;
+  const prevEnergy = _bassEnergy;
+  const prevTarget = _bassTargetPitch;
   _rng = options.random ?? Math.random;
   _bassGranular = options.granular;
   _harmonicRhythm = options.bandContext?.harmonicRhythm ?? 1;
+  _bassEnergy = options.bandContext?.sectionEnergy ?? 0.7;
+  _bassTargetPitch = undefined;
   _approachHistory = [];
 
   const style = options.style ?? "swing";
   const tempo = options.tempo ?? 120;
-  if (tempo <= 0) { _rng = prevRng; _bassGranular = prevGranular; _harmonicRhythm = prevHR; _approachHistory = prevHistory; throw new RangeError(`tempo must be > 0, got ${tempo}`); }
+  if (tempo <= 0) { _rng = prevRng; _bassGranular = prevGranular; _harmonicRhythm = prevHR; _bassEnergy = prevEnergy; _bassTargetPitch = prevTarget; _approachHistory = prevHistory; throw new RangeError(`tempo must be > 0, got ${tempo}`); }
+  try {
   const humanize = options.humanize ?? false;
   const beatDuration = 60 / tempo;
 
@@ -1905,6 +1942,9 @@ export function generateWalkingBass(
     const phraseIntent = bandCtx?.phraseMap?.intents?.length
       ? lookupBassIntent(measureIdx, bandCtx.phraseMap)
       : null;
+
+    // Bass register arc: use phrase-planned target pitch as soft register bias
+    _bassTargetPitch = phraseIntent?.bassTargetPitch;
 
     // Intent-driven bass rest: extremely rare but powerful (bass drops out)
     if (phraseIntent?.bassRests?.includes(measureIdx)) {
@@ -2057,12 +2097,22 @@ export function generateWalkingBass(
 
     // Dynamic arc: scale velocity by chorus position
     // Conversation + arc awareness apply even without measureInfo (standalone calls)
-    const convMult = isLeader ? 1 + 0.15 * conversation : isListening ? 1 - 0.25 * conversation : 1.0;
+    const convMult = isLeader ? 1 + 0.20 * conversation : isListening ? 1 - 0.30 * conversation : 1.0;
+    // When listening and conversation is high, drop beat 2 to half-note feel (sparse backing)
+    if (isListening && conversation > 0.5 && measureNotes.length >= 4 && _rng() < conversation * 0.4) {
+      const keep = measureNotes.filter((_, idx) => idx === 0 || idx === 2); // beats 1 and 3
+      for (let ki = 0; ki < keep.length - 1; ki++) {
+        keep[ki].duration = keep[ki + 1].time - keep[ki].time - 0.01;
+      }
+      measureNotes = keep;
+    }
     const bassArc = phraseIntent?.arc;
-    const arcMult = bassArc === "climax" ? 1.12
-      : bassArc === "build" ? 1.05
-      : bassArc === "release" ? 0.9
-      : bassArc === "drop" ? 0.78
+    const arcMult = bassArc === "shout" ? 1.18
+      : bassArc === "climax" ? 1.12
+      : bassArc === "build" || bassArc === "solo" ? 1.05
+      : bassArc === "release" || bassArc === "outro" || bassArc === "interlude" ? 0.9
+      : bassArc === "drop" || bassArc === "breakdown" ? 0.78
+      : bassArc === "intro" ? 0.92
       : 1.0;
     // Feel changes: double-time = louder, half-time = softer with longer notes
     const bassFeel = phraseIntent?.feel ?? "normal";
@@ -2138,11 +2188,15 @@ export function generateWalkingBass(
     notes[i].duration = notes[i + 1].time - notes[i].time;
   }
 
-  _rng = prevRng;
-  _bassGranular = prevGranular;
-  _harmonicRhythm = prevHR;
-  _approachHistory = prevHistory;
   return notes;
+  } finally {
+    _rng = prevRng;
+    _bassGranular = prevGranular;
+    _harmonicRhythm = prevHR;
+    _bassEnergy = prevEnergy;
+    _bassTargetPitch = prevTarget;
+    _approachHistory = prevHistory;
+  }
 }
 
 // ── Phrase Intent Lookup (bass-side) ──

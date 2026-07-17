@@ -130,7 +130,7 @@ export type JamForm =
   | "secondLine16" | "coltraneMatrix16" | "throughComposed12"
   | "pentatonic8" | "quartal16" | "fullSong" | "free";
 
-export type SongSectionType = "intro" | "head" | "solo" | "bridge" | "interlude" | "shout" | "outro";
+export type SongSectionType = "intro" | "head" | "solo" | "bridge" | "interlude" | "shout" | "outro" | "drumSolo" | "drumTrade";
 
 export interface SongSection {
   type: SongSectionType;
@@ -218,6 +218,8 @@ export interface DrumHit {
   time: number;
   duration: number;
   velocity: number;
+  /** Brush articulation hint for renderers. Absent = sticks (default). */
+  brush?: "sweep" | "tap" | "swirl";
 }
 
 export interface DrumState {
@@ -226,6 +228,7 @@ export interface DrumState {
   patternHoldBars: number;
   tendency: unknown;  // CompingTendency | null, kept opaque for type boundary
   clavePhase?: number;  // 0 = 3-side, 1 = 2-side (son clave alternation for Latin)
+  lastFillIdx?: number;  // last fill index for history penalty in contextual fill selection
 }
 
 export interface DrumPatternOptions {
@@ -333,7 +336,9 @@ export type InstrumentRole = "drums" | "bass" | "piano";
 
 export type RandomFn = () => number;
 
-export type PhraseArc = "build" | "sustain" | "release" | "drop" | "climax";
+export type PhraseArc =
+  | "build" | "sustain" | "release" | "drop" | "climax"
+  | "intro" | "outro" | "breakdown" | "shout" | "vamp" | "solo" | "interlude";
 
 export interface PhraseIntent {
   arc: PhraseArc;                         // overall energy trajectory for this phrase
@@ -347,6 +352,7 @@ export interface PhraseIntent {
   motifLockBars: number;                  // how many bars piano/bass hold their current pattern
   crescendo: boolean;                     // gradual push within this phrase
   conversationLeader: "piano" | "bass" | "drums" | null; // who "speaks" — others listen/support
+  bassTargetPitch?: number;               // MIDI pitch center for bass register arc (33-55)
 }
 
 export interface PhraseMap {

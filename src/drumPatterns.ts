@@ -15,7 +15,8 @@
 
 import { tempoSwingMultiplier, dynamicMultiplier, instrumentSwingFactor } from "./swingUtils";
 import { getGrooveTemplate, applyGroove, drumPitchToElement, rubatoOffset } from "./grooveTemplates";
-import type { DrumHit, DrumGranular, DrumPatternOptions, PhraseIntent } from "./types";
+import { fillProbScale } from "./probabilityMapping";
+import type { DrumHit, DrumGranular, DrumPatternOptions, PhraseIntent, PhraseArc } from "./types";
 
 export type { DrumHit, DrumPatternOptions };
 
@@ -2091,6 +2092,42 @@ const SETUP_FILLS: Pattern[] = [
 
 const FILL_STYLES = new Set(["swing", "hardBop", "coolJazz", "shuffleBlues", "ballad", "fusion", "contemporaryJazz", "holdsworth", "alfaMist"]);
 
+/** Score and select fill based on musical context instead of uniform random.
+ *  Considers: energy match (busy fills for high energy), history penalty
+ *  (avoid repeating same fill), and arc direction. */
+function selectContextualFill(
+  pool: Pattern[],
+  energy: number,
+  arc: PhraseArc | null | undefined,
+  lastIdx: number,
+  rng: () => number,
+): Pattern {
+  if (pool.length <= 1) return pool[0];
+  // Score each fill candidate
+  const scores = pool.map((fill, idx) => {
+    let score = 1.0;
+    // Fill density: count hits. High energy prefers dense fills, low energy prefers sparse.
+    const hitCount = fill.length;
+    const densityMatch = energy > 0.6 ? hitCount / 8 : (8 - hitCount) / 8;
+    score += densityMatch * 0.5;
+    // History penalty: don't repeat the same fill
+    if (idx === lastIdx) score *= 0.15;
+    // Arc bonus: climax/shout prefer biggest fills (most hits), drop/breakdown prefer sparse
+    if ((arc === "climax" || arc === "shout") && hitCount >= 5) score += 0.3;
+    if ((arc === "drop" || arc === "breakdown") && hitCount <= 3) score += 0.3;
+    if ((arc === "build") && hitCount >= 3 && hitCount <= 5) score += 0.2;
+    return score;
+  });
+  // Weighted random selection by score
+  const totalScore = scores.reduce((s, v) => s + v, 0);
+  let roll = rng() * totalScore;
+  for (let i = 0; i < pool.length; i++) {
+    roll -= scores[i];
+    if (roll <= 0) return pool[i];
+  }
+  return pool[pool.length - 1];
+}
+
 // ── Stochastic Jazz Comping ──
 // For swing-family styles, kick/snare comping is probabilistic per-beat rather than
 // static arrays. Each measure is unique. "Tendency" mechanism provides phrase continuity.
@@ -2901,7 +2938,13 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
   const isLatin = style === "latin";
   let clavePhase = ds?.clavePhase ?? 0;
 
+  // Brush articulation: ballad, coolJazz, ECM use brushes instead of sticks.
+  // Annotates snare hits with sweep/tap/swirl for renderers that support it.
+  const BRUSH_STYLES = new Set(["ballad", "coolJazz", "ecm"]);
+  const useBrushes = BRUSH_STYLES.has(style);
+
   const hits: DrumHit[] = [];
+  let lastFillIdx = options.drumState?.lastFillIdx ?? -1;
 
   for (let m = 0; m < numMeasures; m++) {
     // Tendency rotation for stochastic styles
@@ -2988,17 +3031,22 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
     // Without this, drums play identically regardless of musical narrative.
     const isDrop = phraseIntent?.dropMeasures?.includes(absoluteM) ?? false;
     const arcVelMult = isDrop ? 0.7
+      : arc === "shout" ? 1.20
       : arc === "climax" ? 1.15
-      : arc === "build" ? 1.05 + (phraseIntent?.crescendo ? 0.05 : 0)
-      : arc === "release" ? 0.88
-      : arc === "drop" ? 0.75
+      : arc === "build" || arc === "solo" ? 1.05 + (phraseIntent?.crescendo ? 0.05 : 0)
+      : arc === "vamp" ? 1.0
+      : arc === "release" || arc === "outro" || arc === "interlude" ? 0.88
+      : arc === "drop" || arc === "breakdown" ? 0.75
+      : arc === "intro" ? 0.90
       : 1.0;
     // Build/climax: accept more ghost notes (lower threshold). Release/drop: strip ghosts.
     const arcGhostAdjust = isDrop ? 20
+      : arc === "shout" ? -10
       : arc === "climax" ? -8
-      : arc === "build" ? -4
-      : arc === "release" ? 8
-      : arc === "drop" ? 15
+      : arc === "build" || arc === "solo" ? -4
+      : arc === "release" || arc === "outro" || arc === "interlude" ? 8
+      : arc === "drop" || arc === "breakdown" ? 15
+      : arc === "intro" ? 5
       : 0;
 
     // ── Feel Changes (double-time / half-time) ──
@@ -3010,7 +3058,8 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
     // When drums are the leader, play more actively. When listening, pull back.
     const isLeader = phraseIntent?.conversationLeader === "drums";
     const isListening = phraseIntent?.conversationLeader != null && !isLeader;
-    const convDrumVelMult = isLeader ? 1.08 : isListening ? 0.88 : 1.0;
+    // Leader: louder and more present. Listening: pull back (ride + time only feel)
+    const convDrumVelMult = isLeader ? 1.12 : isListening ? 0.82 : 1.0;
 
     // Crash cymbal on form boundaries — louder at section boundaries
     // Alfa Mist: crashes only on section starts or 30% of phrase boundaries (sparse, not every 4 bars)
@@ -3068,24 +3117,23 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
 
       // Style-specific fill frequency: Wackerman fills frequently and dramatically,
       // Alfa Mist is sparse and broken-beat, others are standard jazz.
-      const fillScale = (options.granular ? options.granular.fillIntensity / 50 : 1) * tempoFillScale;
+      const fillScale = fillProbScale(options.granular?.fillIntensity ?? 50) * tempoFillScale;
       const sectionProb = (style === "alfaMist" ? 0.35 : style === "holdsworth" ? 0.55 : style === "metheny" ? 0.70 : 0.6) * energyFillMult * fillScale;
       const phraseProb = (style === "alfaMist" ? 0.20 : style === "holdsworth" ? 0.30 : style === "metheny" ? 0.50 : 0.4) * energyFillMult * fillScale;
 
       if (isBeforeSectionMarker && rng() < sectionProb) {
-        // Big fill before major section boundary
         const pool = style === "holdsworth" ? (hasStyleOddMeter ? HOLDSWORTH_11_8_FILLS : HOLDSWORTH_FILLS)
           : style === "alfaMist" ? ALFA_MIST_FILLS
           : style === "fusion" ? FUSION_FILLS : JAZZ_FILLS_BIG;
-        fillPattern = pool[Math.floor(rng() * pool.length)];
+        fillPattern = selectContextualFill(pool, energy, arc, lastFillIdx, rng);
+        lastFillIdx = pool.indexOf(fillPattern);
       } else if (isBeforeFormMarker && rng() < phraseProb) {
-        // Medium or small fill before phrase boundary
         const pool = style === "holdsworth" ? (hasStyleOddMeter ? HOLDSWORTH_11_8_FILLS : HOLDSWORTH_FILLS)
           : style === "alfaMist" ? ALFA_MIST_FILLS
           : style === "fusion" ? FUSION_FILLS : JAZZ_FILLS;
-        fillPattern = pool[Math.floor(rng() * pool.length)];
+        fillPattern = selectContextualFill(pool, energy, arc, lastFillIdx, rng);
+        lastFillIdx = pool.indexOf(fillPattern);
       } else if (isSetupBar && rng() < 0.25 * energyFillMult) {
-        // Setup fill: subtle anticipation 2 bars before section
         fillPattern = SETUP_FILLS[Math.floor(rng() * SETUP_FILLS.length)];
       }
     }
@@ -3135,7 +3183,7 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
       let beat = hit.beat;
       const frac = beat % 1;
       if (Math.abs(frac - 0.67) < 0.02) {
-        const effectiveSwing = swingAmount * tempoSwingMultiplier(tempo) * instrumentSwingFactor("drums");
+        const effectiveSwing = swingAmount * tempoSwingMultiplier(tempo, bandCtx?.sectionEnergy) * instrumentSwingFactor("drums");
         const swingOffset = (effectiveSwing / 100) * (2 / 3 - 0.5);
         beat = Math.floor(beat) + 0.5 + swingOffset;
       }
@@ -3154,13 +3202,24 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
       // to avoid double-scaling quiet sections.
       const hasSectionDynamics = options.measureInfo?.sections && options.measureInfo.sections.length > 0;
       const energyVelMult = (bandCtx && !hasSectionDynamics) ? (0.7 + energy * 0.3) : 1.0;
-      hits.push({
+      const drumHit: DrumHit = {
         pitch: hit.drum,
         time: Math.max(0, humanizeTime(time, humanize, style, hit.drum, rng, energy, arc)
           + rubatoOffset(style, hit.beat, beatsPerMeasure, arc)),
         duration: 0.08,
         velocity: humanizeVelocity(Math.round(hit.velocity * dynMult * energyVelMult * arcVelMult * feelVelMult * convDrumVelMult), hit.ghost ?? false, humanize, rng),
-      });
+      };
+      // Brush articulation for ballad/coolJazz/ECM styles
+      if (useBrushes) {
+        if (hit.drum === GM_DRUMS.SNARE || hit.drum === GM_DRUMS.CROSS_STICK || hit.drum === GM_DRUMS.SIDE_STICK) {
+          // Beats 2 and 4: tap articulation (brush strike), others: sweep (continuous motion)
+          const isBackbeat = Math.abs(hit.beat - 1) < 0.1 || Math.abs(hit.beat - 3) < 0.1;
+          drumHit.brush = isBackbeat ? "tap" : (hit.ghost ? "swirl" : "sweep");
+        } else if (hit.drum === GM_DRUMS.RIDE || hit.drum === GM_DRUMS.RIDE_BELL) {
+          drumHit.brush = "sweep"; // brush on cymbal = wash
+        }
+      }
+      hits.push(drumHit);
     }
 
     applyMicroVariation(hits, measureStart, beatDuration, beatsPerMeasure, style, density, humanize, rng, options.granular);
@@ -3177,6 +3236,7 @@ export function generateDrumPattern(options: DrumPatternOptions = {}): DrumHit[]
     ds.patternHoldBars = patternHoldBars;
     ds.tendency = tendency;
     ds.clavePhase = clavePhase;
+    ds.lastFillIdx = lastFillIdx;
   }
 
   hits.sort((a, b) => a.time - b.time);
@@ -3202,9 +3262,10 @@ function lookupDrumIntent(measure: number, phraseMap: { boundaries: number[]; in
 
 const INTERLOCK_STYLES = new Set(["swing", "hardBop", "coolJazz", "modal", "neoSoul", "contemporaryJazz", "holdsworth", "alfaMist"]);
 
-export function interlockKickHihat(hits: DrumHit[], style: string, random?: () => number): void {
+export function interlockKickHihat(hits: DrumHit[], style: string, random?: () => number, prob?: number): void {
   if (!INTERLOCK_STYLES.has(style)) return;
   const rng = random ?? Math.random;
+  const interlockProb = prob ?? 0.6;
 
   const kicks = hits.filter(h => h.pitch === GM_DRUMS.KICK);
   for (const kick of kicks) {
@@ -3212,7 +3273,7 @@ export function interlockKickHihat(hits: DrumHit[], style: string, random?: () =
       if (hit.pitch !== GM_DRUMS.HI_HAT_CLOSED) continue;
       if (Math.abs(hit.time - kick.time) > 0.02) continue;
 
-      if (rng() < 0.6) {
+      if (rng() < interlockProb) {
         hit.pitch = GM_DRUMS.HI_HAT_OPEN;
         hit.velocity = Math.min(hit.velocity + 10, 70);
         hit.duration = 0.12;

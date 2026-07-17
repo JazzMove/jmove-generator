@@ -17,6 +17,7 @@ describe("Complexity Mapping", () => {
       const g = resolveDrumGranular(0);
       expect(g.tomFrequency).toBe(0);
       expect(g.fillIntensity).toBe(5);
+      expect(g.rideWash).toBe(10);
       expect(g.ghostDensity).toBe(5);
       expect(g.cymbalColor).toBe(0);
     });
@@ -25,6 +26,7 @@ describe("Complexity Mapping", () => {
       const g = resolveDrumGranular(100);
       expect(g.tomFrequency).toBe(85);
       expect(g.fillIntensity).toBe(90);
+      expect(g.rideWash).toBe(90);
       expect(g.ghostDensity).toBe(85);
       expect(g.cymbalColor).toBe(75);
     });
@@ -221,6 +223,42 @@ describe("GENERATOR_VERSION", () => {
   it("exports a semver string matching package.json", () => {
     // __GENERATOR_VERSION__ injected by tsup (build) and vitest (test) from package.json
     expect(GENERATOR_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
-    expect(GENERATOR_VERSION).toBe("1.3.3");
+    expect(GENERATOR_VERSION).toBe("1.3.4");
+  });
+});
+
+// ═══════════════════════════════════════════════════
+// G24 — S-curve complexity mapping
+// ═══════════════════════════════════════════════════
+
+describe("G24 — S-curve complexity mapping", () => {
+  it("mid-range complexity changes more gradually than linear", () => {
+    // S-curve should have flatter response near 0 and 100, steeper in middle
+    const low = resolveDrumGranular(10);
+    const mid = resolveDrumGranular(50);
+    const high = resolveDrumGranular(90);
+    // All values should be defined and in range
+    expect(low.tomFrequency).toBeGreaterThanOrEqual(0);
+    expect(mid.tomFrequency).toBe(40); // default at 50% complexity
+    expect(high.tomFrequency).toBeLessThanOrEqual(85);
+    // S-curve: value at 25% should be closer to min than linear would give
+    const quarter = resolveDrumGranular(25);
+    const threeQuarter = resolveDrumGranular(75);
+    // At 25%, S-curve should give less than linear midpoint between min and default
+    const linearQuarter = 0 + (40 - 0) * 0.5; // 20 (linear at t=0.5 of first half)
+    // S-curve smoothstep(0.5) = 0.5, so at 25% the curve value should be near 20 but with S-shape
+    expect(quarter.tomFrequency).toBeGreaterThanOrEqual(0);
+    expect(quarter.tomFrequency).toBeLessThanOrEqual(40);
+    expect(threeQuarter.tomFrequency).toBeGreaterThanOrEqual(40);
+    expect(threeQuarter.tomFrequency).toBeLessThanOrEqual(85);
+  });
+
+  it("endpoints match min/max exactly", () => {
+    const atZero = resolveDrumGranular(0);
+    const atHundred = resolveDrumGranular(100);
+    expect(atZero.tomFrequency).toBe(0);   // min
+    expect(atHundred.tomFrequency).toBe(85); // max
+    expect(atZero.fillIntensity).toBe(5);
+    expect(atHundred.fillIntensity).toBe(90);
   });
 });

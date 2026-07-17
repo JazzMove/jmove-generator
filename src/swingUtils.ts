@@ -7,16 +7,28 @@ import type { SongSection, InstrumentRole } from "./types";
 export type { InstrumentRole };
 
 /**
- * Tempo-dependent swing ratio scaling.
+ * Tempo-dependent swing ratio scaling with optional energy modulation.
  * Real jazz: slow tempos = heavy triplet swing, fast tempos = nearly straight.
+ * Energy effect: high energy = slightly straighter (driving), low energy = more
+ * relaxed (triplet-like). Mimics how real drummers tighten swing on builds.
  * Returns multiplier for swingAmount (0-100 parameter).
  */
-export function tempoSwingMultiplier(tempo: number): number {
-  if (tempo <= 80) return 1.5;    // ballad: heavy swing (~3:1 ratio)
-  if (tempo <= 100) return 1.3;   // medium-slow: (~2.5:1 ratio)
-  if (tempo <= 180) return 1.0;
-  if (tempo <= 240) return 1.0 - ((tempo - 180) / 60) * 0.4; // linear 1.0 → 0.6
-  return 0.3;
+export function tempoSwingMultiplier(tempo: number, energy?: number): number {
+  let base: number;
+  if (tempo <= 80) base = 1.5;          // ballad: heavy swing (~3:1 ratio)
+  else if (tempo <= 100) base = 1.3;    // medium-slow: (~2.5:1 ratio)
+  else if (tempo <= 180) base = 1.0;
+  else if (tempo <= 240) base = 1.0 - ((tempo - 180) / 60) * 0.4; // linear 1.0 → 0.6
+  else base = 0.3;
+
+  // Energy modulation: ±10% of base swing ratio
+  // Low energy (0.3) → +5% (relaxed, more swing)
+  // High energy (1.0) → -5% (driving, straighter)
+  if (energy != null) {
+    const energyBias = 0.05 - 0.10 * Math.max(0, Math.min(1, energy));
+    base *= (1 + energyBias);
+  }
+  return base;
 }
 
 /**

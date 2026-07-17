@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { applyGroove, getGrooveTemplate, evolveElement, rubatoOffset } from "../src/grooveTemplates";
+import { tempoSwingMultiplier } from "../src/swingUtils";
 import type { ElementTiming, PhraseArc } from "../src/types";
 
 describe("Groove Templates", () => {
@@ -305,9 +306,9 @@ describe("G5 — rubatoOffset (tempo micro-variation)", () => {
     expect(offset).toBe(0);
   });
 
-  it("climax arc gives 0 offset (not listed in switch)", () => {
+  it("climax arc gives slight forward push", () => {
     const offset = rubatoOffset("swing", 2.0, 4, "climax");
-    expect(offset).toBe(0);
+    expect(offset).toBe(-0.0005); // driving: half ms ahead
   });
 
   // ── Combined beat-position + arc rubato ──
@@ -349,5 +350,70 @@ describe("G5 — rubatoOffset (tempo micro-variation)", () => {
     // Beat 2.5 out of 3 beats = 83.3% → >75% → stretch in ballad
     const offset = rubatoOffset("ballad", 2.5, 3);
     expect(offset).toBeCloseTo(0.004, 6);
+  });
+
+  it("new arc types produce expected offsets", () => {
+    expect(rubatoOffset("swing", 2.0, 4, "shout")).toBe(-0.0005); // driving
+    expect(rubatoOffset("swing", 2.0, 4, "solo")).toBe(-0.001);   // forward
+    expect(rubatoOffset("swing", 2.0, 4, "outro")).toBe(0.002);   // relaxing
+    expect(rubatoOffset("swing", 2.0, 4, "breakdown")).toBe(0.003); // floating
+    expect(rubatoOffset("swing", 2.0, 4, "intro")).toBe(0.001);   // settling
+    expect(rubatoOffset("swing", 2.0, 4, "vamp")).toBe(0);        // neutral
+    expect(rubatoOffset("swing", 2.0, 4, "interlude")).toBe(0.002); // relaxing
+  });
+});
+
+// ═══════════════════════════════════════════════════
+// G20 — Energy-aware swing ratio
+// ═══════════════════════════════════════════════════
+
+describe("G20 — Energy-aware swing", () => {
+  it("high energy produces slightly straighter swing than low energy", () => {
+    const lowEnergy = tempoSwingMultiplier(140, 0.3);
+    const highEnergy = tempoSwingMultiplier(140, 1.0);
+    // High energy should be slightly lower (straighter)
+    expect(highEnergy).toBeLessThan(lowEnergy);
+  });
+
+  it("energy=undefined gives same result as no energy parameter", () => {
+    const withoutEnergy = tempoSwingMultiplier(140);
+    const withUndefined = tempoSwingMultiplier(140, undefined);
+    expect(withoutEnergy).toBe(withUndefined);
+  });
+
+  it("energy modulation stays within ±10% of base", () => {
+    const base = tempoSwingMultiplier(140);
+    const low = tempoSwingMultiplier(140, 0.0);
+    const high = tempoSwingMultiplier(140, 1.0);
+    expect(low).toBeLessThanOrEqual(base * 1.06);
+    expect(high).toBeGreaterThanOrEqual(base * 0.94);
+  });
+});
+
+// ═══════════════════════════════════════════════════
+// G27 — evolveElement handles new arc types
+// ═══════════════════════════════════════════════════
+
+describe("G27 — evolveElement new arcs", () => {
+  const base: ElementTiming = { bias: 0, jitter: 0.003 };
+
+  it("shout arc tightens jitter (locked in)", () => {
+    const evolved = evolveElement(base, 0.8, "shout");
+    expect(evolved.jitter).toBeLessThan(base.jitter);
+  });
+
+  it("breakdown arc loosens jitter (spacious)", () => {
+    const evolved = evolveElement(base, 0.5, "breakdown");
+    expect(evolved.jitter).toBeGreaterThan(base.jitter);
+  });
+
+  it("vamp arc keeps tight jitter (locked groove)", () => {
+    const evolved = evolveElement(base, 0.7, "vamp");
+    expect(evolved.jitter).toBeLessThan(base.jitter);
+  });
+
+  it("intro arc is slightly loose", () => {
+    const evolved = evolveElement(base, 0.5, "intro");
+    expect(evolved.jitter).toBeGreaterThan(base.jitter * 0.9);
   });
 });

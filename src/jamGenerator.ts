@@ -78,17 +78,32 @@ const ROOT_SEMITONES: Record<string, number> = {
   "A": 9, "A#": 10, "Bb": 10, "B": 11,
 };
 
-// Flat preference for jazz
-const SEMITONE_TO_ROOT: string[] = [
+// Flat preference for jazz (default)
+const SEMITONE_TO_ROOT_FLAT: string[] = [
   "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B",
 ];
+// Sharp preference for sharp keys
+const SEMITONE_TO_ROOT_SHARP: string[] = [
+  "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
+];
+
+// Keys that use sharps in their key signature
+const SHARP_KEYS = new Set(["G", "D", "A", "E", "B", "F#", "C#"]);
+
+/** Choose enharmonic spelling table based on key context. */
+function semitoneToRoot(keyContext?: string): string[] {
+  if (keyContext && SHARP_KEYS.has(keyContext)) return SEMITONE_TO_ROOT_SHARP;
+  return SEMITONE_TO_ROOT_FLAT;
+}
+
 
 // ── Transposition ──
 
-function transposeRoot(root: string, semitones: number): string {
+function transposeRoot(root: string, semitones: number, keyContext?: string): string {
   const base = ROOT_SEMITONES[root];
   if (base === undefined) return root;
-  return SEMITONE_TO_ROOT[(base + semitones + 12) % 12];
+  const table = semitoneToRoot(keyContext);
+  return table[(base + semitones + 12) % 12];
 }
 
 type Chord = { root: string; quality: string };
@@ -100,7 +115,7 @@ export function transposeProgression(
 ): Chord[] {
   const interval = (ROOT_SEMITONES[toKey] - ROOT_SEMITONES[fromKey] + 12) % 12;
   if (interval === 0) return chords.map(c => ({ ...c }));
-  return chords.map(c => ({ root: transposeRoot(c.root, interval), quality: c.quality }));
+  return chords.map(c => ({ root: transposeRoot(c.root, interval, toKey), quality: c.quality }));
 }
 
 // ── Chord Progression Templates ──

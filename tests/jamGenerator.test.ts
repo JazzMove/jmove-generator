@@ -1791,3 +1791,41 @@ describe("Jam Generator — tempo validation", () => {
     expect(() => generateJamSession(makeConfig({ tempo: -60 }))).toThrow(RangeError);
   });
 });
+
+// ═══════════════════════════════════════════════════
+// G23 — Enharmonic awareness in transposition
+// ═══════════════════════════════════════════════════
+
+describe("G23 — Enharmonic-aware transposition", () => {
+  it("transposes to sharp keys using sharp spellings", () => {
+    const chords = [{ root: "C", quality: "maj7" }, { root: "F", quality: "7" }];
+    // C → E (sharp key): F should become A (not Bbb)
+    const transposed = transposeProgression(chords, "C", "E");
+    expect(transposed[0].root).toBe("E");
+    expect(transposed[1].root).toBe("A");
+  });
+
+  it("transposes to flat keys using flat spellings", () => {
+    const chords = [{ root: "C", quality: "maj7" }, { root: "G", quality: "7" }];
+    // C → Eb (flat key): G should become Bb (not A#)
+    const transposed = transposeProgression(chords, "C", "Eb");
+    expect(transposed[0].root).toBe("Eb");
+    expect(transposed[1].root).toBe("Bb");
+  });
+
+  it("sharp keys produce F# not Gb", () => {
+    const chords = [{ root: "C", quality: "7" }];
+    // C → D (sharp key): C becomes D, but test that Gb → F# in D key
+    const fromGb = [{ root: "Gb", quality: "maj7" }];
+    const transposed = transposeProgression(fromGb, "C", "D");
+    // Gb (6 semitones) + 2 semitones = 8 = G# in sharp key
+    expect(transposed[0].root).toBe("G#");
+  });
+
+  it("identity transposition preserves chords", () => {
+    const chords = [{ root: "Db", quality: "7" }, { root: "Ab", quality: "m7" }];
+    const transposed = transposeProgression(chords, "C", "C");
+    expect(transposed[0].root).toBe("Db");
+    expect(transposed[1].root).toBe("Ab");
+  });
+});

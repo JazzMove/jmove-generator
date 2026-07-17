@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   generateWalkingBass,
+  generateEnsemble,
   scoreChordsToEvents,
   resolveBassGranular,
   createPRNG,
@@ -1616,6 +1617,62 @@ describe("G9 — harmonic rhythm awareness (bass)", () => {
       expect(n.time).toBeGreaterThanOrEqual(0);
       expect(n.pitch).toBeGreaterThanOrEqual(BASS_LOW);
       expect(n.pitch).toBeLessThanOrEqual(BASS_HIGH);
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════
+// G22 — Style-aware passing tone filtering
+// ═══════════════════════════════════════════════════
+
+describe("G22 — Passing tone dissonance filtering", () => {
+  const chords: ChordEvent[] = [
+    { root: "C", quality: "maj7", time: 0, duration: 2 },
+    { root: "G", quality: "7", time: 2, duration: 2 },
+    { root: "C", quality: "maj7", time: 4, duration: 2 },
+    { root: "F", quality: "maj7", time: 6, duration: 2 },
+  ];
+
+  it("high chromaticApproach allows more chromatic passing tones", () => {
+    let lowChromaticVariety = new Set<number>();
+    let highChromaticVariety = new Set<number>();
+    for (let s = 0; s < 50; s++) {
+      const lowNotes = generateWalkingBass(chords, {
+        tempo: 140, style: "swing", random: createPRNG(700 + s),
+        granular: { chromaticApproach: 10, registerWidth: 50, syncopation: 30, beatVariety: 40, bassRegister: 50 },
+      });
+      const highNotes = generateWalkingBass(chords, {
+        tempo: 140, style: "swing", random: createPRNG(700 + s),
+        granular: { chromaticApproach: 90, registerWidth: 50, syncopation: 30, beatVariety: 40, bassRegister: 50 },
+      });
+      for (const n of lowNotes) lowChromaticVariety.add(n.pitch % 12);
+      for (const n of highNotes) highChromaticVariety.add(n.pitch % 12);
+    }
+    // High chromatic approach should produce equal or more pitch variety
+    expect(highChromaticVariety.size).toBeGreaterThanOrEqual(lowChromaticVariety.size);
+  });
+});
+
+// ═══════════════════════════════════════════════════
+// G16 — Bass register planning
+// ═══════════════════════════════════════════════════
+
+describe("G16 — Bass register planning across form", () => {
+  it("bass register target pitch is present in phrase intents", () => {
+    const chords: ChordEvent[] = Array.from({ length: 16 }, (_, i) => ({
+      root: ["C", "F", "G", "Am"][i % 4].replace("m", ""),
+      quality: i % 4 === 3 ? "m7" : "maj7",
+      time: i * 2,
+      duration: 2,
+    }));
+    const result = generateEnsemble({
+      chordEvents: chords, style: "swing", tempo: 120, measures: 16, seed: 42,
+    });
+    // Every phrase intent should have a bassTargetPitch
+    for (const intent of result.context.phraseMap.intents) {
+      expect(intent.bassTargetPitch).toBeDefined();
+      expect(intent.bassTargetPitch).toBeGreaterThanOrEqual(33);
+      expect(intent.bassTargetPitch).toBeLessThanOrEqual(55);
     }
   });
 });

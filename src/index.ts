@@ -140,6 +140,13 @@ export { analyzeHarmony } from "./harmonicAnalysis";
 // ── Complexity Mapping ──
 export { resolveDrumGranular, resolvePianoGranular, resolveBassGranular } from "./complexityMapping";
 
+// ── Probability Mapping ──
+export {
+  anticipationProb, passingChordProb, brokenVoicingProb, graceNoteProb,
+  bassRootProb, enclosureProb, chromaticPassingProb,
+  kickHihatInterlockProb, fillProbScale, alignmentThreshold, airGapDropProb,
+} from "./probabilityMapping";
+
 // ── PRNG ──
 export { createPRNG, randomSeed, deriveStream, STREAM_DRUMS, STREAM_BASS, STREAM_PIANO } from "./prng";
 

@@ -7,6 +7,9 @@ import type { DrumGranular, PianoGranular, BassGranular } from "./types.js";
 
 // ── Mapping Curves ──
 // Each control has [min, default, max] — complexity 0→min, 50→default, 100→max
+// Uses smooth S-curve (hermite) instead of piecewise linear for perceptually
+// natural response: gentle at extremes (where fine control matters), steeper
+// in the mid-range (where users set it most).
 
 interface ControlCurve {
   min: number;
@@ -14,14 +17,22 @@ interface ControlCurve {
   max: number;
 }
 
+/** Hermite smoothstep: 3t^2 - 2t^3. Smooth endpoints, steeper mid-range. */
+function smoothstep(t: number): number {
+  const c = Math.max(0, Math.min(1, t));
+  return c * c * (3 - 2 * c);
+}
+
 function lerp(curve: ControlCurve, complexity: number): number {
   const t = Math.max(0, Math.min(100, complexity)) / 100;
   if (t <= 0.5) {
-    // 0→50 maps min→default
-    return curve.min + (curve.default - curve.min) * (t / 0.5);
+    // 0→50 maps min→default with S-curve
+    const s = smoothstep(t / 0.5);
+    return curve.min + (curve.default - curve.min) * s;
   }
-  // 50→100 maps default→max
-  return curve.default + (curve.max - curve.default) * ((t - 0.5) / 0.5);
+  // 50→100 maps default→max with S-curve
+  const s = smoothstep((t - 0.5) / 0.5);
+  return curve.default + (curve.max - curve.default) * s;
 }
 
 // ── Drum Curves ──
