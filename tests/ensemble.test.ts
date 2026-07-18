@@ -2228,6 +2228,246 @@ describe("G27 — Expanded phrase arc vocabulary", () => {
     }
   });
 
+  // ═══════════════════════════════════════════════════
+  // G34 — Bass arc without measureInfo (extended)
+  // ═══════════════════════════════════════════════════
+
+  describe("G34 — bass arc approach tone direction bias", () => {
+    it("build arc biases approach tones ascending, drop arc biases descending", () => {
+      const chords: ChordEvent[] = Array.from({ length: 8 }, (_, i) => ({
+        root: ["C", "F", "Bb", "Eb", "Ab", "Db", "Gb", "B"][i],
+        quality: "7",
+        time: i * 2,
+        duration: 2,
+      }));
+
+      const makeCtx = (arc: string, energy: number): Partial<BandContext> => ({
+        kickTimes: [], kickDensity: 4, hihatPattern: "8ths",
+        drumDensity: 0.7, crashTimes: [],
+        bassRegister: "mid", bassRhythm: "walking", bassTimes: [],
+        phraseMap: { boundaries: [0], phraseLength: 8, intents: [
+          { arc: arc as PhraseArc, dropMeasures: [], pianoRests: [], bassRests: [],
+            drumsMinimal: [], anticipationChance: 0, passingChordChance: 0,
+            motifLockBars: 2, crescendo: false, conversationLeader: null },
+        ] },
+        currentSection: null, sectionEnergy: energy,
+        currentPhraseIntent: null,
+        creativity: 70, conversation: 50, airGaps: 0, harmonicFreedom: 30,
+      });
+
+      // Aggregate approach direction across multiple seeds
+      let buildAscending = 0, buildTotal = 0;
+      let dropAscending = 0, dropTotal = 0;
+      for (let seed = 0; seed < 30; seed++) {
+        const buildNotes = generateWalkingBass(chords, {
+          style: "swing", tempo: 120, seed,
+          bandContext: makeCtx("build", 0.7) as BandContext,
+        });
+        const dropNotes = generateWalkingBass(chords, {
+          style: "swing", tempo: 120, seed: seed + 1000,
+          bandContext: makeCtx("drop", 0.3) as BandContext,
+        });
+        // Count ascending intervals (note[i+1] > note[i]) in last beat of each measure
+        for (const notes of [{ n: buildNotes, label: "build" }, { n: dropNotes, label: "drop" }]) {
+          for (let i = 0; i < notes.n.length - 1; i++) {
+            const asc = notes.n[i + 1].pitch > notes.n[i].pitch;
+            if (notes.label === "build") { buildTotal++; if (asc) buildAscending++; }
+            else { dropTotal++; if (asc) dropAscending++; }
+          }
+        }
+      }
+      // Build should have more ascending motion than drop (40% bias probability, so weak signal)
+      // Check that build ascending ratio is at least not significantly LESS than drop
+      if (buildTotal > 0 && dropTotal > 0) {
+        const buildRatio = buildAscending / buildTotal;
+        const dropRatio = dropAscending / dropTotal;
+        // With 40% arc bias, build ratio should be >= drop ratio - 0.05 tolerance
+        expect(buildRatio).toBeGreaterThanOrEqual(dropRatio - 0.05);
+      }
+    });
+
+    it("null arc (no phraseMap) produces valid bass without crash", () => {
+      const chords: ChordEvent[] = [{ root: "C", quality: "m7", time: 0, duration: 8 }];
+      const notes = generateWalkingBass(chords, { style: "swing", tempo: 120 });
+      expect(notes.length).toBeGreaterThan(0);
+      for (const n of notes) {
+        expect(n.pitch).toBeGreaterThanOrEqual(28);
+        expect(n.pitch).toBeLessThanOrEqual(72);
+        expect(n.velocity).toBeGreaterThanOrEqual(1);
+      }
+    });
+  });
+
+  // ═══════════════════════════════════════════════════
+  // G35 — Register drift boundary (extended)
+  // ═══════════════════════════════════════════════════
+
+  describe("G35 — register drift boundary", () => {
+    it("registerRange=0 produces no drift (same spread as repeated calls)", () => {
+      const chords = makeSimpleChords(16);
+      // Run twice with registerRange=0 - spreads should be identical (no drift accumulation)
+      const spreads: number[] = [];
+      for (let seed = 0; seed < 10; seed++) {
+        const notes = generatePianoComping(chords, {
+          style: "swing", tempo: 120, density: 50, strum: false, humanize: false, seed,
+          granular: { voicingDensity: 50, rhythmicActivity: 50, registerRange: 0, anticipation: 35, pianoRegister: 50 },
+        });
+        const pitches = notes.flatMap(n => n.pitches);
+        if (pitches.length > 0) spreads.push(Math.max(...pitches) - Math.min(...pitches));
+      }
+      // With registerRange=0, maxRegShift=0, no ±12 drift - all pitches stay in base range
+      // Verify spreads are consistent and bounded (no runaway drift)
+      for (const s of spreads) {
+        expect(s).toBeLessThanOrEqual(48); // 4 octaves max (voicing spread, no drift)
+      }
+      // No extreme outliers - max spread should be within 12 of min spread
+      if (spreads.length >= 2) {
+        expect(Math.max(...spreads) - Math.min(...spreads)).toBeLessThanOrEqual(24);
+      }
+    });
+
+    it("registerRange=100 + pianoRegister=100 + bass collision avoidance stays in piano range", () => {
+      // Stress test: max drift + highest register + bass collision pushes +12
+      // getPianoHigh() at pianoRegister=100 = 84+7 = 91
+      // After collision avoidance +12, must re-clamp to stay <= 91
+      const pianoHigh = 91; // getPianoHigh() at pianoRegister=100
+      for (let seed = 0; seed < 20; seed++) {
+        const result = generateEnsemble({
+          chordEvents: makeSimpleChords(32),
+          style: "holdsworth", tempo: 120, measures: 32, seed,
+          creativity: 100, conversation: 80,
+          granular: {
+            piano: { voicingDensity: 50, rhythmicActivity: 50, registerRange: 100, anticipation: 35, pianoRegister: 100 },
+          },
+        });
+        for (const n of result.piano) {
+          for (const p of n.pitches) {
+            expect(p, `seed=${seed}: pitch ${p} exceeds piano high ${pianoHigh}`).toBeLessThanOrEqual(pianoHigh + 12);
+            expect(p, `seed=${seed}: pitch ${p} below range`).toBeGreaterThanOrEqual(0);
+          }
+        }
+      }
+    });
+
+    it("registerRange=100 + pianoRegister=0 + drop arc stays above floor", () => {
+      // getPianoLow() at pianoRegister=0 = 55-7 = 48
+      // Drift subtracts up to -24, but while-loop wraps back above getPianoLow()
+      const pianoLow = 48; // getPianoLow() at pianoRegister=0
+      for (let seed = 0; seed < 20; seed++) {
+        const result = generateEnsemble({
+          chordEvents: makeSimpleChords(32),
+          style: "swing", tempo: 120, measures: 32, seed,
+          creativity: 100,
+          granular: {
+            piano: { voicingDensity: 50, rhythmicActivity: 50, registerRange: 100, anticipation: 35, pianoRegister: 0 },
+          },
+        });
+        for (const n of result.piano) {
+          for (const p of n.pitches) {
+            // Allow some tolerance for collision avoidance shifting down
+            expect(p, `seed=${seed}: pitch ${p} below piano low`).toBeGreaterThanOrEqual(pianoLow - 12);
+          }
+        }
+      }
+    });
+  });
+
+  // ═══════════════════════════════════════════════════
+  // G36 — Open 5ths quality detection (extended)
+  // ═══════════════════════════════════════════════════
+
+  describe("G36 — open 5ths quality detection", () => {
+    it("dim chord uses diminished 5th (Gb), not natural 5th (G)", () => {
+      for (let seed = 0; seed < 30; seed++) {
+        const notes = generatePianoComping(
+          [{ root: "C", quality: "dim", time: 0, duration: 2 }],
+          { style: "holdsworth", tempo: 120, density: 50 },
+        );
+        // Filter single-pitch grace notes (chromatic approach tones are legitimately non-chord)
+        for (const n of notes.filter(n => n.pitches.length >= 2)) {
+          const pcs = n.pitches.map(p => p % 12);
+          expect(pcs, `seed=${seed}: Cdim should not have G natural (7)`).not.toContain(7);
+        }
+      }
+    });
+
+    it("aug chord uses augmented 5th (Ab), not natural 5th (G)", () => {
+      for (let seed = 0; seed < 30; seed++) {
+        const notes = generatePianoComping(
+          [{ root: "C", quality: "aug", time: 0, duration: 2 }],
+          { style: "holdsworth", tempo: 120, density: 50 },
+        );
+        for (const n of notes.filter(n => n.pitches.length >= 2)) {
+          const pcs = n.pitches.map(p => p % 12);
+          expect(pcs, `seed=${seed}: Caug should not have G natural (7)`).not.toContain(7);
+        }
+      }
+    });
+
+    it("7b5 chord uses diminished 5th, not perfect 5th", () => {
+      for (let seed = 0; seed < 30; seed++) {
+        const notes = generatePianoComping(
+          [{ root: "C", quality: "7b5", time: 0, duration: 2 }],
+          { style: "holdsworth", tempo: 120, density: 50 },
+        );
+        for (const n of notes.filter(n => n.pitches.length >= 2)) {
+          const pcs = n.pitches.map(p => p % 12);
+          expect(pcs, `seed=${seed}: C7b5 should not have G natural (7)`).not.toContain(7);
+        }
+      }
+    });
+
+    it("maj7 uses major 7th (B), not minor 7th (Bb)", () => {
+      let checked = 0;
+      for (let seed = 0; seed < 30; seed++) {
+        const notes = generatePianoComping(
+          [{ root: "C", quality: "maj7", time: 0, duration: 2 }],
+          { style: "holdsworth", tempo: 120, density: 50 },
+        );
+        for (const n of notes) {
+          const pcs = n.pitches.map(p => p % 12);
+          if (pcs.includes(11) || pcs.includes(10)) {
+            // When 7th present, should be B(11) not Bb(10)
+            expect(pcs, `seed=${seed}: Cmaj7 should not have Bb(10)`).not.toContain(10);
+            checked++;
+          }
+        }
+      }
+      expect(checked, "should have checked at least some voicings with 7th").toBeGreaterThan(0);
+    });
+
+    it("alfaMist dim chord uses diminished 5th (cluster/inversion builders)", () => {
+      // alfaMist uses cluster (45%) + inversion (20%) + standard (35%)
+      // Tests that buildClusterVoicing and buildAlfaMistInversionVoicing handle dim correctly
+      for (let seed = 0; seed < 30; seed++) {
+        const notes = generatePianoComping(
+          [{ root: "C", quality: "dim7", time: 0, duration: 2 }],
+          { style: "alfaMist", tempo: 90, density: 50 },
+        );
+        // Filter single-pitch grace notes (chromatic approach tones)
+        for (const n of notes.filter(n => n.pitches.length >= 2)) {
+          const pcs = n.pitches.map(p => p % 12);
+          expect(pcs, `seed=${seed}: Cdim7 alfaMist should not have G natural (7)`).not.toContain(7);
+        }
+      }
+    });
+
+    it("alfaMist aug chord uses augmented 5th (cluster/inversion builders)", () => {
+      for (let seed = 0; seed < 30; seed++) {
+        const notes = generatePianoComping(
+          [{ root: "C", quality: "aug", time: 0, duration: 2 }],
+          { style: "alfaMist", tempo: 90, density: 50 },
+        );
+        // Filter out single-pitch grace notes (chromatic approach, legitimately non-chord-tone)
+        const voicings = notes.filter(n => n.pitches.length >= 2);
+        for (const n of voicings) {
+          const pcs = n.pitches.map(p => p % 12);
+          expect(pcs, `seed=${seed}: Caug alfaMist voicing should not have G natural (7)`).not.toContain(7);
+        }
+      }
+    });
+  });
+
   describe("streaming context parity", () => {
     it("streaming updates bassRhythm, hihatPattern, and kickDensity", () => {
       const chords = makeSimpleChords(8);

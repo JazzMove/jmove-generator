@@ -687,7 +687,13 @@ function buildClusterVoicing(root: string, quality: string): number[] {
   const q = quality.replace(/\/.*$/, "");
 
   let intervals: number[];
-  if (q.includes("sus")) {
+  if (q.includes("dim")) {
+    // Dim cluster: b3-b5-bb7 (span 6)
+    intervals = [3, 6, 9];
+  } else if (q.includes("aug")) {
+    // Aug cluster: 3-#5-maj7 (span 8)
+    intervals = [4, 8, 11];
+  } else if (q.includes("sus")) {
     // Sus cluster: 9-4-b7 (span 8)
     intervals = [2, 5, 10];
   } else if (q.startsWith("m") && !q.startsWith("maj")) {
@@ -733,19 +739,21 @@ function buildAlfaMistInversionVoicing(root: string, quality: string): number[] 
   const seventh = (q.includes("maj7") || q.includes("maj9")) ? 11
     : (q.includes("7") || q.includes("9") || q.includes("13")) ? 10
     : isMinor ? 10 : 11;
+  const fifth = (q.includes("b5") || q.includes("ø") || q.includes("dim")) ? 6
+    : (q.includes("#5") || q.includes("aug") || q.includes("alt")) ? 8 : 7;
 
   // Inversion shapes — warm, not angular. Span 9-14 semitones (tighter than Metheny's 12-17)
   const shapes: number[][] = [
     // 1st inversion + 9: 3rd on bottom, root above, 9th on top (span 11)
     [third, 12, 14],
     // 2nd inversion + 9: 5th on bottom, root-3rd close, 9th high (span 9)
-    [7, 12, 12 + third, 14],
+    [fifth, 12, 12 + third, 14],
     // Root + 7th + 9: warm open (span 14)
     [0, seventh, 14],
     // 1st inversion + 7 + 9: 3rd-7th-root-9 (span 11)
     [third, seventh, 12, 14],
     // Close root position + 9: root-3rd-5th-9 (span 14)
-    [0, third, 7, 14],
+    [0, third, fifth, 14],
   ];
 
   const intervals = shapes[Math.floor(_rng() * shapes.length)];
@@ -784,6 +792,12 @@ function buildOpenVoicing(root: string, quality: string): number[] {
   } else if (q.includes("m7b5") || q.includes("ø")) {
     // Half-dim open: b3-b5-b7 (locrian tones)
     intervals = [3, 6, 10];
+  } else if (q.includes("dim")) {
+    // Diminished open: b3-b5-bb7 (whole-half dim tones)
+    intervals = [3, 6, 9];
+  } else if (q.includes("aug") && !q.includes("aug7")) {
+    // Augmented open: 3-#5-maj7 (augmented triad + maj7)
+    intervals = [4, 8, 11];
   } else if (q.includes("m(maj7)")) {
     // Minor-major open: 9-5-maj7 (melodic minor tones)
     intervals = [2, 7, 11];
@@ -869,8 +883,8 @@ function buildQuartalVoicing(root: string, quality?: string): number[] {
   } else if (q.includes("7#9")) {
     // Dominant #9: b7-#9-3-5
     intervals = [10, 15, 16, 19];
-  } else if (q.includes("7#5") || q.includes("aug7")) {
-    // Augmented dom: b7-3-#5-9
+  } else if (q.includes("aug") || q.includes("7#5")) {
+    // Augmented: b7-3-#5-9 (aug triad / aug dom)
     intervals = [10, 16, 20, 26];
   } else if (q.includes("7b5")) {
     // Lydian dom / tritone sub: b7-3-b5-9
@@ -1736,7 +1750,10 @@ export function generatePianoComping(
       if (bandCtx?.bassRegister === "high") {
         const lowestPitch = Math.min(...finalPitches);
         if (lowestPitch < 62) {
-          finalPitches = finalPitches.map(p => p + 12);
+          finalPitches = finalPitches.map(p => {
+            const shifted = p + 12;
+            return shifted > getPianoHigh() ? p : shifted;
+          });
         }
       } else if (bandCtx?.bassRegister === "mid") {
         const lowestPitch = Math.min(...finalPitches);

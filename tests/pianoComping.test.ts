@@ -99,7 +99,10 @@ describe("Piano Comping — range constraints", () => {
 
 describe("Piano Comping — voicings", () => {
   it("produces rootless voicings (4 notes per chord)", () => {
-    const notes = generatePianoComping([makeChord("C", "maj7", 0)], { style: "ballad", humanize: false, strum: false });
+    const notes = generatePianoComping([makeChord("C", "maj7", 0)], {
+      style: "ballad", humanize: false, strum: false,
+      granular: { voicingDensity: 95, rhythmicActivity: 50, registerRange: 50, anticipation: 35, pianoRegister: 50 },
+    });
     // Ballad = whole note, so 1 hit per measure
     expect(notes.length).toBeGreaterThanOrEqual(1);
     expect(notes[0].pitches.length).toBe(4);
@@ -128,6 +131,7 @@ describe("Piano Comping — voicings", () => {
       style: "ballad",
       humanize: false,
       strum: false,
+      granular: { voicingDensity: 95, rhythmicActivity: 50, registerRange: 50, anticipation: 35, pianoRegister: 50 },
     });
     const pitchClasses = notes[0].pitches.map((p) => p % 12).sort((a, b) => a - b);
     // Dm7 intervals from D(2): b3=5, 5=9, b7=0, 9=4

@@ -2477,3 +2477,155 @@ describe("G14 — Brush drumming", () => {
     expect(brushHits.length).toBe(0);
   });
 });
+
+// ═══════════════════════════════════════════════════
+// G32 — Per-measure drum intent lookup
+// ═══════════════════════════════════════════════════
+
+describe("G32 — per-measure drum intent lookup", () => {
+  const makeIntent = (arc: string, feel = "normal" as const) => ({
+    arc: arc as "sustain" | "build" | "climax" | "release" | "drop",
+    feel, dropMeasures: [] as number[], pianoRests: [] as number[],
+    bassRests: [] as number[], drumsMinimal: [] as number[],
+    anticipationChance: 0, passingChordChance: 0, motifLockBars: 4,
+    crescendo: false, conversationLeader: null,
+  });
+
+  const baseBandCtx = {
+    kickTimes: [] as number[], kickDensity: 2, hihatPattern: "quarters" as const,
+    drumDensity: 0.5, crashTimes: [] as number[],
+    bassRegister: "mid" as const, bassRhythm: "walking" as const,
+    bassTimes: [] as number[], currentSection: null, sectionEnergy: 0.7,
+    creativity: 50, conversation: 50, airGaps: 20, harmonicFreedom: 25, harmonicRhythm: 1,
+  };
+
+  it("empty intents array produces valid output (null fallback)", () => {
+    const hits = generateDrumPattern({
+      style: "swing", tempo: 140, measures: 4, humanize: false,
+      random: createPRNG(42),
+      bandContext: {
+        ...baseBandCtx,
+        phraseMap: { boundaries: [0], phraseLength: 4, intents: [] },
+        currentPhraseIntent: null,
+      },
+    });
+    expect(hits.length).toBeGreaterThan(0);
+    for (const h of hits) {
+      expect(h.time).toBeGreaterThanOrEqual(0);
+      expect(h.velocity).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it("multi-phrase boundaries route correct intent per measure", () => {
+    // Phrase 0-3: sustain (normal), Phrase 4-7: climax (louder)
+    const hits = generateDrumPattern({
+      style: "swing", tempo: 120, measures: 8, humanize: false,
+      random: createPRNG(42),
+      bandContext: {
+        ...baseBandCtx,
+        phraseMap: {
+          boundaries: [0, 4], phraseLength: 4,
+          intents: [makeIntent("sustain"), makeIntent("climax")],
+        },
+        currentPhraseIntent: makeIntent("sustain"),
+      },
+    });
+    expect(hits.length).toBeGreaterThan(0);
+    // Climax measures (4-7) should have higher average velocity than sustain (0-3)
+    const measureDur = 4 * 60 / 120;
+    const sustainHits = hits.filter(h => h.time < 4 * measureDur);
+    const climaxHits = hits.filter(h => h.time >= 4 * measureDur);
+    if (sustainHits.length > 0 && climaxHits.length > 0) {
+      const avgSustain = sustainHits.reduce((s, h) => s + h.velocity, 0) / sustainHits.length;
+      const avgClimax = climaxHits.reduce((s, h) => s + h.velocity, 0) / climaxHits.length;
+      expect(avgClimax).toBeGreaterThanOrEqual(avgSustain);
+    }
+  });
+
+  it("measure before first boundary uses null intent gracefully", () => {
+    // boundary starts at 2 - measures 0,1 have no matching intent
+    const hits = generateDrumPattern({
+      style: "swing", tempo: 140, measures: 4, humanize: false,
+      random: createPRNG(42),
+      bandContext: {
+        ...baseBandCtx,
+        phraseMap: {
+          boundaries: [2], phraseLength: 4,
+          intents: [makeIntent("climax")],
+        },
+        currentPhraseIntent: null,
+      },
+    });
+    expect(hits.length).toBeGreaterThan(0);
+    for (const h of hits) {
+      expect(h.velocity).toBeGreaterThanOrEqual(1);
+      expect(h.velocity).toBeLessThanOrEqual(127);
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════
+// G33 — Ghost threshold cap enforcement
+// ═══════════════════════════════════════════════════
+
+describe("G33 — ghost threshold cap at 40", () => {
+  const makeIntent = (arc: string) => ({
+    arc: arc as "drop" | "release",
+    feel: "normal" as const, dropMeasures: [] as number[], pianoRests: [] as number[],
+    bassRests: [] as number[], drumsMinimal: [] as number[],
+    anticipationChance: 0, passingChordChance: 0, motifLockBars: 4,
+    crescendo: false, conversationLeader: null,
+  });
+
+  it("drop + low energy at density=42 preserves hits (cap at 40 < 42, uncapped ~46 > 42)", () => {
+    // Without cap: 15 + (1-0.2)*20 + arcGhostAdj(~5) + 0 + 0 = ~36-46 (above 42)
+    // With cap: min(40, ~46) = 40, so density=42 >= 40 preserves ghost hits
+    // Compare density=42 output under drop (capped threshold) vs sustain (naturally low threshold)
+    const makeCtx = (arc: string, energy: number) => ({
+      kickTimes: [] as number[], kickDensity: 2, hihatPattern: "quarters" as const,
+      drumDensity: 0.5, crashTimes: [] as number[],
+      bassRegister: "mid" as const, bassRhythm: "walking" as const, bassTimes: [] as number[],
+      phraseMap: { boundaries: [0], phraseLength: 4, intents: [makeIntent(arc)] },
+      currentSection: null, sectionEnergy: energy,
+      currentPhraseIntent: makeIntent(arc),
+      creativity: 50, conversation: 50, airGaps: 20, harmonicFreedom: 25, harmonicRhythm: 1,
+    });
+    let dropTotal = 0;
+    let sustainTotal = 0;
+    for (let seed = 0; seed < 20; seed++) {
+      const dropHits = generateDrumPattern({
+        style: "swing", tempo: 140, measures: 8, density: 42, humanize: false,
+        random: createPRNG(seed),
+        bandContext: makeCtx("drop", 0.2),
+      });
+      const sustainHits = generateDrumPattern({
+        style: "swing", tempo: 140, measures: 8, density: 42, humanize: false,
+        random: createPRNG(seed),
+        bandContext: makeCtx("sustain", 0.8),
+      });
+      dropTotal += dropHits.length;
+      sustainTotal += sustainHits.length;
+    }
+    expect(dropTotal).toBeGreaterThan(0);
+    expect(sustainTotal).toBeGreaterThan(0);
+    // With cap, drop hit count should be close to sustain (both preserve ghost hits)
+    // Without cap, drop would strip more aggressively at threshold 46 > density 42
+    expect(dropTotal / sustainTotal).toBeGreaterThan(0.7);
+  });
+
+  it("ghost threshold floor at 0 without bandContext (high ghostDensity)", () => {
+    // ghostDensity=100 → ghostShift = (100-40)*-0.4 = -24
+    // Without bandCtx: max(0, 15 + (-24) + 0) = max(0, -9) = 0
+    // At density=0, threshold=0 means ghosts filtered (density < threshold is false since 0 < 0 is false)
+    const hits = generateDrumPattern({
+      style: "swing", tempo: 120, measures: 4, density: 0, humanize: false,
+      random: createPRNG(42),
+      granular: { tomFrequency: 40, fillIntensity: 50, rideWash: 50, ghostDensity: 100, cymbalColor: 30 },
+    });
+    // Should produce valid output (threshold floored at 0, not negative)
+    expect(hits.length).toBeGreaterThan(0);
+    for (const h of hits) {
+      expect(h.velocity).toBeGreaterThanOrEqual(1);
+    }
+  });
+});

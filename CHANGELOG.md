@@ -4,6 +4,17 @@ All notable changes to `@jmove/generator` will be documented in this file.
 
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [1.3.6] - 2026-07-18
+
+### Fixed
+
+- **Bass collision avoidance overflow** - "high" bass register collision shift (+12) now re-clamps to getPianoHigh() instead of silently exceeding piano range. "mid" path already had guard, "high" was missing it
+- **dim/aug voicing quality** - `buildOpenVoicing`, `buildClusterVoicing`, `buildAlfaMistInversionVoicing`, and `buildQuartalVoicing` now use quality-aware 5th interval for dim (b5) and aug (#5) chords. Previously fell through to natural 5th default
+
+### Added
+
+- 16 new tests (G32-G36): per-measure drum intent lookup (empty intents, multi-phrase boundaries, pre-boundary measure), ghost threshold cap at 40 (boundary density verification), bass arc approach tone direction bias and null arc fallback, register drift stress tests (registerRange=0, registerRange=100 + pianoRegister extremes + collision avoidance), open 5ths quality detection for dim/aug/7b5/maj7 across holdsworth and alfaMist styles
+
 ## [1.3.5] - 2026-07-18
 
 ### Fixed
