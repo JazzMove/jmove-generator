@@ -562,17 +562,17 @@ describe("Piano Comping — chord anticipation", () => {
 describe("Piano Comping — shell voicings", () => {
   it("low density produces mostly 2-note shell voicings", () => {
     const notes = generatePianoComping(iiVI(), {
-      style: "swing", humanize: false, density: 20, strum: false,
+      style: "swing", humanize: false, density: 20, strum: false, random: createPRNG(8001),
       granular: { voicingDensity: 10, rhythmicActivity: 50, registerRange: 50, anticipation: 35, pianoRegister: 50 },
     });
     const shells = notes.filter(n => n.pitches.length === 2);
-    // At voicingDensity=10, shellChance=0.7 - most should be shells (PRNG variance across Node versions)
+    // At voicingDensity=10, shellChance=0.7 - most should be shells
     expect(shells.length / notes.length).toBeGreaterThanOrEqual(0.2);
   });
 
   it("high density produces mostly full voicings (3-4 notes)", () => {
     const notes = generatePianoComping(iiVI(), {
-      style: "ballad", humanize: false, density: 80, strum: false,
+      style: "ballad", humanize: false, density: 80, strum: false, random: createPRNG(8002),
       granular: { voicingDensity: 90, rhythmicActivity: 50, registerRange: 50, anticipation: 35, pianoRegister: 50 },
     });
     const full = notes.filter(n => n.pitches.length >= 3);

@@ -223,7 +223,7 @@ describe("GENERATOR_VERSION", () => {
   it("exports a semver string matching package.json", () => {
     // __GENERATOR_VERSION__ injected by tsup (build) and vitest (test) from package.json
     expect(GENERATOR_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
-    expect(GENERATOR_VERSION).toBe("1.3.7");
+    expect(GENERATOR_VERSION).toBe("1.4.0");
   });
 });
 

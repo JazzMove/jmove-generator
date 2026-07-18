@@ -4,6 +4,17 @@ All notable changes to `@jmove/generator` will be documented in this file.
 
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [1.4.0] - 2026-07-18
+
+### Changed
+
+- **Module architecture split** - three monolith generator files split into 10 focused modules with zero behavioral change. All 1674 tests pass after each phase
+  - `drumPatterns.ts` (3285 lines) split into `drumPatternData.ts` (2365 lines, pure data), `drumStochastic.ts` (188 lines, stochastic comping/humanization), and reduced `drumPatterns.ts` (811 lines, orchestration facade)
+  - `pianoComping.ts` (1841 lines) split into `pianoVoicingData.ts` (523 lines, voicing/rhythm constants), `pianoVoicings.ts` (613 lines, voicing engine with init/restore state), and reduced `pianoComping.ts` (754 lines, rhythm/orchestration)
+  - `walkingBass.ts` (2137 lines) split into `bassHelpers.ts` (391 lines, state/utilities/pattern data), `bassStyles.ts` (1124 lines, 17 style generators), `bassOddMeters.ts` (281 lines, 7 odd-meter generators + dispatcher), and reduced `walkingBass.ts` (360 lines, orchestrator)
+- **ES module live bindings** for cross-module state - voicing and bass engines use init/restore pattern to share PRNG and register state without circular dependencies
+- **Re-export facade pattern** - original files re-export from new modules so external consumers (ensemble.ts, index.ts) require zero changes
+
 ## [1.3.7] - 2026-07-18
 
 ### Added
