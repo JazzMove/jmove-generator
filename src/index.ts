@@ -137,6 +137,20 @@ export { generateEnsemble, generateEnsembleMeasures } from "./ensemble";
 // ── Harmonic Analysis ──
 export { analyzeHarmony } from "./harmonicAnalysis";
 
+// ── Chord Quality ──
+export {
+  parseQuality,
+  getChordIntervals,
+  getQualityScale,
+  classifyQuality,
+  isDominant,
+  isMinor,
+  isDiminished,
+  isHalfDiminished,
+  SCALES as QUALITY_SCALES,
+} from "./chordQuality";
+export type { QualityFamily, ParsedQuality } from "./chordQuality";
+
 // ── Complexity Mapping ──
 export { resolveDrumGranular, resolvePianoGranular, resolveBassGranular } from "./complexityMapping";
 

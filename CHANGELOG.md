@@ -4,6 +4,21 @@ All notable changes to `@jmove/generator` will be documented in this file.
 
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [1.3.7] - 2026-07-18
+
+### Added
+
+- **Central chord quality resolution** - new `chordQuality.ts` module parses ANY chord quality string into normalized interval sets, classifies quality family (major/minor/dominant/diminished/halfDiminished/augmented/suspended/power), and selects musically appropriate scales. Handles all iReal Pro qualities plus arbitrary extensions/alterations algorithmically. Single source of truth replacing duplicated quality handling across walkingBass, pianoComping, and harmonicAnalysis
+- **Improved scale selection** - quality-aware scales for passing tones: half-diminished uses Locrian natural 2 (was Dorian), augmented uses whole-tone (was Ionian), altered dominants use altered scale (was Mixolydian), 7b9 uses half-whole diminished, m(maj7) uses melodic minor, #11 qualities use Lydian/Lydian dominant. Total: 11 scales up from 4
+- **iReal Pro symbol normalization** - chord quality parser handles raw iReal Pro symbols (o, o7, h, h7, ^7, +, -, ø) in addition to normalized internal format. Previously unrecognized symbols like "o7" fell through to wrong fallback (dominant instead of diminished)
+- 214 new tests: known quality round-trips (47), iReal Pro symbols (20), slash chord handling (5), scale selection (13), algorithmic parsing (11), predicate functions (57), backward compatibility (62), cache immutability (1)
+
+### Changed
+
+- **walkingBass.ts** - chord tone resolution and scale selection now use centralized `chordQuality` module. Removed 90-line CHORD_TONES constant and resolveQuality fallback. Identical output for all known qualities; better handling of unknown qualities
+- **harmonicAnalysis.ts** - quality classifier predicates (isDominant, isMinor, isDiminished, isHalfDiminished) now imported from `chordQuality` module. Removed 24-line duplicated implementation
+- **pianoComping.ts** - isDominantQuality imported from `chordQuality`. resolveVoicingQuality fallback uses family-based switch (was cascading if-chain). Now correctly resolves half-diminished to m7b5 voicing (was falling through to m7)
+
 ## [1.3.6] - 2026-07-18
 
 ### Fixed

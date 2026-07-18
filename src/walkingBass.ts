@@ -14,6 +14,7 @@
 import { tempoSwingMultiplier, dynamicMultiplier, instrumentSwingFactor } from "./swingUtils";
 import { getGrooveTemplate, applyGroove, rubatoOffset } from "./grooveTemplates";
 import { enclosureProb as enclosureProbFn } from "./probabilityMapping";
+import { getChordIntervals, getQualityScale } from "./chordQuality";
 import type { BassNote, BassGranular, WalkingBassOptions, ChordEvent, PhraseIntent, PhraseArc } from "./types";
 
 export type { BassNote, WalkingBassOptions, ChordEvent };
@@ -64,97 +65,6 @@ const ROOT_SEMITONES: Record<string, number> = {
   A: 9, "A#": 10, Bb: 10, B: 11, Cb: 11,
 };
 
-// Chord quality → intervals (semitones from root) for chord tones.
-// Covers all iReal Pro qualities + common variants.
-const CHORD_TONES: Record<string, number[]> = {
-  // Major family
-  "": [0, 4, 7],
-  "maj7": [0, 4, 7, 11],
-  "maj9": [0, 4, 7, 11],
-  "maj13": [0, 4, 7, 11],
-  "maj7#11": [0, 4, 7, 11],
-  "maj7#5": [0, 4, 8, 11],
-  "6": [0, 4, 7, 9],
-  "69": [0, 4, 7, 9],
-  "6/9": [0, 4, 7, 9],
-  "add9": [0, 4, 7],
-  "5": [0, 7],
-
-  // Minor family
-  "m": [0, 3, 7],
-  "m7": [0, 3, 7, 10],
-  "m9": [0, 3, 7, 10],
-  "m6": [0, 3, 7, 9],
-  "m6/9": [0, 3, 7, 9],
-  "m(maj7)": [0, 3, 7, 11],
-  "m11": [0, 3, 7, 10],
-
-  // Dominant family
-  "7": [0, 4, 7, 10],
-  "9": [0, 4, 7, 10],
-  "13": [0, 4, 7, 10],
-  "7b9": [0, 4, 7, 10],
-  "7#9": [0, 4, 7, 10],
-  "7b5": [0, 4, 6, 10],
-  "7#5": [0, 4, 8, 10],
-  "7alt": [0, 4, 8, 10],
-  "7b13": [0, 4, 7, 10],
-  "7#11": [0, 4, 7, 10],
-  "7b9b13": [0, 4, 7, 10],
-  "7#9b13": [0, 4, 7, 10],
-  "7b9#11": [0, 4, 7, 10],
-  "7#9#11": [0, 4, 7, 10],
-  "7#9b5": [0, 4, 6, 10],
-  "7b9b5": [0, 4, 6, 10],
-  "aug7": [0, 4, 8, 10],
-
-  // Suspended family (NO major 3rd!)
-  "7sus": [0, 5, 7, 10],
-  "7sus4": [0, 5, 7, 10],
-  "9sus4": [0, 5, 7, 10],
-  "13sus4": [0, 5, 7, 10],
-  "sus4": [0, 5, 7],
-  "sus2": [0, 2, 7],
-
-  // Diminished / half-dim
-  "dim": [0, 3, 6],
-  "dim7": [0, 3, 6, 9],
-  "m7b5": [0, 3, 6, 10],
-
-  // Augmented
-  "aug": [0, 4, 8],
-};
-
-/** Resolve unknown quality string to closest match. */
-function resolveQuality(q: string): number[] {
-  // Direct match
-  if (CHORD_TONES[q]) return CHORD_TONES[q];
-
-  // Strip slash bass
-  const slashIdx = q.indexOf("/");
-  const base = slashIdx >= 0 ? q.slice(0, slashIdx) : q;
-  if (CHORD_TONES[base]) return CHORD_TONES[base];
-
-  // Smart fallback: parse quality string for base type
-  if (base.includes("dim")) return CHORD_TONES["dim7"];
-  if (base.includes("aug")) return CHORD_TONES["aug"];
-  if (base.includes("sus")) return CHORD_TONES["7sus"]; // NEVER use major 3rd for sus!
-  if (base.startsWith("m") && !base.startsWith("maj")) {
-    return base.includes("7") ? CHORD_TONES["m7"] : CHORD_TONES["m"];
-  }
-  if (base.includes("7") || base.includes("9") || base.includes("13")) {
-    return base.includes("maj") ? CHORD_TONES["maj7"] : CHORD_TONES["7"];
-  }
-
-  // Absolute fallback: major triad (only for truly unknown like "5", "add9")
-  return CHORD_TONES[""] ?? [0, 4, 7];
-}
-
-// Scale tones for passing notes
-const MAJOR_SCALE = [0, 2, 4, 5, 7, 9, 11];       // ionian
-const MINOR_SCALE = [0, 2, 3, 5, 7, 9, 10];       // dorian (jazz standard for m7)
-const DOMINANT_SCALE = [0, 2, 4, 5, 7, 9, 10];    // mixolydian
-
 // ── Helpers ──
 
 function rootToMidi(root: string): number {
@@ -170,7 +80,7 @@ function rootToMidi(root: string): number {
 /** Get chord tones in MIDI range for given root + quality. */
 function getChordTones(root: string, quality: string): number[] {
   const rootMidi = rootToMidi(root);
-  const intervals = resolveQuality(quality);
+  const intervals = getChordIntervals(quality);
 
   const tones: number[] = [];
   for (const interval of intervals) {
@@ -186,20 +96,7 @@ function getChordTones(root: string, quality: string): number[] {
 /** Get scale tones spanning the FULL bass range (all octaves). */
 function getScaleTones(root: string, quality: string): number[] {
   const rootPC = ROOT_SEMITONES[root] ?? 0;
-  const q = quality.replace(/\/.*$/, ""); // strip slash
-
-  let scale: number[];
-  if (q.includes("dim")) {
-    scale = [0, 2, 3, 5, 6, 8, 9, 11]; // diminished scale
-  } else if (q.includes("sus")) {
-    scale = DOMINANT_SCALE; // mixolydian (no 3rd emphasis)
-  } else if (q.startsWith("m") && !q.startsWith("maj")) {
-    scale = MINOR_SCALE;
-  } else if (q === "7" || q === "9" || q === "13" || q.startsWith("7") || q === "aug7") {
-    scale = DOMINANT_SCALE;
-  } else {
-    scale = MAJOR_SCALE;
-  }
+  const scale = getQualityScale(quality);
 
   // Generate ALL scale tones across the full bass range
   const tones: number[] = [];

@@ -12,6 +12,7 @@
 
 import { tempoSwingMultiplier, dynamicMultiplier, instrumentSwingFactor } from "./swingUtils";
 import { getGrooveTemplate, applyGroove, rubatoOffset } from "./grooveTemplates";
+import { isDominant as isDominantQuality, classifyQuality } from "./chordQuality";
 import type { CompNote, PianoStyle, PianoCompingOptions, ChordEvent, PianoGranular } from "./types";
 
 export type { CompNote, PianoStyle, PianoCompingOptions, ChordEvent };
@@ -661,23 +662,26 @@ function voiceLeadingDistance(a: number[], b: number[]): number {
 
 /** Resolve unknown quality to closest VOICINGS key. */
 function resolveVoicingQuality(q: string): [VoicingTemplate, VoicingTemplate] {
-  // Direct match
+  // Direct match (covers all common iReal Pro qualities)
   if (VOICINGS[q]) return VOICINGS[q];
 
-  // Smart fallback: parse quality for base type
-  if (q.includes("dim")) return VOICINGS["dim7"];
-  if (q.includes("aug")) return VOICINGS["aug"];
-  if (q.includes("sus")) return VOICINGS["7sus"]; // NEVER maj3 for sus
-  if (q.startsWith("m") && !q.startsWith("maj")) {
-    if (q.includes("7") || q.includes("9") || q.includes("11")) return VOICINGS["m7"];
-    return VOICINGS["m"];
+  // Family-based fallback via centralized quality classification
+  const family = classifyQuality(q);
+  switch (family) {
+    case "diminished":    return VOICINGS["dim7"];
+    case "halfDiminished": return VOICINGS["m7b5"];
+    case "augmented":     return VOICINGS["aug"];
+    case "suspended":     return VOICINGS["7sus"];
+    case "minor":
+      return (q.includes("7") || q.includes("9") || q.includes("11") || q.includes("13"))
+        ? VOICINGS["m7"] : VOICINGS["m"];
+    case "major":
+      return (q.includes("7") || q.includes("9") || q.includes("13"))
+        ? VOICINGS["maj7"] : VOICINGS[""];
+    case "power":         return VOICINGS[""];
+    case "dominant":
+    default:              return VOICINGS["7"];
   }
-  if (q.startsWith("maj")) return VOICINGS["maj7"];
-  if (q.includes("7") || q.includes("9") || q.includes("13")) return VOICINGS["7"];
-  if (q === "69") return VOICINGS["6"];
-  if (q === "5" || q === "add9") return VOICINGS[""];
-
-  return VOICINGS["7"]; // dominant is safest generic fallback for jazz
 }
 
 /** Build cluster voicing (tight groupings, span 5-8 semitones) for Alfa Mist Rhodes.
@@ -1027,16 +1031,6 @@ function buildRootPositionVoicing(root: string, quality: string): number[] {
     return p;
   });
   return [...new Set(clamped)].sort((a, b) => a - b);
-}
-
-/** Detect dominant chord quality (not minor, not major 7th, not dim/sus). */
-function isDominantQuality(q: string): boolean {
-  const c = q.replace(/\/.*$/, "");
-  if (c.startsWith("m") && !c.startsWith("maj")) return false;
-  if (c.includes("maj")) return false;
-  if (c.includes("dim")) return false;
-  if (c.includes("sus")) return false;
-  return c.includes("7") || c.includes("9") || c.includes("13");
 }
 
 /** Check if root motion is V-I (up a perfect 4th = 5 semitones). */

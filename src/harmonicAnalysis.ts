@@ -16,6 +16,12 @@ import type {
   HarmonicFunction,
   HarmonicAnalysisResult,
 } from "./types";
+import {
+  isDominant as isDominantQuality,
+  isMinor as isMinorQuality,
+  isDiminished as isDiminishedQuality,
+  isHalfDiminished as isHalfDiminishedQuality,
+} from "./chordQuality";
 
 // ── Pitch Class Utilities ──
 
@@ -35,33 +41,6 @@ const PC_TO_NAME: string[] = [
 
 function rootToPC(root: string): number {
   return NOTE_TO_PC[root] ?? 0;
-}
-
-// ── Chord Quality Classification ──
-
-function isDominantQuality(q: string): boolean {
-  const c = q.replace(/\/.*$/, "");
-  if (c.startsWith("m") && !c.startsWith("maj")) return false;
-  if (c.includes("maj")) return false;
-  if (c.includes("dim")) return false;
-  if (c.includes("sus")) return false;
-  return c.includes("7") || c.includes("9") || c.includes("13");
-}
-
-function isMinorQuality(q: string): boolean {
-  const c = q.replace(/\/.*$/, "");
-  if (c.startsWith("maj")) return false;
-  return c.startsWith("m") || c === "dim" || c === "dim7";
-}
-
-function isDiminishedQuality(q: string): boolean {
-  const c = q.replace(/\/.*$/, "");
-  return c === "dim" || c === "dim7" || c === "o" || c === "o7";
-}
-
-function isHalfDiminishedQuality(q: string): boolean {
-  const c = q.replace(/\/.*$/, "");
-  return c === "m7b5" || c === "h" || c === "h7" || c === "0" || c === "07";
 }
 
 // ── Key Detection ──
