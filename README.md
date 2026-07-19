@@ -33,8 +33,8 @@ Deep technical articles about how JMove and the generator work:
 - **Jam Session Generator** - random chord progressions across 17 jazz forms (blues, rhythm changes, AABA, modal, Coltrane matrix, and more)
 
 **Instruments**
-- **Walking Bass** - rule-based walking lines with dissonance filtering, chromatic approaches, pattern variety, 19 styles (swing, bossa, Latin tumbao, neo-soul, math rock, IDM), proper odd-meter groupings (11/8, 7/8, 5/4)
-- **Piano Comping** - Bill Evans rootless voicings (Type A/B), quartal, shell, cluster - all quality-aware with diatonic intervals per chord type, voice-led with rhythmic templates per style
+- **Walking Bass** - rule-based walking lines with dissonance filtering, chromatic approaches, tritone sub approach on V-I, pattern variety, 19 styles (swing, bossa, Latin tumbao, neo-soul, math rock, IDM), proper odd-meter groupings (11/8, 7/8, 5/4)
+- **Piano Comping** - Bill Evans rootless voicings (Type A/B), quartal, shell, cluster, upper structure triads, tritone sub reharmonization - all quality-aware with diatonic intervals per chord type, voice-led with rhythmic templates per style
 - **Drum Patterns** - 19 styles with humanization, ghost notes, groove templates based on GrooVAE research. Holdsworth preset features Chad Wackerman-inspired drumming: cross-stick interjections, ghost cascades, linear fills, 11/8-specific patterns
 
 **Intelligence**

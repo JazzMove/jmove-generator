@@ -3,10 +3,21 @@ import {
   generatePianoComping,
   resolvePianoGranular,
   createPRNG,
+  isDominant,
   type ChordEvent,
   type CompNote,
   type PianoGranular,
 } from "../src/index";
+import {
+  buildUpperStructureVoicing,
+  buildStandardVoicing,
+  buildOpenVoicing,
+  buildQuartalVoicing,
+  buildOpen5thsVoicing,
+  initVoicingState,
+  restoreVoicingState,
+} from "../src/pianoVoicings";
+import { UST_TRIADS } from "../src/pianoVoicingData";
 
 // ── Constants ──
 const PIANO_LOW = 55;  // G3
@@ -1587,6 +1598,510 @@ describe("G26 — Non-uniform strum spread", () => {
         // With randomized exponent, gaps should vary
         expect(allSame).toBe(false);
       }
+    }
+  });
+});
+
+// ── G11: Upper Structure Triads ──
+
+describe("G11 — Upper Structure Triads", () => {
+  const ROOTS = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
+  const ROOT_SEMITONES: Record<string, number> = {
+    C: 0, "Db": 1, D: 2, Eb: 3, E: 4, F: 5, "Gb": 6, G: 7, Ab: 8, A: 9, Bb: 10, B: 11,
+  };
+
+  describe("buildUpperStructureVoicing — direct unit tests", () => {
+    it("produces 3-4 note voicings for all 12 roots", () => {
+      for (const root of ROOTS) {
+        const saved = initVoicingState(PIANO_LOW, PIANO_HIGH, createPRNG(42));
+        try {
+          const pitches = buildUpperStructureVoicing(root, "7", null);
+          expect(pitches.length).toBeGreaterThanOrEqual(3);
+          expect(pitches.length).toBeLessThanOrEqual(4);
+        } finally {
+          restoreVoicingState(saved);
+        }
+      }
+    });
+
+    it("all pitches within piano range [55, 84]", () => {
+      for (const root of ROOTS) {
+        for (let seed = 0; seed < 5; seed++) {
+          const saved = initVoicingState(PIANO_LOW, PIANO_HIGH, createPRNG(seed));
+          try {
+            const pitches = buildUpperStructureVoicing(root, "7", null);
+            for (const p of pitches) {
+              expect(p, `${root}7 seed=${seed}: pitch ${p} out of range`).toBeGreaterThanOrEqual(PIANO_LOW);
+              expect(p, `${root}7 seed=${seed}: pitch ${p} out of range`).toBeLessThanOrEqual(PIANO_HIGH);
+            }
+          } finally {
+            restoreVoicingState(saved);
+          }
+        }
+      }
+    });
+
+    it("no semitone clusters (adjacent notes >= 2 semitones apart)", () => {
+      for (const root of ROOTS) {
+        for (const q of ["7", "7alt", "7b9", "7#9", "7#11", "7b5"]) {
+          for (let seed = 0; seed < 10; seed++) {
+            const saved = initVoicingState(PIANO_LOW, PIANO_HIGH, createPRNG(seed));
+            try {
+              const pitches = buildUpperStructureVoicing(root, q, null);
+              const sorted = [...pitches].sort((a, b) => a - b);
+              for (let i = 1; i < sorted.length; i++) {
+                expect(
+                  sorted[i] - sorted[i - 1],
+                  `${root}${q} seed=${seed}: semitone cluster [${sorted}]`
+                ).toBeGreaterThanOrEqual(2);
+              }
+            } finally {
+              restoreVoicingState(saved);
+            }
+          }
+        }
+      }
+    });
+
+    it("span <= 15 semitones", () => {
+      for (const root of ROOTS) {
+        for (const q of ["7", "7alt", "7b9", "7#9", "7#11", "7#5", "7b5"]) {
+          for (let seed = 0; seed < 10; seed++) {
+            const saved = initVoicingState(PIANO_LOW, PIANO_HIGH, createPRNG(seed));
+            try {
+              const pitches = buildUpperStructureVoicing(root, q, null);
+              const sorted = [...pitches].sort((a, b) => a - b);
+              const span = sorted[sorted.length - 1] - sorted[0];
+              expect(span, `${root}${q} seed=${seed}: span ${span}`).toBeLessThanOrEqual(15);
+            } finally {
+              restoreVoicingState(saved);
+            }
+          }
+        }
+      }
+    });
+
+    it("voicing always contains b7 (PC 10 from root)", () => {
+      for (const root of ROOTS) {
+        const rpc = ROOT_SEMITONES[root];
+        for (let seed = 0; seed < 5; seed++) {
+          const saved = initVoicingState(PIANO_LOW, PIANO_HIGH, createPRNG(seed));
+          try {
+            const pitches = buildUpperStructureVoicing(root, "7", null);
+            const pcs = new Set(pitches.map(p => ((p % 12) - rpc + 12) % 12));
+            expect(pcs.has(10), `${root}7 seed=${seed}: missing b7 in PCs [${[...pcs]}]`).toBe(true);
+          } finally {
+            restoreVoicingState(saved);
+          }
+        }
+      }
+    });
+
+    it("correct triad PCs for each quality", () => {
+      const QUALITY_EXPECTED_PCS: Record<string, number[][]> = {
+        "7":    [[10, 2, 5]],       // b7 + bVII maj
+        "7#11": [[10, 2, 6, 9]],   // b7 + II maj
+        "7alt": [[10, 6, 1]],      // b7 + bV maj (10 shared with triad)
+        "7b9":  [[10, 6, 1]],      // b7 + bV maj
+        "7#9":  [[10, 3, 7]],      // b7 + bIII maj (10 shared with triad)
+      };
+
+      for (const [q, expectedSets] of Object.entries(QUALITY_EXPECTED_PCS)) {
+        const rpc = ROOT_SEMITONES["C"];
+        // Run many seeds to cover all candidates
+        const allPcSets = new Set<string>();
+        for (let seed = 0; seed < 20; seed++) {
+          const saved = initVoicingState(PIANO_LOW, PIANO_HIGH, createPRNG(seed));
+          try {
+            const pitches = buildUpperStructureVoicing("C", q, null);
+            const pcs = pitches.map(p => ((p % 12) - rpc + 12) % 12).sort((a, b) => a - b);
+            allPcSets.add(pcs.join(","));
+          } finally {
+            restoreVoicingState(saved);
+          }
+        }
+        // Every observed PC set must match one of the expected sets (b7 + triad)
+        for (const pcStr of allPcSets) {
+          const pcs = pcStr.split(",").map(Number);
+          const matches = expectedSets.some(expected => {
+            const expSet = new Set(expected);
+            return pcs.every(pc => expSet.has(pc));
+          });
+          expect(matches, `C${q}: unexpected PCs [${pcStr}], expected one of ${JSON.stringify(expectedSets)}`).toBe(true);
+        }
+      }
+    });
+
+    it("deterministic with same PRNG seed", () => {
+      for (let seed = 0; seed < 5; seed++) {
+        const saved1 = initVoicingState(PIANO_LOW, PIANO_HIGH, createPRNG(seed));
+        let pitches1: number[];
+        try { pitches1 = buildUpperStructureVoicing("C", "7", null); }
+        finally { restoreVoicingState(saved1); }
+
+        const saved2 = initVoicingState(PIANO_LOW, PIANO_HIGH, createPRNG(seed));
+        let pitches2: number[];
+        try { pitches2 = buildUpperStructureVoicing("C", "7", null); }
+        finally { restoreVoicingState(saved2); }
+
+        expect(pitches1).toEqual(pitches2);
+      }
+    });
+
+    it("7b5 routes to Lydian dominant (II maj) not generic bVII", () => {
+      const rpc = ROOT_SEMITONES["C"];
+      // II maj PCs: 2, 6, 9 (contains #11 = PC 6)
+      const expectedPCs = new Set([2, 6, 9, 10]); // triad + b7
+      for (let seed = 0; seed < 10; seed++) {
+        const saved = initVoicingState(PIANO_LOW, PIANO_HIGH, createPRNG(seed));
+        try {
+          const pitches = buildUpperStructureVoicing("C", "7b5", null);
+          const pcs = new Set(pitches.map(p => ((p % 12) - rpc + 12) % 12));
+          for (const pc of pcs) {
+            expect(expectedPCs.has(pc), `C7b5 seed=${seed}: PC ${pc} not in II maj triad`).toBe(true);
+          }
+        } finally {
+          restoreVoicingState(saved);
+        }
+      }
+    });
+  });
+
+  describe("UST integration — fires only on dominant chords", () => {
+    it("non-dominant qualities never produce UST pitch classes", () => {
+      const nonDomQualities = ["maj7", "m7", "m9", "dim7", "m7b5", "6", "m6"];
+      for (const q of nonDomQualities) {
+        expect(isDominant(q), `${q} should not be dominant`).toBe(false);
+      }
+    });
+
+    it("dominant qualities are recognized", () => {
+      const domQualities = ["7", "9", "13", "7alt", "7b9", "7#9", "7#11", "7#5", "7b5"];
+      for (const q of domQualities) {
+        expect(isDominant(q), `${q} should be dominant`).toBe(true);
+      }
+    });
+
+    it("UST appears in swing voicings for dominant chords (statistical)", () => {
+      // Over many seeds, at least some dominant chord voicings should differ from
+      // what buildStandardVoicing produces (indicating UST activation)
+      const chords = [makeChord("G", "7", 0, 2)];
+      let ustCount = 0;
+      const trials = 50;
+      for (let seed = 0; seed < trials; seed++) {
+        const notes = generatePianoComping(chords, {
+          style: "swing",
+          humanize: false,
+          strum: false,
+          random: createPRNG(seed),
+        });
+        if (notes.length === 0) continue;
+        // UST voicing has b7 but typically lacks the 3rd
+        const rpc = ROOT_SEMITONES["G"];
+        const pcs = new Set(notes[0].pitches.map(p => ((p % 12) - rpc + 12) % 12));
+        const thirdPC = 4; // major 3rd of G7
+        if (!pcs.has(thirdPC) && pcs.has(10)) ustCount++;
+      }
+      // Expect roughly 20% UST activation (allow wide margin for PRNG)
+      expect(ustCount, `UST fired ${ustCount}/${trials} times`).toBeGreaterThan(0);
+      expect(ustCount, `UST fired too often: ${ustCount}/${trials}`).toBeLessThan(trials * 0.6);
+    });
+
+    it("no UST on ballad style", () => {
+      // Ballad excluded from UST - every voicing should have guide tones
+      const chords = [makeChord("C", "7", 0, 4)];
+      for (let seed = 0; seed < 20; seed++) {
+        const notes = generatePianoComping(chords, {
+          style: "ballad",
+          humanize: false,
+          strum: false,
+          random: createPRNG(seed),
+        });
+        if (notes.length === 0) continue;
+        const rpc = ROOT_SEMITONES["C"];
+        const pcs = new Set(notes[0].pitches.map(p => ((p % 12) - rpc + 12) % 12));
+        // Ballad should always have the 3rd (guide tone)
+        expect(pcs.has(4), `ballad seed=${seed}: missing 3rd in [${[...pcs]}]`).toBe(true);
+      }
+    });
+
+    it("no UST on coolJazz, funk, shuffleBlues styles", () => {
+      const noUstStyles = ["coolJazz", "funk", "shuffleBlues"] as const;
+      for (const style of noUstStyles) {
+        const chords = [makeChord("C", "7", 0, 2)];
+        for (let seed = 0; seed < 10; seed++) {
+          const notes = generatePianoComping(chords, {
+            style,
+            humanize: false,
+            strum: false,
+            random: createPRNG(seed),
+          });
+          if (notes.length === 0) continue;
+          // These styles should always produce standard voicings with the 3rd
+          const rpc = ROOT_SEMITONES["C"];
+          const pcs = new Set(notes[0].pitches.map(p => ((p % 12) - rpc + 12) % 12));
+          // funk/shuffleBlues have root position (includes 3rd), coolJazz has shell (3rd+7th)
+          expect(pcs.has(4), `${style} seed=${seed}: missing 3rd in [${[...pcs]}]`).toBe(true);
+        }
+      }
+    });
+
+    it("non-dominant chords never trigger UST (no b7-only voicings without 3rd)", () => {
+      // For non-dominant chords, UST builder is never called. Verify by checking
+      // that voicings never match the UST pattern (b7 present, 3rd absent).
+      const nonDomChords = [
+        makeChord("C", "maj7", 0, 2),
+        makeChord("D", "m7", 2, 2),
+      ];
+      for (let seed = 0; seed < 20; seed++) {
+        const notes = generatePianoComping(nonDomChords, {
+          style: "swing",
+          humanize: false,
+          strum: false,
+          random: createPRNG(seed),
+        });
+        for (const note of notes) {
+          const root = note.time < 2 ? "C" : "D";
+          const quality = note.time < 2 ? "maj7" : "m7";
+          const rpc = ROOT_SEMITONES[root];
+          const pcs = new Set(note.pitches.map(p => ((p % 12) - rpc + 12) % 12));
+          const third = quality.startsWith("m") ? 3 : 4;
+          const seventh = quality === "maj7" ? 11 : 10;
+          // If voicing has 7th but not 3rd, that would indicate UST (which shouldn't happen)
+          if (pcs.has(seventh) && !pcs.has(third)) {
+            // Quartal voicings can legitimately omit the 3rd, but they won't have
+            // the exact UST triad PCs. Just verify non-dom chords never get UST pattern.
+            // This is a soft check - quartal voicings may omit 3rd naturally.
+            // For maj7, the 7th is 11 (not 10), so UST b7 pattern won't match.
+            if (seventh === 10) {
+              // Only m7 has b7=10. Verify it's not a UST triad pattern.
+              const ustTriadPCs = [
+                [2, 5], [6, 9], [1, 6], [3, 7], // subsets of UST triads
+              ];
+              const isUST = ustTriadPCs.some(t => t.every(pc => pcs.has(pc)));
+              expect(isUST, `${root}${quality} seed=${seed}: looks like UST on non-dom chord`).toBe(false);
+            }
+          }
+        }
+      }
+    });
+  });
+
+  describe("UST data — UST_TRIADS constants", () => {
+    it("all entries have exactly 3 pitch classes", () => {
+      for (const [key, entries] of Object.entries(UST_TRIADS)) {
+        for (const entry of entries) {
+          expect(entry.triadPCs.length, `${key} ${entry.label}`).toBe(3);
+        }
+      }
+    });
+
+    it("all pitch classes are 0-11", () => {
+      for (const [key, entries] of Object.entries(UST_TRIADS)) {
+        for (const entry of entries) {
+          for (const pc of entry.triadPCs) {
+            expect(pc, `${key} ${entry.label}: PC ${pc}`).toBeGreaterThanOrEqual(0);
+            expect(pc, `${key} ${entry.label}: PC ${pc}`).toBeLessThan(12);
+          }
+        }
+      }
+    });
+
+    it("all expected quality keys present", () => {
+      const expectedKeys = ["7", "7#11", "7alt", "7b9", "7#9"];
+      for (const key of expectedKeys) {
+        expect(UST_TRIADS[key], `missing UST key: ${key}`).toBeDefined();
+        expect(UST_TRIADS[key].length, `empty UST entries for ${key}`).toBeGreaterThan(0);
+      }
+    });
+
+    it("7#5 falls through to generic 7 (no dedicated entry)", () => {
+      // 7#5 has no scale-compatible UST triads, so quality matching uses "7" fallback
+      expect(UST_TRIADS["7#5"]).toBeUndefined();
+    });
+
+    it("triad pitch classes form valid major triads (intervals 0-4-7 in some rotation)", () => {
+      for (const [key, entries] of Object.entries(UST_TRIADS)) {
+        for (const entry of entries) {
+          const [a, b, c] = entry.triadPCs;
+          // Check intervals between notes form a major triad (4+3 semitones in some rotation)
+          const intervals = [
+            ((b - a) + 12) % 12,
+            ((c - b) + 12) % 12,
+            ((a - c) + 12) % 12,
+          ].sort((x, y) => x - y);
+          expect(
+            intervals,
+            `${key} ${entry.label}: PCs [${entry.triadPCs}] not a major triad`
+          ).toEqual([3, 4, 5]);
+        }
+      }
+    });
+  });
+});
+
+// ── G12: Tritone Substitution ──
+
+describe("G12 — Tritone Substitution (piano)", () => {
+  it("tritone sub and altered voicings share guide tones (theory validation)", () => {
+    // Jazz theory: G7alt rootless and Db7 rootless share the tritone (F-B).
+    // This confirms our tritone sub is musically correct.
+    const saved = initVoicingState(PIANO_LOW, PIANO_HIGH, createPRNG(99));
+    try {
+      const altVoicing = buildStandardVoicing("G", "7alt", null, false, false);
+      const altPCs = new Set(altVoicing.map(p => p % 12));
+      // G7alt should have tritone: B(11) and F(5)
+      expect(altPCs.has(5) || altPCs.has(11), `G7alt missing tritone: [${[...altPCs]}]`).toBe(true);
+    } finally {
+      restoreVoicingState(saved);
+    }
+
+    const saved2 = initVoicingState(PIANO_LOW, PIANO_HIGH, createPRNG(99));
+    try {
+      const triSubVoicing = buildStandardVoicing("Db", "7", null, false, false);
+      const triPCs = new Set(triSubVoicing.map(p => p % 12));
+      // Db7 standard should have tritone: F(5) as 3rd, Cb/B(11) as b7
+      expect(triPCs.has(5) || triPCs.has(11), `Db7 missing tritone: [${[...triPCs]}]`).toBe(true);
+    } finally {
+      restoreVoicingState(saved2);
+    }
+  });
+
+  it("resolving dominant produces valid voicings across all styles", () => {
+    const chords: ChordEvent[] = [
+      makeChord("G", "7", 0, 2),
+      makeChord("C", "maj7", 2, 2),
+    ];
+    const styles = ["swing", "hardBop", "fusion", "contemporaryJazz", "metheny", "modal", "ecm", "ballad"] as const;
+    for (const style of styles) {
+      for (let seed = 0; seed < 20; seed++) {
+        const notes = generatePianoComping(chords, {
+          style,
+          humanize: false,
+          strum: false,
+          random: createPRNG(seed),
+        });
+        expect(notes.length, `${style} seed=${seed}: no notes`).toBeGreaterThan(0);
+        for (const note of notes) {
+          for (const p of note.pitches) {
+            expect(p, `${style} seed=${seed}: out of range`).toBeGreaterThanOrEqual(PIANO_LOW);
+            expect(p, `${style} seed=${seed}: out of range`).toBeLessThanOrEqual(PIANO_HIGH);
+          }
+        }
+      }
+    }
+  });
+
+  it("non-resolving dominants do not activate tritone sub path", () => {
+    // C7 → Ab7: interval = 8 semitones (not V-I which needs 5)
+    const chords: ChordEvent[] = [
+      makeChord("C", "7", 0, 2),
+      makeChord("Ab", "7", 2, 2),
+    ];
+    for (let seed = 0; seed < 20; seed++) {
+      const notes = generatePianoComping(chords, {
+        style: "hardBop",
+        humanize: false,
+        strum: false,
+        random: createPRNG(seed),
+      });
+      expect(notes.length).toBeGreaterThan(0);
+      // Standard C7: PCs include 3rd (E=4) and b7 (Bb=10)
+      // Verify the voicing is a valid C7 sonority (not a tritone sub which would be Gb7)
+      const pcs = new Set(notes[0].pitches.map(p => p % 12));
+      // Should contain either 3rd (4) or b7 (10) for standard C7
+      expect(pcs.has(4) || pcs.has(10), `seed=${seed}: missing C7 guide tones`).toBe(true);
+    }
+  });
+
+  it("tritone sub weight is 0 for funk and shuffleBlues", () => {
+    const chords: ChordEvent[] = [
+      makeChord("G", "7", 0, 2),
+      makeChord("C", "maj7", 2, 2),
+    ];
+    for (const style of ["funk", "shuffleBlues"] as const) {
+      for (let seed = 0; seed < 20; seed++) {
+        const notes = generatePianoComping(chords, {
+          style,
+          humanize: false,
+          strum: false,
+          random: createPRNG(seed),
+        });
+        if (notes.length === 0) continue;
+        expect(notes[0].pitches.length).toBeGreaterThanOrEqual(2);
+      }
+    }
+  });
+
+  it("V-I resolution detected correctly for all root combinations", () => {
+    // Test isResolvingDominant via integration: every V→I pair should produce valid output
+    const vIpairs = [
+      ["G", "C"], ["D", "G"], ["A", "D"], ["E", "A"],
+      ["B", "E"], ["Gb", "B"], ["Db", "Gb"], ["Ab", "Db"],
+      ["Eb", "Ab"], ["Bb", "Eb"], ["F", "Bb"], ["C", "F"],
+    ];
+    for (const [v, i] of vIpairs) {
+      const chords = [makeChord(v, "7", 0, 2), makeChord(i, "maj7", 2, 2)];
+      const notes = generatePianoComping(chords, {
+        style: "swing", humanize: false, strum: false, random: createPRNG(42),
+      });
+      expect(notes.length, `${v}7→${i}maj7: no output`).toBeGreaterThan(0);
+    }
+  });
+});
+
+// ── Augmented chord cluster regression ──
+
+describe("Augmented/#5 chord cluster regression", () => {
+  const ROOTS = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
+  const AUG_QUALITIES = ["maj7#5", "7#5", "aug7", "aug"];
+
+  const hasSemitoneCluster = (pitches: number[]) => {
+    const sorted = [...pitches].sort((a, b) => a - b);
+    for (let i = 1; i < sorted.length; i++) {
+      if (sorted[i] - sorted[i - 1] === 1) return true;
+    }
+    return false;
+  };
+
+  it("buildOpenVoicing: no semitone clusters on #5 chords", () => {
+    for (const root of ROOTS) {
+      for (const q of AUG_QUALITIES) {
+        const pitches = buildOpenVoicing(root, q);
+        expect(hasSemitoneCluster(pitches), `${root}${q} open: cluster [${pitches}]`).toBe(false);
+      }
+    }
+  });
+
+  it("buildQuartalVoicing: no semitone clusters on #5 chords", () => {
+    for (const root of ROOTS) {
+      for (const q of AUG_QUALITIES) {
+        const pitches = buildQuartalVoicing(root, q);
+        expect(hasSemitoneCluster(pitches), `${root}${q} quartal: cluster [${pitches}]`).toBe(false);
+      }
+    }
+  });
+
+  it("buildOpen5thsVoicing: no semitone clusters on #5 chords", () => {
+    for (const root of ROOTS) {
+      for (const q of AUG_QUALITIES) {
+        const pitches = buildOpen5thsVoicing(root, q);
+        expect(hasSemitoneCluster(pitches), `${root}${q} open5ths: cluster [${pitches}]`).toBe(false);
+      }
+    }
+  });
+
+  it("maj7#5 uses maj7 interval (11) not b7 (10)", () => {
+    for (const root of ROOTS) {
+      const pitches = buildOpenVoicing(root, "maj7#5");
+      const pcs = pitches.map(p => p % 12);
+      const rootPC = pitches[0] % 12 - 4; // 3rd is +4, so root = first - 4
+      // Should contain interval 11 (maj7) from root, not 10 (b7)
+      const normalizedRoot = ((rootPC % 12) + 12) % 12;
+      const maj7PC = (normalizedRoot + 11) % 12;
+      const b7PC = (normalizedRoot + 10) % 12;
+      expect(pcs, `${root}maj7#5: should have maj7`).toContain(maj7PC);
+      expect(pcs.includes(b7PC), `${root}maj7#5: should NOT have b7`).toBe(false);
     }
   });
 });

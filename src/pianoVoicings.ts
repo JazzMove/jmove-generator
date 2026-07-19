@@ -1,6 +1,6 @@
 /** Piano voicing engine - builders, voice leading, and selection. Extracted from pianoComping.ts for G29. */
 
-import { VOICINGS, ROOT_SEMITONES, type VoicingTemplate } from "./pianoVoicingData";
+import { VOICINGS, ROOT_SEMITONES, UST_TRIADS, type VoicingTemplate } from "./pianoVoicingData";
 import { isDominant as isDominantQuality, classifyQuality } from "./chordQuality";
 
 // ── Voicing State ──
@@ -32,6 +32,20 @@ export function restoreVoicingState(saved: SavedVoicingState): void {
 
 export function rootMidi(root: string): number {
   return ROOT_SEMITONES[root] ?? 0;
+}
+
+/** Reverse lookup: MIDI pitch class → root name (for tritone sub). */
+const MIDI_TO_ROOT = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
+
+/** Tritone sub piano voicing probability per style. */
+function tritoneSubPianoWeight(style?: string): number {
+  const w: Record<string, number> = {
+    hardBop: 0.18, contemporaryJazz: 0.22, fusion: 0.15,
+    metheny: 0.12, alfaMist: 0.12, swing: 0.10, holdsworth: 0.10,
+    neoSoul: 0.08, ecm: 0.08, modal: 0.06, coolJazz: 0.05,
+    bossa: 0.04, latin: 0.04, ballad: 0.06,
+  };
+  return w[style ?? "swing"] ?? 0;
 }
 
 /** Build voicing pitches from root + template, placed in piano range.
@@ -235,6 +249,24 @@ export function buildAlfaMistInversionVoicing(root: string, quality: string): nu
   return [...new Set(clamped)].sort((a, b) => a - b);
 }
 
+/** Post-clamping cleanup: if individual note clamping created semitone clusters,
+ *  bump the higher note up an octave. If that's out of range, drop it. */
+function removeSemitoneClusters(pitches: number[]): number[] {
+  const sorted = [...pitches];
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i] - sorted[i - 1] === 1) {
+      const bumped = sorted[i] + 12;
+      if (bumped <= _voicingHigh) {
+        sorted[i] = bumped;
+      } else {
+        sorted.splice(i, 1);
+        i--;
+      }
+    }
+  }
+  return sorted.sort((a, b) => a - b);
+}
+
 /** Build open voicing (wide intervals, open 5ths) for Metheny — translates
  *  guitar open-string voicings to piano. Lydian shimmer: 3-note or 4-note
  *  spread across 12-17 semitones. Rootless — bass handles the root. */
@@ -276,6 +308,9 @@ export function buildOpenVoicing(root: string, quality: string): number[] {
   } else if (q.includes("7#9")) {
     // Dom #9: 3-b7-#9
     intervals = [4, 10, 15];
+  } else if (q.includes("maj") && q.includes("#5")) {
+    // Major augmented: 3-#5-maj7 (augmented triad + maj7)
+    intervals = [4, 8, 11];
   } else if (q.includes("7#5") || q.includes("aug7")) {
     // Augmented dom: 3-#5-b7
     intervals = [4, 8, 10];
@@ -298,7 +333,7 @@ export function buildOpenVoicing(root: string, quality: string): number[] {
       return pitches;
     }
   }
-  // Fallback: octave 4
+  // Fallback: octave 4 — clamping can create clusters, guard against them
   const base = 60 + rootPC;
   const clamped = intervals.map(i => {
     let p = base + i;
@@ -306,7 +341,7 @@ export function buildOpenVoicing(root: string, quality: string): number[] {
     while (p < _voicingLow) p += 12;
     return p;
   });
-  return [...new Set(clamped)].sort((a, b) => a - b);
+  return removeSemitoneClusters([...new Set(clamped)].sort((a, b) => a - b));
 }
 
 /** Build quartal voicing (stacked diatonic 4ths) for modal/ECM styles.
@@ -365,7 +400,7 @@ export function buildQuartalVoicing(root: string, quality?: string): number[] {
     while (p < _voicingLow) p += 12;
     return p;
   });
-  return [...new Set(clamped)].sort((a, b) => a - b);
+  return removeSemitoneClusters([...new Set(clamped)].sort((a, b) => a - b));
 }
 
 /** Open 5ths voicing — wide intervals, Holdsworth keyboard signature.
@@ -405,7 +440,7 @@ export function buildOpen5thsVoicing(root: string, quality: string): number[] {
     while (p < _voicingLow) p += 12;
     return p;
   });
-  return [...new Set(clamped)].sort((a, b) => a - b);
+  return removeSemitoneClusters([...new Set(clamped)].sort((a, b) => a - b));
 }
 
 /** Standard Evans rootless voicing with voice-leading optimization. */
@@ -489,6 +524,109 @@ export function buildRootPositionVoicing(root: string, quality: string): number[
   return [...new Set(clamped)].sort((a, b) => a - b);
 }
 
+/** Upper structure triad voicing - major triad superimposed over dominant b7.
+ *  Standard jazz technique: E/C7 = altered, D/C7 = Lydian dom, etc.
+ *  Layout: b7 anchor on bottom, triad placed above with voice-leading optimization. */
+export function buildUpperStructureVoicing(
+  root: string,
+  quality: string,
+  prevPitches: number[] | null,
+): number[] {
+  const r = rootMidi(root);
+  const q = quality.replace(/\/.*$/, "");
+
+  // Match quality to UST key in specificity order
+  let ustKey = "7";
+  if (q.includes("#11") || q.includes("lyd")) ustKey = "7#11";
+  else if (q.includes("alt")) ustKey = "7alt";
+  else if (q.includes("b9") && !q.includes("#9")) ustKey = "7b9";
+  else if (q.includes("#9")) ustKey = "7#9";
+  else if (q.includes("#5") || q.includes("aug")) ustKey = "7#5";
+  else if (q.includes("b5")) ustKey = "7#11"; // b5 = #11 enharmonic (Lydian dominant)
+
+  const ustCandidates = UST_TRIADS[ustKey] ?? UST_TRIADS["7"];
+  const entry = ustCandidates[Math.floor(_voicingRng() * ustCandidates.length)];
+  const [pcA, pcB, pcC] = entry.triadPCs;
+
+  // Build 3 inversions: ascending close-position per rotation
+  const b7 = 10;
+  const inversions: number[][] = [];
+  const rawPCs = [pcA, pcB, pcC];
+  for (let inv = 0; inv < 3; inv++) {
+    const rotated = [rawPCs[inv % 3], rawPCs[(inv + 1) % 3], rawPCs[(inv + 2) % 3]];
+    // Each triad note placed above the previous (ascending close-position)
+    const placed: number[] = [b7];
+    let floor = b7;
+    for (const pc of rotated) {
+      let note = pc;
+      while (note <= floor) note += 12;
+      placed.push(note);
+      floor = note;
+    }
+    inversions.push(placed);
+  }
+
+  // Filter: span <= 15 AND no semitone clusters (adjacent gap >= 2)
+  const valid = inversions.filter(inv => {
+    if (inv[inv.length - 1] - inv[0] > 15) return false;
+    for (let i = 1; i < inv.length; i++) {
+      if (inv[i] - inv[i - 1] < 2) return false;
+    }
+    return true;
+  });
+  if (valid.length === 0) {
+    return buildStandardVoicing(root, quality, prevPitches, false);
+  }
+
+  // Place each valid inversion in piano range and pick best voice-leading
+  const base = 60 + r;
+  const candidates: number[][] = [];
+  const isClean = (ps: number[]) => {
+    for (let i = 1; i < ps.length; i++) if (ps[i] - ps[i - 1] < 2) return false;
+    return ps[ps.length - 1] - ps[0] <= 15;
+  };
+  for (const inv of valid) {
+    let pitches = inv.map(i => {
+      let p = base + i;
+      while (p > _voicingHigh) p -= 12;
+      while (p < _voicingLow) p += 12;
+      return p;
+    });
+    pitches = [...new Set(pitches)].sort((a, b) => a - b);
+    // Octave clamping can introduce new clusters - recheck
+    if (!isClean(pitches)) continue;
+    candidates.push(pitches);
+
+    // Also try octave-shifted variant for better voice leading
+    if (prevPitches) {
+      const prevCenter = prevPitches.reduce((s, p) => s + p, 0) / prevPitches.length;
+      const currCenter = pitches.reduce((s, p) => s + p, 0) / pitches.length;
+      const shift = Math.round((prevCenter - currCenter) / 12) * 12;
+      if (shift !== 0) {
+        const shifted = pitches.map(p => p + shift);
+        if (shifted.every(p => p >= _voicingLow && p <= _voicingHigh) && isClean(shifted)) {
+          candidates.push(shifted);
+        }
+      }
+    }
+  }
+  if (candidates.length === 0) {
+    return buildStandardVoicing(root, quality, prevPitches, false);
+  }
+
+  // Pick candidate with best voice leading
+  if (prevPitches && candidates.length > 1) {
+    let bestDist = Infinity;
+    let best = candidates[0];
+    for (const c of candidates) {
+      const dist = voiceLeadingDistance(prevPitches, c);
+      if (dist < bestDist) { bestDist = dist; best = c; }
+    }
+    return best;
+  }
+  return candidates[0];
+}
+
 /** Check if root motion is V-I (up a perfect 4th = 5 semitones). */
 export function isResolvingDominant(currentRoot: string, nextRoot: string): boolean {
   return (rootMidi(nextRoot) - rootMidi(currentRoot) + 12) % 12 === 5;
@@ -524,38 +662,60 @@ export function pickVoicing(
     return options[chosen][1]();
   };
 
+  const isDom = isDominantQuality(quality);
+  const ustBuilder = () => buildUpperStructureVoicing(root, quality, prevPitches);
+
+  // Tritone substitution: on resolving dominants, build voicing from bII root instead.
+  // Creates chromatic voice leading and altered color. Style-gated.
+  if (resolving && isDom) {
+    const triWeight = tritoneSubPianoWeight(style);
+    if (triWeight > 0 && _voicingRng() < triWeight) {
+      const triRootMidi = (rootMidi(root) + 6) % 12;
+      const triRoot = MIDI_TO_ROOT[triRootMidi];
+      return buildStandardVoicing(triRoot, "7", prevPitches, shell, false);
+    }
+  }
+
   // Pat Metheny: 65% wide open voicings (guitar translation), 35% quartal (variety)
   if (style === "metheny") {
-    return pickWithVariety([
+    const opts: [number, () => number[]][] = [
       [65, () => buildOpenVoicing(root, quality)],
       [35, () => buildQuartalVoicing(root, quality)],
-    ]);
+    ];
+    if (isDom) opts.push([20, ustBuilder]);
+    return pickWithVariety(opts);
   }
 
   // Alfa Mist: 45% cluster (tight, dreamy), 20% warm inversions (1st/2nd inv + 9th),
   // 35% standard Evans (variety). Self-taught ear-based voicing approach.
   if (style === "alfaMist") {
-    return pickWithVariety([
+    const opts: [number, () => number[]][] = [
       [45, () => buildClusterVoicing(root, quality)],
       [20, () => buildAlfaMistInversionVoicing(root, quality)],
       [35, () => buildStandardVoicing(root, quality, prevPitches, shell)],
-    ]);
+    ];
+    if (isDom) opts.push([10, ustBuilder]);
+    return pickWithVariety(opts);
   }
 
   // Modal: 60% quartal (McCoy Tyner), 40% standard rootless (variety)
   if (style === "modal") {
-    return pickWithVariety([
+    const opts: [number, () => number[]][] = [
       [60, () => buildQuartalVoicing(root, quality)],
       [40, () => buildStandardVoicing(root, quality, prevPitches, shell)],
-    ]);
+    ];
+    if (isDom) opts.push([15, ustBuilder]);
+    return pickWithVariety(opts);
   }
 
   // ECM: 70% quartal (Nordic clarity), 30% standard
   if (style === "ecm") {
-    return pickWithVariety([
+    const opts: [number, () => number[]][] = [
       [70, () => buildQuartalVoicing(root, quality)],
       [30, () => buildStandardVoicing(root, quality, prevPitches, shell)],
-    ]);
+    ];
+    if (isDom) opts.push([10, ustBuilder]);
+    return pickWithVariety(opts);
   }
 
   // Cool Jazz: always shell voicings (2-note guide tones) for lighter texture
@@ -565,19 +725,23 @@ export function pickVoicing(
 
   // Holdsworth: 40% open 5ths (wide intervals), 35% quartal (4th stacks), 25% open voicings
   if (style === "holdsworth") {
-    return pickWithVariety([
+    const opts: [number, () => number[]][] = [
       [40, () => buildOpen5thsVoicing(root, quality)],
       [35, () => buildQuartalVoicing(root, quality)],
       [25, () => buildOpenVoicing(root, quality)],
-    ]);
+    ];
+    if (isDom) opts.push([15, ustBuilder]);
+    return pickWithVariety(opts);
   }
 
   // Fusion: 50% quartal (Herbie Hancock), 50% open voicings
   if (style === "fusion") {
-    return pickWithVariety([
+    const opts: [number, () => number[]][] = [
       [50, () => buildQuartalVoicing(root, quality)],
       [50, () => buildOpenVoicing(root, quality)],
-    ]);
+    ];
+    if (isDom) opts.push([25, ustBuilder]);
+    return pickWithVariety(opts);
   }
 
   // Neo-Soul: 55% cluster voicings (Glasper, higher register), 45% standard
@@ -601,6 +765,14 @@ export function pickVoicing(
     return shell ? toShellVoicing(voicing) : voicing;
   }
 
+  // Default (swing, hardBop, bossa, latin, ballad, etc.): Evans rootless
+  // On dominant chords, 20% chance of upper structure triad (not ballad - traditional guide tones)
+  if (isDom && style !== "ballad") {
+    return pickWithVariety([
+      [80, () => buildStandardVoicing(root, quality, prevPitches, shell, resolving)],
+      [20, ustBuilder],
+    ]);
+  }
   return buildStandardVoicing(root, quality, prevPitches, shell, resolving);
 }
 

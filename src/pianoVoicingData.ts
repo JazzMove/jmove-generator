@@ -226,6 +226,30 @@ export const VOICINGS: Record<string, [VoicingTemplate, VoicingTemplate]> = {
   ],
 };
 
+// ── Upper Structure Triads ──
+// Major triads superimposed over dominant 7th chords.
+// triadPCs: pitch classes (0-11) of the triad relative to the chord root.
+// The voicing builder adds b7(10) on bottom and places the triad above.
+
+export interface USTEntry {
+  triadPCs: [number, number, number];
+  label: string;
+}
+
+export const UST_TRIADS: Record<string, USTEntry[]> = {
+  // Lydian dominant: D/C -> C13#11 (all PCs in Lydian dom scale)
+  "7#11": [{ triadPCs: [2, 6, 9], label: "II maj" }],
+  // Altered: Gb/C -> C7b5b9 (all PCs in altered scale)
+  "7alt": [{ triadPCs: [6, 10, 1], label: "bV maj" }],
+  // Flat nine: Gb/C -> C7b5b9 (all PCs in half-whole dim)
+  "7b9": [{ triadPCs: [6, 10, 1], label: "bV maj" }],
+  // Sharp nine: Eb/C -> C7#9 (all PCs in half-whole dim)
+  "7#9": [{ triadPCs: [3, 7, 10], label: "bIII maj" }],
+  // 7#5: no scale-compatible UST triads; quality falls through to "7" key
+  // Generic dominant (7, 9, 13): Bb/C -> C9 (consonant, stays in Mixolydian)
+  "7": [{ triadPCs: [10, 2, 5], label: "bVII maj" }],
+};
+
 // ── Rhythm Templates ──
 // Each entry = [beatOffset, durationMultiplier] relative to measure start.
 // beatOffset in quarter-note beats. Duration multiplier × beat duration.

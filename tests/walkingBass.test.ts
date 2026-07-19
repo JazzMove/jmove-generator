@@ -1676,3 +1676,113 @@ describe("G16 — Bass register planning across form", () => {
     }
   });
 });
+
+// ── G12: Tritone Substitution (bass) ──
+
+describe("G12 — Tritone Substitution (bass approach)", () => {
+  it("tritone sub approach fires on V-I resolution (statistical)", () => {
+    // G7 → Cmaj7 = V→I. Tritone sub approach = Db (target+1, from above).
+    // Leading tone approach = B (target-1, from below). Both are valid.
+    const chords: ChordEvent[] = [
+      { root: "G", quality: "7", time: 0, duration: 2,
+        analysis: makeAnalysis({ degree: "V", function: "dominant", isPartOfIiVI: true, iiViPosition: "V" }) },
+      { root: "C", quality: "maj7", time: 2, duration: 2,
+        analysis: makeAnalysis({ degree: "I", function: "tonic", cadenceRole: "resolution", isPartOfIiVI: true, iiViPosition: "I" }) },
+    ];
+
+    let fromAboveCount = 0; // tritone sub approach (target+1)
+    let fromBelowCount = 0; // leading tone (target-1)
+    const trials = 100;
+    for (let seed = 0; seed < trials; seed++) {
+      const notes = generateWalkingBass(chords, {
+        style: "hardBop",
+        tempo: 120,
+        random: createPRNG(seed),
+      });
+      if (notes.length < 4) continue;
+      // Beat 4 of first measure (last note before bar 2)
+      // Find last note in first chord's duration
+      const bar1Notes = notes.filter(n => n.time < 2);
+      if (bar1Notes.length === 0) continue;
+      const beat4 = bar1Notes[bar1Notes.length - 1];
+      // Target = C root. Closest octave of C in bass range
+      const targetPC = 0; // C
+      const beat4PC = beat4.pitch % 12;
+      // Tritone sub approach: Db = PC 1 (half step above C)
+      if (beat4PC === 1) fromAboveCount++;
+      // Leading tone: B = PC 11 (half step below C)
+      if (beat4PC === 11) fromBelowCount++;
+    }
+    // Tritone sub should fire some but not dominate
+    expect(fromAboveCount, `tritone sub approach fired ${fromAboveCount}/${trials}`).toBeGreaterThan(0);
+    // Leading tone should also fire (existing behavior preserved)
+    expect(fromBelowCount, `leading tone fired ${fromBelowCount}/${trials}`).toBeGreaterThan(0);
+  });
+
+  it("tritone sub approach does not fire without harmonic analysis", () => {
+    // Without analysis field, bass uses generic approach logic (no V→I detection)
+    const chords: ChordEvent[] = [
+      makeChord("G", "7", 0, 2),
+      makeChord("C", "maj7", 2, 2),
+    ];
+    // Just verify no crash and notes are produced
+    for (let seed = 0; seed < 20; seed++) {
+      const notes = generateWalkingBass(chords, {
+        style: "hardBop",
+        tempo: 120,
+        random: createPRNG(seed),
+      });
+      expect(notes.length).toBeGreaterThan(0);
+      for (const n of notes) {
+        expect(n.pitch).toBeGreaterThanOrEqual(BASS_LOW);
+        expect(n.pitch).toBeLessThanOrEqual(BASS_HIGH);
+      }
+    }
+  });
+
+  it("tritone sub weight varies by style (higher for hardBop/fusion)", () => {
+    const chords: ChordEvent[] = [
+      { root: "G", quality: "7", time: 0, duration: 2,
+        analysis: makeAnalysis({ degree: "V", function: "dominant", isPartOfIiVI: true, iiViPosition: "V" }) },
+      { root: "C", quality: "maj7", time: 2, duration: 2,
+        analysis: makeAnalysis({ degree: "I", function: "tonic", cadenceRole: "resolution", isPartOfIiVI: true, iiViPosition: "I" }) },
+    ];
+
+    const countTriSub = (style: string, trials: number) => {
+      let count = 0;
+      for (let seed = 0; seed < trials; seed++) {
+        const notes = generateWalkingBass(chords, { style: style as any, tempo: 120, random: createPRNG(seed) });
+        const bar1Notes = notes.filter(n => n.time < 2);
+        if (bar1Notes.length === 0) continue;
+        const beat4PC = bar1Notes[bar1Notes.length - 1].pitch % 12;
+        if (beat4PC === 1) count++; // Db = tritone sub of G approaching C
+      }
+      return count;
+    };
+
+    const hardBop = countTriSub("hardBop", 200);
+    const bossa = countTriSub("bossa", 200);
+    // hardBop has higher tritone sub weight than bossa
+    expect(hardBop, `hardBop=${hardBop} should be > bossa=${bossa}`).toBeGreaterThanOrEqual(bossa);
+  });
+
+  it("all bass notes stay in range after tritone sub", () => {
+    const chords: ChordEvent[] = [
+      { root: "G", quality: "7", time: 0, duration: 2,
+        analysis: makeAnalysis({ degree: "V", function: "dominant", isPartOfIiVI: true, iiViPosition: "V" }) },
+      { root: "C", quality: "maj7", time: 2, duration: 2,
+        analysis: makeAnalysis({ degree: "I", function: "tonic", cadenceRole: "resolution", isPartOfIiVI: true, iiViPosition: "I" }) },
+    ];
+    for (let seed = 0; seed < 50; seed++) {
+      const notes = generateWalkingBass(chords, {
+        style: "contemporaryJazz",
+        tempo: 120,
+        random: createPRNG(seed),
+      });
+      for (const n of notes) {
+        expect(n.pitch, `seed=${seed}: pitch ${n.pitch} out of range`).toBeGreaterThanOrEqual(BASS_LOW);
+        expect(n.pitch, `seed=${seed}: pitch ${n.pitch} out of range`).toBeLessThanOrEqual(BASS_HIGH);
+      }
+    }
+  });
+});

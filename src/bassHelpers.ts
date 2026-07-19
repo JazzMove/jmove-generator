@@ -389,3 +389,25 @@ export function closestOctave(root: number, ref: number): number {
 
 /** Re-export enclosureProb for swing measure. */
 export { enclosureProbFn as enclosureProb };
+
+/** Tritone sub bass approach probability per style.
+ *  Chromatic descent from bII root (e.g. Db→C on V→I). */
+const TRITONE_SUB_BASS_WEIGHT: Record<string, number> = {
+  hardBop: 0.20,
+  contemporaryJazz: 0.25,
+  fusion: 0.18,
+  metheny: 0.15,
+  alfaMist: 0.15,
+  swing: 0.12,
+  holdsworth: 0.12,
+  neoSoul: 0.10,
+  ecm: 0.10,
+  coolJazz: 0.08,
+  modal: 0.08,
+  bossa: 0.05,
+  latin: 0.05,
+  ballad: 0.08,
+};
+export function tritoneSubBassWeight(style?: string): number {
+  return TRITONE_SUB_BASS_WEIGHT[style ?? "swing"] ?? 0;
+}

@@ -8,7 +8,7 @@ import {
   rootToMidi, getChordTones, getScaleTones,
   approachTone, passingTone, clamp, pick, filterDissonant,
   scaleDegreeToMidi, nudgeTowardTarget, closestOctave, recordAndReturn,
-  getBassLow, getBassHigh,
+  getBassLow, getBassHigh, tritoneSubBassWeight,
 } from "./bassHelpers";
 
 export function generateSwingMeasure(
@@ -117,15 +117,23 @@ export function generateSwingMeasure(
     // Jazz idiom: chord's 3rd as approach when half-step below next root
     const third = chordTones.length > 1 ? chordTones[1] : null;
     // Harmonic-aware approach selection:
-    //   V→I: leading tone (half-step below I root) - strongest resolution
+    //   V→I: leading tone (half-step below) or tritone sub (half-step above)
     //   ii→V: 5th of V from below or b7 of ii as common tone - sets up dominant
     const isVtoI = analysis?.function === "dominant"
       && nextChord?.analysis?.cadenceRole === "resolution";
     const isIiToV = analysis?.isPartOfIiVI && analysis?.iiViPosition === "ii"
       && nextChord?.analysis?.iiViPosition === "V";
-    if (isVtoI && _rng() < 0.45) {
-      // Leading tone = one semitone below target
+    // Tritone sub approach: chromatic descent (Db→C) - style-gated probability
+    const triSubWeight = isVtoI ? (tritoneSubBassWeight(style) ?? 0) : 0;
+    // Single roll partitions V→I probability: leading tone | tritone sub | pass
+    const vRoll = isVtoI ? _rng() : 1;
+    if (isVtoI && vRoll < 0.45) {
+      // Leading tone = one semitone below target (B→C)
       beat4 = clamp(target - 1);
+      recordAndReturn(beat4, target);
+    } else if (isVtoI && triSubWeight > 0 && vRoll < 0.45 + triSubWeight) {
+      // Tritone sub approach = one semitone above target (Db→C)
+      beat4 = clamp(target + 1);
       recordAndReturn(beat4, target);
     } else if (isIiToV && _rng() < 0.35) {
       // ii→V: approach from a half-step below V root (ascending chromatic)

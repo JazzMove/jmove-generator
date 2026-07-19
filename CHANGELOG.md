@@ -4,6 +4,29 @@ All notable changes to `@jmove/generator` will be documented in this file.
 
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [1.5.0] - 2026-07-19
+
+### Added
+
+- **Upper structure triads (UST)** - major triads superimposed over dominant 7th chords for modern jazz color. Builds b7 + triad voicings with ascending close-position inversions, span/semitone guards, and octave-aware voice leading. Falls back to standard voicing when no clean inversion fits
+  - Scale-safe entries: bVII maj (7), II maj (7#11/b5), bV maj (7alt/7b9), bIII maj (7#9)
+  - Style-gated activation: 25% hardBop/fusion, 20% swing/metheny, 15% modal/holdsworth, 10% ecm/alfaMist. Excluded from ballad/coolJazz/funk/shuffleBlues
+- **Tritone substitution (piano)** - on resolving dominants (V-I), style-gated chance to build voicing from bII root instead of original dominant root. Creates chromatic voice leading and altered color without changing the chord symbol
+  - Weight: 22% contemporaryJazz, 18% hardBop, 15% fusion, 12% metheny/alfaMist, 10% swing/holdsworth, 4-8% lighter styles. 0% funk/shuffleBlues
+- **Tritone substitution (bass)** - chromatic descent approach on V-I resolution (e.g. Db-C instead of B-C). Single-roll probability partition with leading tone (45%) and tritone sub (style-gated)
+  - Weight: 25% contemporaryJazz, 20% hardBop, 18% fusion, 15% metheny/alfaMist, 12% swing/holdsworth, 5-10% lighter styles
+- 32 new tests: UST builder (range, clusters, span, PCs, determinism, b5 routing), UST integration (dominant gating, style exclusions, statistical activation), tritone sub piano (theory validation, all styles, range, V-I pairs), tritone sub bass (statistical, style weighting, range), augmented chord cluster regression (open, quartal, open5ths, maj7 interval verification)
+
+### Fixed
+
+- **Augmented chord semitone clusters** - `maj7#5` chords were misrouted through `7#5` path in `buildOpenVoicing`, using b7(10) instead of maj7(11). Added dedicated `maj7#5` quality branch with correct intervals [4, 8, 11]
+- **Post-clamping cluster guard** - individual note clamping in `buildOpenVoicing`, `buildQuartalVoicing`, and `buildOpen5thsVoicing` could introduce adjacent semitones when folding notes into playable range. New `removeSemitoneClusters()` bumps conflicting notes up an octave or drops them
+
+### Changed
+
+- **Voicing quality routing** - `7b5` now routes to Lydian dominant (II maj UST) instead of generic bVII, matching enharmonic equivalence with `7#11`
+- **Bass approach probability** - V-I branch uses single-roll partition (was nested independent rolls causing probability distortion)
+
 ## [1.4.0] - 2026-07-18
 
 ### Changed
