@@ -587,15 +587,15 @@ describe("Piano Comping — ≥3 distinct pitch classes per voicing", () => {
   });
 });
 
-describe("Piano Comping — range within G3-C6 (MIDI 55-84)", () => {
+describe("Piano Comping — range within C3-G5 (MIDI 48-79)", () => {
   it("across all 20 standards", () => {
     for (const std of ALL_STANDARDS) {
       const chords = std.chords() as CompChordEvent[];
       const notes = generatePianoComping(chords, { style: "swing", humanize: false, strum: false });
       for (const note of notes) {
         for (const p of note.pitches) {
-          expect(p, `${std.name}: below range ${p}`).toBeGreaterThanOrEqual(55);
-          expect(p, `${std.name}: above range ${p}`).toBeLessThanOrEqual(84);
+          expect(p, `${std.name}: below range ${p}`).toBeGreaterThanOrEqual(48);
+          expect(p, `${std.name}: above range ${p}`).toBeLessThanOrEqual(79);
         }
       }
     }
@@ -671,13 +671,13 @@ describe("Combined — bass + piano harmonic agreement", () => {
     expect(rate, `Tritone rate: ${(rate * 100).toFixed(1)}% (${tritoneCount}/${totalMinorBeats})`).toBeLessThan(0.03);
   });
 
-  it("bass and piano register separation (piano lowest > MIDI 55 always)", () => {
+  it("bass and piano register separation (piano lowest > MIDI 48 always)", () => {
     for (const std of ALL_STANDARDS) {
       const chords = std.chords() as CompChordEvent[];
       const pianoNotes = generatePianoComping(chords, { style: "swing", humanize: false, strum: false });
       for (const pn of pianoNotes) {
         const lowest = Math.min(...pn.pitches);
-        expect(lowest, `${std.name}: piano too low ${lowest}`).toBeGreaterThanOrEqual(55);
+        expect(lowest, `${std.name}: piano too low ${lowest}`).toBeGreaterThanOrEqual(48);
       }
     }
   });
@@ -977,7 +977,7 @@ describe("ii-V-I voicing awareness", () => {
       for (const n of notes) {
         for (const p of n.pitches) {
           expect(p).toBeGreaterThanOrEqual(48);
-          expect(p).toBeLessThanOrEqual(84);
+          expect(p).toBeLessThanOrEqual(79);
         }
       }
     }

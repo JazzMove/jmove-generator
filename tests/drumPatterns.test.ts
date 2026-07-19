@@ -1896,6 +1896,15 @@ describe("Drum Patterns — v1.2.5 tom integration", () => {
     }
     expect(totalToms).toBeGreaterThan(0);
   });
+
+  it("alfaMist produces ride cymbal hits via rotation (statistical)", () => {
+    let rideFound = false;
+    for (let i = 0; i < 50; i++) {
+      const hits = generateDrumPattern({ style: "alfaMist", tempo: 110, measures: 16, humanize: false });
+      if (hits.some(h => h.pitch === 51 || h.pitch === 53)) { rideFound = true; break; }
+    }
+    expect(rideFound, "alfaMist should produce ride cymbal hits in 50 trials of 16 measures").toBe(true);
+  });
 });
 
 // ── Granular Controls ──

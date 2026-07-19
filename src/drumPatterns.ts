@@ -32,7 +32,8 @@ import {
   HOLDSWORTH_11_8_HIHATS, HOLDSWORTH_11_8_KICK_SNARE, HOLDSWORTH_11_8_FILLS,
   HOLDSWORTH_11_8_STOCHASTIC,
   // Alfa Mist
-  ALFA_MIST_HIHAT, ALFA_MIST_HIHAT_BROKEN, ALFA_MIST_KICK_SNARE, ALFA_MIST_FILLS,
+  ALFA_MIST_KICK_SNARE, ALFA_MIST_FILLS,
+  ALFA_MIST_RIDES, ALFA_MIST_HIHATS,
   // Metheny
   METHENY_RIDES, METHENY_HIHATS, METHENY_KICK_SNARE,
   // Neo-Soul
@@ -174,9 +175,19 @@ function getFusionPatternSet(rng: () => number = Math.random): StylePatternSet {
 }
 
 function getAlfaMistPatternSet(rng: () => number = Math.random): StylePatternSet {
-  // 50/50 between full 16th shimmer and broken-gap hi-hat
-  const hihat = rng() < 0.50 ? ALFA_MIST_HIHAT : ALFA_MIST_HIHAT_BROKEN;
-  return { base: [...hihat], variations: ALFA_MIST_KICK_SNARE };
+  // Initial hi-hat: 50/50 between full 16th shimmer and broken-gap
+  const hhIdx = Math.floor(rng() * ALFA_MIST_HIHATS.length);
+  // ~30% chance to start on ride (textural, not timekeeping) - mostly hi-hat driven
+  const useRide = rng() < 0.3;
+  const base = useRide
+    ? [...ALFA_MIST_RIDES[Math.floor(rng() * ALFA_MIST_RIDES.length)], ...ALFA_MIST_HIHATS[hhIdx]]
+    : [...ALFA_MIST_HIHATS[hhIdx]];
+  return {
+    base,
+    variations: ALFA_MIST_KICK_SNARE,
+    rideVariants: ALFA_MIST_RIDES,
+    hihatVariants: ALFA_MIST_HIHATS,
+  };
 }
 
 function getMethenyPatternSet(rng: () => number = Math.random): StylePatternSet {

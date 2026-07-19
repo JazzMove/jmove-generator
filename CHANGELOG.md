@@ -4,6 +4,18 @@ All notable changes to `@jmove/generator` will be documented in this file.
 
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [1.5.1] - 2026-07-19
+
+### Added
+
+- **3-way preset blending** - `blendPresets3(a, b, c, weights)` weighted average of three presets using barycentric coordinates. Dominant style = highest weight. Auto-normalizes weights, clamps negatives. 16 new tests
+- **Alfa Mist ride cymbal patterns** - sparse bell accents and broken ride patterns for textural variety. Rotates between hi-hat and ride via `rideVariants`/`hihatVariants` every 4-8 bars, controlled by `rideWash` granular parameter
+
+### Fixed
+
+- **Piano register too high** - default range lowered from G3-C6 (55-84) to C3-G5 (48-79), octave preference reordered to [3,4,2,5]. Voicing builders default to lower register for warmer, more authentic jazz comping
+- **Fusion drums missing ride** - `FUSION_TIMEKEEPING` rebalanced from 75% hi-hat / 25% ride to 50/50. Added ride-based linear pattern (`FUSION_LINEAR_B`)
+
 ## [1.5.0] - 2026-07-19
 
 ### Added
@@ -15,7 +27,8 @@ This project follows [Semantic Versioning](https://semver.org/).
   - Weight: 22% contemporaryJazz, 18% hardBop, 15% fusion, 12% metheny/alfaMist, 10% swing/holdsworth, 4-8% lighter styles. 0% funk/shuffleBlues
 - **Tritone substitution (bass)** - chromatic descent approach on V-I resolution (e.g. Db-C instead of B-C). Single-roll probability partition with leading tone (45%) and tritone sub (style-gated)
   - Weight: 25% contemporaryJazz, 20% hardBop, 18% fusion, 15% metheny/alfaMist, 12% swing/holdsworth, 5-10% lighter styles
-- 32 new tests: UST builder (range, clusters, span, PCs, determinism, b5 routing), UST integration (dominant gating, style exclusions, statistical activation), tritone sub piano (theory validation, all styles, range, V-I pairs), tritone sub bass (statistical, style weighting, range), augmented chord cluster regression (open, quartal, open5ths, maj7 interval verification)
+- **Preset blending** - `blendPresets(a, b, ratio)` interpolates all numeric parameters between two presets. Style dispatch uses dominant preset (ratio <= 0.5 picks A, > 0.5 picks B). `blendGrooveTemplates()` utility interpolates micro-timing bias/jitter between two styles
+- 74 new tests: UST builder (range, clusters, span, PCs, determinism, b5 routing), UST integration (dominant gating, style exclusions, statistical activation), tritone sub piano (theory validation, all styles, range, V-I pairs), tritone sub bass (statistical, style weighting, range), augmented chord cluster regression (open, quartal, open5ths, maj7 interval verification), preset blending 42 tests (pure endpoints, self-blend, midpoint, integer output, monotonicity, symmetry, style crossover, clamping, tempoRange ordering, instrumentStyles merge/conflict/one-sided/hybrid, drum/piano/bass granular interpolation/one-sided/clamping, metadata format, pairwise sanity across all 27 presets, ensemble integration, groove template blending with symmetry/fallback/all-elements)
 
 ### Fixed
 

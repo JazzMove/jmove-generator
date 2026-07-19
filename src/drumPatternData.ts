@@ -431,8 +431,21 @@ export const FUSION_RIDE_BELL: Pattern = [
   { drum: GM_DRUMS.RIDE, beat: 3.5, velocity: 55 },
 ];
 
+// Ride bell - syncopated quarter-note pattern (Weckl/Colaiuta accent feel)
+export const FUSION_RIDE_BELL_B: Pattern = [
+  { drum: GM_DRUMS.RIDE_BELL, beat: 0, velocity: 85 },
+  { drum: GM_DRUMS.RIDE, beat: 0.75, velocity: 50 },
+  { drum: GM_DRUMS.RIDE_BELL, beat: 1, velocity: 78 },
+  { drum: GM_DRUMS.RIDE, beat: 1.5, velocity: 55 },
+  { drum: GM_DRUMS.RIDE_BELL, beat: 2, velocity: 85 },
+  { drum: GM_DRUMS.RIDE, beat: 2.75, velocity: 50 },
+  { drum: GM_DRUMS.RIDE_BELL, beat: 3, velocity: 78 },
+  { drum: GM_DRUMS.RIDE, beat: 3.5, velocity: 55 },
+];
+
 // In fusion, hihat and ride bell are alternative timekeeping — rideVariants holds all options
-export const FUSION_TIMEKEEPING = [FUSION_HIHAT_A, FUSION_HIHAT_B, FUSION_HIHAT_C, FUSION_RIDE_BELL];
+// Balanced 50/50 hi-hat vs ride for realistic fusion drumming
+export const FUSION_TIMEKEEPING = [FUSION_HIHAT_A, FUSION_RIDE_BELL, FUSION_HIHAT_B, FUSION_RIDE_BELL_B];
 
 // Linear drumming (Weckl/Gadd): no two limbs simultaneously
 // These patterns encode the full kit — base should be empty
@@ -456,23 +469,23 @@ export const FUSION_LINEAR_A: Pattern = [
 ];
 
 export const FUSION_LINEAR_B: Pattern = [
-  // Kick-driven linear: more kick, less snare
+  // Ride-based linear (Weckl ride hand): ride replaces hi-hat for timbral variety
   { drum: GM_DRUMS.KICK, beat: 0, velocity: 100 },
-  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 0.25, velocity: 55 },
-  { drum: GM_DRUMS.KICK, beat: 0.5, velocity: 75 },
-  { drum: GM_DRUMS.HI_HAT_OPEN, beat: 0.75, velocity: 65 },
-  { drum: GM_DRUMS.SNARE, beat: 1, velocity: 90 },
-  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 1.25, velocity: 55 },
-  { drum: GM_DRUMS.KICK, beat: 1.5, velocity: 80 },
-  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 1.75, velocity: 55 },
+  { drum: GM_DRUMS.RIDE, beat: 0.25, velocity: 55 },
+  { drum: GM_DRUMS.SNARE, beat: 0.5, velocity: 85 },
+  { drum: GM_DRUMS.RIDE, beat: 0.75, velocity: 50 },
+  { drum: GM_DRUMS.KICK, beat: 1, velocity: 90 },
+  { drum: GM_DRUMS.RIDE_BELL, beat: 1.25, velocity: 60 },
+  { drum: GM_DRUMS.SNARE, beat: 1.5, velocity: 85 },
+  { drum: GM_DRUMS.RIDE, beat: 1.75, velocity: 50 },
   { drum: GM_DRUMS.KICK, beat: 2, velocity: 95 },
-  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 2.25, velocity: 55 },
-  { drum: GM_DRUMS.KICK, beat: 2.5, velocity: 75 },
-  { drum: GM_DRUMS.HI_HAT_OPEN, beat: 2.75, velocity: 65 },
-  { drum: GM_DRUMS.SNARE, beat: 3, velocity: 90 },
-  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 3.25, velocity: 55 },
-  { drum: GM_DRUMS.KICK, beat: 3.5, velocity: 80 },
-  { drum: GM_DRUMS.HI_HAT_CLOSED, beat: 3.75, velocity: 55 },
+  { drum: GM_DRUMS.RIDE, beat: 2.25, velocity: 55 },
+  { drum: GM_DRUMS.SNARE, beat: 2.5, velocity: 85 },
+  { drum: GM_DRUMS.RIDE, beat: 2.75, velocity: 50 },
+  { drum: GM_DRUMS.KICK, beat: 3, velocity: 90 },
+  { drum: GM_DRUMS.RIDE_BELL, beat: 3.25, velocity: 60 },
+  { drum: GM_DRUMS.SNARE, beat: 3.5, velocity: 85 },
+  { drum: GM_DRUMS.RIDE, beat: 3.75, velocity: 50 },
 ];
 
 // Fusion-specific fills (linear fills, not jazz fills)
@@ -986,6 +999,32 @@ export const ALFA_MIST_KICK_SNARE: Pattern[] = [
     { drum: GM_DRUMS.SNARE, beat: 3.67, velocity: 35, ghost: true },  // triplet ghost cascade
   ],
 ];
+
+// Alfa Mist ride A: sparse bell accents - textural, not timekeeping.
+// Jas Kayser uses ride bell for color between hi-hat textures, not as primary driver.
+// Quarter-note bell hits at low velocity with gaps - leaves space for Rhodes delay tails.
+export const ALFA_MIST_RIDE_A: Pattern = [
+  { drum: GM_DRUMS.RIDE_BELL, beat: 0, velocity: 58 },
+  { drum: GM_DRUMS.RIDE, beat: 1, velocity: 42 },
+  { drum: GM_DRUMS.RIDE_BELL, beat: 2, velocity: 55 },
+  { drum: GM_DRUMS.RIDE, beat: 3, velocity: 40 },
+];
+
+// Alfa Mist ride B: broken ride - asymmetric hits, bell on "and" beats.
+// Mirrors the broken-beat displacement of the kick/snare patterns.
+export const ALFA_MIST_RIDE_B: Pattern = [
+  { drum: GM_DRUMS.RIDE, beat: 0, velocity: 50 },
+  { drum: GM_DRUMS.RIDE_BELL, beat: 0.75, velocity: 62 },
+  { drum: GM_DRUMS.RIDE, beat: 1.5, velocity: 45 },
+  { drum: GM_DRUMS.RIDE_BELL, beat: 2.5, velocity: 58 },
+  { drum: GM_DRUMS.RIDE, beat: 3, velocity: 48 },
+];
+
+// Alfa Mist ride variants array: sparse first for rideWash bias (low wash -> sparse)
+export const ALFA_MIST_RIDES: Pattern[] = [ALFA_MIST_RIDE_A, ALFA_MIST_RIDE_B];
+
+// Alfa Mist hihat variants for rotation (existing patterns as array)
+export const ALFA_MIST_HIHATS: Pattern[] = [ALFA_MIST_HIHAT, ALFA_MIST_HIHAT_BROKEN];
 
 // ── PAT METHENY (Antonio Sanchez / Bob Moses) ──
 // Sanchez: melodic bell work, precise kicks, accent snares, dynamic fills, wide velocity.

@@ -145,8 +145,8 @@ describe("Practice Integration — generators work together", () => {
     const piano = generatePianoComping(chordEvents, { style: "swing", tempo, humanize: false });
     for (const n of piano) {
       for (const p of n.pitches) {
-        expect(p).toBeGreaterThanOrEqual(55);
-        expect(p).toBeLessThanOrEqual(84);
+        expect(p).toBeGreaterThanOrEqual(48);
+        expect(p).toBeLessThanOrEqual(79);
       }
     }
   });

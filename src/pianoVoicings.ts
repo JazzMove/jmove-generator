@@ -6,8 +6,8 @@ import { isDominant as isDominantQuality, classifyQuality } from "./chordQuality
 // ── Voicing State ──
 // Set by pianoComping.ts before each generation call.
 // ES module live bindings allow importers to read current values.
-let _voicingLow = 55;   // replaces getPianoLow()
-let _voicingHigh = 84;  // replaces getPianoHigh()
+let _voicingLow = 48;   // replaces getPianoLow()
+let _voicingHigh = 79;  // replaces getPianoHigh()
 let _voicingRng: () => number = Math.random;  // replaces _rng
 
 interface SavedVoicingState {
@@ -56,9 +56,9 @@ export function buildVoicing(root: string, template: VoicingTemplate): number[] 
   const maxInterval = Math.max(...template.intervals);
 
   // Find the octave where entire voicing fits within PIANO range.
-  // Prefer k=4 (octave 4, middle register) then try k=3, k=5, k=2.
+  // Prefer k=3 (jazz comping register) then try k=4, k=2, k=5.
   let base = -1;
-  for (const k of [4, 3, 5, 2]) {
+  for (const k of [3, 4, 2, 5]) {
     const candidate = 12 * k + rootPC;
     if (candidate + minInterval >= _voicingLow && candidate + maxInterval <= _voicingHigh) {
       base = candidate;
@@ -333,8 +333,8 @@ export function buildOpenVoicing(root: string, quality: string): number[] {
       return pitches;
     }
   }
-  // Fallback: octave 4 — clamping can create clusters, guard against them
-  const base = 60 + rootPC;
+  // Fallback: octave 3 — clamping can create clusters, guard against them
+  const base = 48 + rootPC;
   const clamped = intervals.map(i => {
     let p = base + i;
     while (p > _voicingHigh) p -= 12;
@@ -392,7 +392,7 @@ export function buildQuartalVoicing(root: string, quality?: string): number[] {
     intervals = [4, 9, 14, 19];
   }
 
-  const base = 60 + rootPC; // C4 — keeps quartal voicings in mid register
+  const base = 48 + rootPC; // C3 — keeps quartal voicings in jazz comping register
   const pitches = intervals.map(i => base + i);
   // Fold into playable range, then dedup (octave-apart intervals can collide after clamping)
   const clamped = pitches.map((p) => {
@@ -408,7 +408,7 @@ export function buildQuartalVoicing(root: string, quality?: string): number[] {
 export function buildOpen5thsVoicing(root: string, quality: string): number[] {
   const r = rootMidi(root);
   const q = quality.replace(/\/.*$/, "");
-  const base = 60 + r; // C4 — avoids muddy low voicings
+  const base = 48 + r; // C3 — open 5ths span 2 octaves upward into comping register
 
   // Determine 3rd quality — m(maj7) is minor despite containing "maj"
   const isMinor = (q.includes("m") && !q.includes("maj")) || q.includes("m(maj7)");

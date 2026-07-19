@@ -1,10 +1,10 @@
 /** Piano voicing and rhythm data - pure constants, no logic. Extracted from pianoComping.ts for G29. */
 
 // ── Register Constants ──
-// Base range: G3 (55) to C6 (84). pianoRegister (0-100) shifts center ±7 semitones.
-// 0 = low (C3-F5), 50 = default (G3-C6), 100 = high (D4-G6).
-export const PIANO_LOW_DEFAULT = 55;
-export const PIANO_HIGH_DEFAULT = 84;
+// Base range: C3 (48) to G5 (79). pianoRegister (0-100) shifts center ±7 semitones.
+// 0 = low (F2-C5), 50 = default (C3-G5), 100 = high (G3-D6).
+export const PIANO_LOW_DEFAULT = 48;
+export const PIANO_HIGH_DEFAULT = 79;
 
 export const ROOT_SEMITONES: Record<string, number> = {
   C: 0, "C#": 1, Db: 1, D: 2, "D#": 3, Eb: 3,

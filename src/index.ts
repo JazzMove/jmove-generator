@@ -125,6 +125,9 @@ export { autoDetectPreset } from "./autoDetectPreset";
 // ── Groove Templates ──
 export { getGrooveTemplate, applyGroove, drumPitchToElement, evolveElement, rubatoOffset } from "./grooveTemplates";
 
+// ── Preset Blending ──
+export { blendPresets, blendPresets3, blendGrooveTemplates } from "./presetBlending";
+
 // ── Swing Utilities ──
 export { tempoSwingMultiplier, instrumentSwingFactor, dynamicMultiplier, compressDynamicLevel } from "./swingUtils";
 

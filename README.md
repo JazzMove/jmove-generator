@@ -47,7 +47,8 @@ Deep technical articles about how JMove and the generator work:
 **Quality**
 - **Seedable and Reproducible** - deterministic PRNG (xoshiro128**) with per-instrument streams. Save a seed, replay the exact same take
 - **Groove Templates** - structured micro-timing offsets per instrument, not random jitter
-- **23 Style Presets** - Classic Swing to IDM, with per-instrument style overrides and tuned musicality parameters
+- **27 Style Presets** - Classic Swing to IDM, with per-instrument style overrides and tuned musicality parameters
+- **Preset Blending** - `blendPresets(a, b, ratio)` and `blendPresets3(a, b, c, weights)` interpolate numeric parameters between 2 or 3 presets for continuous style morphing
 
 ---
 
@@ -344,7 +345,7 @@ interface BassGranular {
 
 #### `STYLE_PRESETS: StylePreset[]`
 
-23 built-in presets across 6 categories:
+27 built-in presets across 6 categories:
 
 | Category | Presets |
 |----------|---------|
@@ -378,6 +379,35 @@ interface StylePreset {
 #### `autoDetectPreset(score): StylePreset`
 
 Analyze a score and return the best-matching preset based on tempo, time signature, chord content, and style hints.
+
+#### `blendPresets(a, b, ratio): StylePreset`
+
+Interpolate between two presets. All numeric parameters are linearly blended. Style dispatch uses the dominant preset (ratio <= 0.5 picks A, > 0.5 picks B).
+
+```typescript
+import { blendPresets, STYLE_PRESETS } from '@jmove/generator';
+
+const hardBop = STYLE_PRESETS.find(p => p.id === 'hard-bop')!;
+const ecm = STYLE_PRESETS.find(p => p.id === 'ecm')!;
+const blend = blendPresets(hardBop, ecm, 0.3); // 70% hard bop, 30% ECM
+```
+
+#### `blendPresets3(a, b, c, weights): StylePreset`
+
+3-way blend using barycentric weights. Weights auto-normalize to sum=1. Dominant style = highest weight.
+
+```typescript
+import { blendPresets3, STYLE_PRESETS } from '@jmove/generator';
+
+const hardBop = STYLE_PRESETS.find(p => p.id === 'hard-bop')!;
+const ecm = STYLE_PRESETS.find(p => p.id === 'ecm')!;
+const funk = STYLE_PRESETS.find(p => p.id === 'funk')!;
+const blend = blendPresets3(hardBop, ecm, funk, [0.5, 0.3, 0.2]);
+```
+
+#### `blendGrooveTemplates(styleA, styleB, ratio): GrooveTemplate`
+
+Interpolate micro-timing bias/jitter between two styles for continuous groove morphing.
 
 ### Groove and Swing
 
